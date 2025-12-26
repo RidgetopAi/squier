@@ -11,6 +11,7 @@
 import { pool } from '../db/pool.js';
 import { generateEmbedding } from '../providers/embeddings.js';
 import { EntityType } from './entities.js';
+import { getNonEmptySummaries, type LivingSummary } from './summaries.js';
 
 // === TYPES ===
 
@@ -65,12 +66,20 @@ export interface EntitySummary {
   mention_count: number;
 }
 
+export interface SummarySnapshot {
+  category: string;
+  content: string;
+  version: number;
+  memory_count: number;
+}
+
 export interface ContextPackage {
   generated_at: string;
   profile: string;
   query?: string;
   memories: ScoredMemory[];
   entities: EntitySummary[];
+  summaries: SummarySnapshot[];
   token_count: number;
   disclosure_id: string;
   markdown: string;
@@ -293,6 +302,7 @@ async function getEntitiesForMemories(memoryIds: string[]): Promise<EntitySummar
 function formatMarkdown(
   memories: ScoredMemory[],
   entities: EntitySummary[],
+  summaries: SummarySnapshot[],
   profile: ContextProfile,
   query?: string
 ): string {
@@ -306,6 +316,17 @@ function formatMarkdown(
     lines.push(`**Query**: "${query}"`);
   }
   lines.push('');
+
+  // Living Summaries section (first, as overview)
+  if (summaries.length > 0) {
+    lines.push('## Living Summaries');
+    lines.push('');
+    for (const s of summaries) {
+      lines.push(`### ${s.category.charAt(0).toUpperCase() + s.category.slice(1)}`);
+      lines.push(s.content);
+      lines.push('');
+    }
+  }
 
   if (memories.length === 0) {
     lines.push('No memories match the current criteria.');
@@ -386,6 +407,7 @@ function formatMarkdown(
 function formatJson(
   memories: ScoredMemory[],
   entities: EntitySummary[],
+  summaries: SummarySnapshot[],
   profile: ContextProfile,
   query?: string
 ): object {
@@ -394,6 +416,12 @@ function formatJson(
     generated_at: new Date().toISOString(),
     query,
     scoring_weights: profile.scoring_weights,
+    summaries: summaries.map((s) => ({
+      category: s.category,
+      content: s.content,
+      version: s.version,
+      memory_count: s.memory_count,
+    })),
     entities: entities.map((e) => ({
       id: e.id,
       name: e.name,
@@ -544,6 +572,15 @@ export async function generateContext(
   const memoryIds = budgetedMemories.map((m) => m.id);
   const entities = await getEntitiesForMemories(memoryIds);
 
+  // Get living summaries (non-empty ones)
+  const livingSummaries = await getNonEmptySummaries();
+  const summaries: SummarySnapshot[] = livingSummaries.map((s: LivingSummary) => ({
+    category: s.category,
+    content: s.content,
+    version: s.version,
+    memory_count: s.memory_count,
+  }));
+
   // Log disclosure
   const disclosureId = await logDisclosure(
     profile.name,
@@ -556,8 +593,8 @@ export async function generateContext(
   );
 
   // Format output
-  const markdown = formatMarkdown(budgetedMemories, entities, profile, query);
-  const json = formatJson(budgetedMemories, entities, profile, query);
+  const markdown = formatMarkdown(budgetedMemories, entities, summaries, profile, query);
+  const json = formatJson(budgetedMemories, entities, summaries, profile, query);
 
   return {
     generated_at: new Date().toISOString(),
@@ -565,6 +602,7 @@ export async function generateContext(
     query,
     memories: budgetedMemories,
     entities,
+    summaries,
     token_count: totalTokens,
     disclosure_id: disclosureId,
     markdown,

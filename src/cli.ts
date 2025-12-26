@@ -13,7 +13,19 @@ import {
 import { consolidateAll, getConsolidationStats } from './services/consolidation.js';
 import { getRelatedMemories, getEdgeStats } from './services/edges.js';
 import { parseImportFile, importMemories, getImportStats } from './services/import.js';
-import { checkConnection, closePool } from './db/pool.js';
+import {
+  getAllSummaries,
+  getSummary,
+  generateSummary,
+  updateAllSummaries,
+  getSummaryStats,
+  isValidCategory,
+  SUMMARY_CATEGORIES,
+  classifyMemoryCategories,
+  linkMemoryToCategories,
+  type SummaryCategory,
+} from './services/summaries.js';
+import { pool, checkConnection, closePool } from './db/pool.js';
 import { checkEmbeddingHealth } from './providers/embeddings.js';
 import { checkLLMHealth, getLLMInfo } from './providers/llm.js';
 import { config } from './config/index.js';
@@ -50,6 +62,14 @@ program
       if (entities.length > 0) {
         const entityList = entities.map((e) => `${e.name} (${e.entity_type})`).join(', ');
         console.log(`  Entities: ${entityList}`);
+      }
+
+      // Classify memory into summary categories
+      const classifications = await classifyMemoryCategories(content);
+      if (classifications.length > 0) {
+        await linkMemoryToCategories(memory.id, classifications);
+        const categories = classifications.map((c) => c.category).join(', ');
+        console.log(`  Categories: ${categories}`);
       }
     } catch (error) {
       console.error('Failed to store memory:', error);
@@ -338,16 +358,18 @@ program
       console.log(`    Configured: ${llmInfo.configured ? 'Yes' : 'No (set GROQ_API_KEY)'}`);
 
       if (dbConnected) {
-        const [total, entityCounts, consolidationStats, edgeStats] = await Promise.all([
+        const [total, entityCounts, consolidationStats, edgeStats, summaryStats] = await Promise.all([
           countMemories(),
           countEntitiesByType(),
           getConsolidationStats(),
           getEdgeStats(),
+          getSummaryStats(),
         ]);
         const entityTotal = Object.values(entityCounts).reduce((a, b) => a + b, 0);
         console.log(`  Memories: ${total} (${consolidationStats.activeMemories} active, ${consolidationStats.dormantMemories} dormant)`);
         console.log(`  Entities: ${entityTotal}`);
         console.log(`  Edges: ${edgeStats.total} SIMILAR connections`);
+        console.log(`  Summaries: ${summaryStats.withContent}/${summaryStats.categories} (${summaryStats.pendingMemories} pending)`);
       }
 
       console.log('');
@@ -631,6 +653,234 @@ program
       console.log('');
     } catch (error) {
       console.error('Failed to get import stats:', error);
+      process.exit(1);
+    } finally {
+      await closePool();
+    }
+  });
+
+/**
+ * summary - Show a living summary by category
+ */
+program
+  .command('summary')
+  .description('Show a living summary by category')
+  .argument('<category>', `Category: ${SUMMARY_CATEGORIES.join(', ')}`)
+  .option('-r, --regenerate', 'Regenerate the summary from pending memories')
+  .action(async (category: string, options: { regenerate?: boolean }) => {
+    try {
+      if (!isValidCategory(category)) {
+        console.log(`\nInvalid category: "${category}"`);
+        console.log(`Valid categories: ${SUMMARY_CATEGORIES.join(', ')}`);
+        return;
+      }
+
+      if (options.regenerate) {
+        console.log(`\nRegenerating ${category} summary...`);
+        const result = await generateSummary(category as SummaryCategory);
+
+        if (result.memoriesProcessed === 0) {
+          console.log('No new memories to incorporate.');
+        } else {
+          console.log(`Incorporated ${result.memoriesProcessed} new memories.`);
+        }
+        console.log('');
+      }
+
+      const summary = await getSummary(category as SummaryCategory);
+      if (!summary) {
+        console.log(`\nSummary not found: ${category}`);
+        return;
+      }
+
+      console.log(`\n${category.toUpperCase()}`);
+      console.log(`${'─'.repeat(40)}`);
+
+      if (!summary.content) {
+        console.log('No summary yet. Add memories and run regeneration.');
+        console.log(`\nTry: squire summary ${category} --regenerate`);
+      } else {
+        console.log(summary.content);
+      }
+
+      console.log(`${'─'.repeat(40)}`);
+      console.log(`Version: ${summary.version} | Memories: ${summary.memory_count} | Last updated: ${summary.last_updated_at.toLocaleString()}`);
+      console.log('');
+    } catch (error) {
+      console.error('Failed to get summary:', error);
+      process.exit(1);
+    } finally {
+      await closePool();
+    }
+  });
+
+/**
+ * summaries - List all living summaries
+ */
+program
+  .command('summaries')
+  .description('List all living summaries')
+  .option('-a, --all', 'Show all categories including empty ones')
+  .option('-r, --regenerate', 'Regenerate all summaries with pending memories')
+  .action(async (options: { all?: boolean; regenerate?: boolean }) => {
+    try {
+      if (options.regenerate) {
+        console.log('\nUpdating all summaries with pending memories...\n');
+        const result = await updateAllSummaries();
+
+        if (result.updated.length === 0) {
+          console.log('No summaries needed updating.');
+        } else {
+          console.log(`Updated ${result.updated.length} summaries:`);
+          for (const cat of result.updated) {
+            console.log(`  - ${cat}`);
+          }
+          console.log(`\nTotal memories processed: ${result.memoriesProcessed}`);
+        }
+        console.log('');
+      }
+
+      const summaries = await getAllSummaries();
+      const stats = await getSummaryStats();
+
+      console.log('\nLiving Summaries\n');
+      console.log(`  Categories: ${stats.categories}`);
+      console.log(`  With content: ${stats.withContent}`);
+      console.log(`  Pending memories: ${stats.pendingMemories}`);
+      console.log('');
+
+      for (const summary of summaries) {
+        if (!options.all && !summary.content) continue;
+
+        const preview = summary.content
+          ? (summary.content.length > 80 ? summary.content.substring(0, 80) + '...' : summary.content)
+          : '(empty)';
+        const stale = summary.staleness_score > 0.3 ? ' [stale]' : '';
+
+        console.log(`  ${summary.category}${stale}`);
+        console.log(`    ${preview}`);
+        console.log(`    v${summary.version} | ${summary.memory_count} memories | ${summary.last_updated_at.toLocaleDateString()}`);
+        console.log('');
+      }
+
+      if (stats.pendingMemories > 0) {
+        console.log(`Run 'squire summaries --regenerate' to incorporate ${stats.pendingMemories} pending memories.`);
+        console.log('');
+      }
+    } catch (error) {
+      console.error('Failed to list summaries:', error);
+      process.exit(1);
+    } finally {
+      await closePool();
+    }
+  });
+
+/**
+ * classify - Classify a memory into categories (for debugging/testing)
+ */
+program
+  .command('classify')
+  .description('Classify text into summary categories (for testing)')
+  .argument('<content>', 'Content to classify')
+  .action(async (content: string) => {
+    try {
+      console.log(`\nClassifying: "${content.substring(0, 60)}${content.length > 60 ? '...' : ''}"\n`);
+
+      const classifications = await classifyMemoryCategories(content);
+
+      if (classifications.length === 0) {
+        console.log('No categories detected for this content.');
+      } else {
+        console.log('Categories:');
+        for (const c of classifications) {
+          const relevance = (c.relevance * 100).toFixed(0);
+          console.log(`  ${c.category}: ${relevance}%`);
+          if (c.reason) {
+            console.log(`    ${c.reason}`);
+          }
+        }
+      }
+      console.log('');
+    } catch (error) {
+      console.error('Classification failed:', error);
+      process.exit(1);
+    } finally {
+      await closePool();
+    }
+  });
+
+/**
+ * backfill-summaries - Classify existing memories for summaries
+ */
+program
+  .command('backfill-summaries')
+  .description('Classify existing memories into summary categories')
+  .option('-l, --limit <limit>', 'Maximum number of memories to process', '50')
+  .option('--dry-run', 'Show what would be classified without doing it')
+  .action(async (options: { limit: string; dryRun?: boolean }) => {
+    try {
+      const limit = parseInt(options.limit, 10);
+
+      // Find memories not yet linked to any summary
+      const result = await pool.query<{ id: string; content: string }>(
+        `SELECT m.id, m.content FROM memories m
+         WHERE NOT EXISTS (
+           SELECT 1 FROM memory_summary_links msl WHERE msl.memory_id = m.id
+         )
+         ORDER BY m.created_at DESC
+         LIMIT $1`,
+        [limit]
+      );
+
+      const unclassified = result.rows;
+
+      console.log(`\nFound ${unclassified.length} unclassified memories.\n`);
+
+      if (unclassified.length === 0) {
+        console.log('All memories are already classified.');
+        return;
+      }
+
+      if (options.dryRun) {
+        console.log('DRY RUN - would classify:');
+        for (const mem of unclassified.slice(0, 10)) {
+          const preview = mem.content.length > 60
+            ? mem.content.substring(0, 60) + '...'
+            : mem.content;
+          console.log(`  ${mem.id.substring(0, 8)}: ${preview}`);
+        }
+        if (unclassified.length > 10) {
+          console.log(`  ... and ${unclassified.length - 10} more`);
+        }
+        return;
+      }
+
+      console.log('Classifying memories...\n');
+
+      let classified = 0;
+      let totalCategories = 0;
+
+      for (const mem of unclassified) {
+        const preview = mem.content.length > 40
+          ? mem.content.substring(0, 40) + '...'
+          : mem.content;
+        process.stdout.write(`\r  [${classified + 1}/${unclassified.length}] ${preview.padEnd(45)}`);
+
+        const classifications = await classifyMemoryCategories(mem.content);
+        if (classifications.length > 0) {
+          await linkMemoryToCategories(mem.id, classifications);
+          totalCategories += classifications.length;
+        }
+        classified++;
+      }
+
+      console.log(`\n\nBackfill complete!`);
+      console.log(`  Memories classified: ${classified}`);
+      console.log(`  Category links created: ${totalCategories}`);
+      console.log(`\nRun 'squire summaries --regenerate' to update summaries.`);
+      console.log('');
+    } catch (error) {
+      console.error('Backfill failed:', error);
       process.exit(1);
     } finally {
       await closePool();
