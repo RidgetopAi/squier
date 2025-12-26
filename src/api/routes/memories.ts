@@ -12,26 +12,27 @@ const router = Router();
 
 /**
  * POST /api/memories
- * Store a new memory
+ * Store a new memory with entity extraction
  */
 router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { content, source, content_type, source_metadata, occurred_at } = req.body;
+    const { content, source, content_type, source_metadata, occurred_at, skipEntityExtraction } = req.body;
 
     if (!content || typeof content !== 'string') {
       res.status(400).json({ error: 'content is required and must be a string' });
       return;
     }
 
-    const memory = await createMemory({
+    const result = await createMemory({
       content,
       source,
       content_type,
       source_metadata,
       occurred_at: occurred_at ? new Date(occurred_at) : undefined,
+      skipEntityExtraction: skipEntityExtraction === true,
     });
 
-    res.status(201).json(memory);
+    res.status(201).json(result);
   } catch (error) {
     console.error('Error creating memory:', error);
     res.status(500).json({ error: 'Failed to create memory' });

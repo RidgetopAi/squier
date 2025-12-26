@@ -1,6 +1,7 @@
 import { pool } from '../db/pool.js';
 import { generateEmbedding } from '../providers/embeddings.js';
 import { calculateSalience } from './salience.js';
+import { extractAndStoreEntities, Entity, EntityMention } from './entities.js';
 
 export interface Memory {
   id: string;
@@ -27,6 +28,14 @@ export interface CreateMemoryInput {
   content_type?: string;
   source_metadata?: Record<string, unknown>;
   occurred_at?: Date;
+  /** Skip entity extraction (for bulk imports) */
+  skipEntityExtraction?: boolean;
+}
+
+export interface CreateMemoryResult {
+  memory: Memory;
+  entities: Entity[];
+  mentions: EntityMention[];
 }
 
 export interface ListMemoriesOptions {
@@ -36,15 +45,16 @@ export interface ListMemoriesOptions {
 }
 
 /**
- * Store a new memory with embedding
+ * Store a new memory with embedding and extract entities
  */
-export async function createMemory(input: CreateMemoryInput): Promise<Memory> {
+export async function createMemory(input: CreateMemoryInput): Promise<CreateMemoryResult> {
   const {
     content,
     source = 'cli',
     content_type = 'text',
     source_metadata = {},
     occurred_at,
+    skipEntityExtraction = false,
   } = input;
 
   // First, store the raw observation (immutable input)
@@ -84,7 +94,18 @@ export async function createMemory(input: CreateMemoryInput): Promise<Memory> {
     ]
   );
 
-  return result.rows[0] as Memory;
+  const memory = result.rows[0] as Memory;
+
+  // Extract and store entities (Slice 4)
+  let entities: Entity[] = [];
+  let mentions: EntityMention[] = [];
+  if (!skipEntityExtraction) {
+    const extraction = await extractAndStoreEntities(memory.id, content);
+    entities = extraction.entities;
+    mentions = extraction.mentions;
+  }
+
+  return { memory, entities, mentions };
 }
 
 /**

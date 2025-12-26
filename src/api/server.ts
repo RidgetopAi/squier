@@ -3,6 +3,7 @@ import { config } from '../config/index.js';
 import memoriesRouter from './routes/memories.js';
 import healthRouter from './routes/health.js';
 import contextRouter from './routes/context.js';
+import entitiesRouter from './routes/entities.js';
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use(express.json());
 app.use('/api/health', healthRouter);
 app.use('/api/memories', memoriesRouter);
 app.use('/api/context', contextRouter);
+app.use('/api/entities', entitiesRouter);
 
 // 404 handler
 app.use((_req, res) => {

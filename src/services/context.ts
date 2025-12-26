@@ -10,6 +10,7 @@
 
 import { pool } from '../db/pool.js';
 import { generateEmbedding } from '../providers/embeddings.js';
+import { EntityType } from './entities.js';
 
 // === TYPES ===
 
@@ -57,11 +58,19 @@ export interface ScoredMemory {
   category: 'high_salience' | 'relevant' | 'recent';
 }
 
+export interface EntitySummary {
+  id: string;
+  name: string;
+  type: EntityType;
+  mention_count: number;
+}
+
 export interface ContextPackage {
   generated_at: string;
   profile: string;
   query?: string;
   memories: ScoredMemory[];
+  entities: EntitySummary[];
   token_count: number;
   disclosure_id: string;
   markdown: string;
@@ -247,6 +256,35 @@ async function logDisclosure(
   return result.rows[0]?.id as string;
 }
 
+// === ENTITY FUNCTIONS ===
+
+/**
+ * Get entities mentioned in a set of memories
+ * Returns unique entities with total mention counts
+ */
+async function getEntitiesForMemories(memoryIds: string[]): Promise<EntitySummary[]> {
+  if (memoryIds.length === 0) return [];
+
+  const result = await pool.query(
+    `SELECT e.id, e.name, e.entity_type as type, COUNT(em.id) as mention_count
+     FROM entities e
+     JOIN entity_mentions em ON em.entity_id = e.id
+     WHERE em.memory_id = ANY($1)
+       AND e.is_merged = FALSE
+     GROUP BY e.id, e.name, e.entity_type
+     ORDER BY mention_count DESC, e.name ASC
+     LIMIT 20`,
+    [memoryIds]
+  );
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    type: row.type as EntityType,
+    mention_count: parseInt(row.mention_count, 10),
+  }));
+}
+
 // === FORMATTING ===
 
 /**
@@ -254,6 +292,7 @@ async function logDisclosure(
  */
 function formatMarkdown(
   memories: ScoredMemory[],
+  entities: EntitySummary[],
   profile: ContextProfile,
   query?: string
 ): string {
@@ -312,6 +351,32 @@ function formatMarkdown(
     lines.push('');
   }
 
+  // Entity summary section
+  if (entities.length > 0) {
+    lines.push('## Key Entities');
+    lines.push('');
+
+    // Group by type
+    const byType: Record<string, EntitySummary[]> = {};
+    for (const e of entities) {
+      const arr = byType[e.type] ?? [];
+      arr.push(e);
+      byType[e.type] = arr;
+    }
+
+    // Display people first, then projects, then others
+    const typeOrder = ['person', 'project', 'organization', 'place', 'concept'];
+    for (const type of typeOrder) {
+      const typeEntities = byType[type];
+      if (typeEntities && typeEntities.length > 0) {
+        const label = type.charAt(0).toUpperCase() + type.slice(1) + 's';
+        const names = typeEntities.map((e) => e.name).join(', ');
+        lines.push(`- **${label}**: ${names}`);
+      }
+    }
+    lines.push('');
+  }
+
   return lines.join('\n');
 }
 
@@ -320,6 +385,7 @@ function formatMarkdown(
  */
 function formatJson(
   memories: ScoredMemory[],
+  entities: EntitySummary[],
   profile: ContextProfile,
   query?: string
 ): object {
@@ -328,6 +394,12 @@ function formatJson(
     generated_at: new Date().toISOString(),
     query,
     scoring_weights: profile.scoring_weights,
+    entities: entities.map((e) => ({
+      id: e.id,
+      name: e.name,
+      type: e.type,
+      mention_count: e.mention_count,
+    })),
     memories: memories.map((m) => ({
       id: m.id,
       content: m.content,
@@ -468,11 +540,15 @@ export async function generateContext(
   // Calculate total tokens
   const totalTokens = budgetedMemories.reduce((sum, m) => sum + m.token_estimate, 0);
 
+  // Get entities mentioned in disclosed memories
+  const memoryIds = budgetedMemories.map((m) => m.id);
+  const entities = await getEntitiesForMemories(memoryIds);
+
   // Log disclosure
   const disclosureId = await logDisclosure(
     profile.name,
     query,
-    budgetedMemories.map((m) => m.id),
+    memoryIds,
     totalTokens,
     profile.format,
     weights,
@@ -480,14 +556,15 @@ export async function generateContext(
   );
 
   // Format output
-  const markdown = formatMarkdown(budgetedMemories, profile, query);
-  const json = formatJson(budgetedMemories, profile, query);
+  const markdown = formatMarkdown(budgetedMemories, entities, profile, query);
+  const json = formatJson(budgetedMemories, entities, profile, query);
 
   return {
     generated_at: new Date().toISOString(),
     profile: profile.name,
     query,
     memories: budgetedMemories,
+    entities,
     token_count: totalTokens,
     disclosure_id: disclosureId,
     markdown,
