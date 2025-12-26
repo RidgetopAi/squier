@@ -1,5 +1,6 @@
 import { pool } from '../db/pool.js';
 import { generateEmbedding } from '../providers/embeddings.js';
+import { calculateSalience } from './salience.js';
 
 export interface Memory {
   id: string;
@@ -59,14 +60,16 @@ export async function createMemory(input: CreateMemoryInput): Promise<Memory> {
   const embedding = await generateEmbedding(content);
   const embeddingStr = `[${embedding.join(',')}]`;
 
-  // Create the memory with embedding
-  // For Slice 1, salience is default (5.0) - scoring comes in Slice 2
+  // Calculate salience score (Slice 2)
+  const salience = calculateSalience(content);
+
+  // Create the memory with embedding and salience
   const result = await pool.query(
     `INSERT INTO memories (
       raw_observation_id, content, content_type, source, source_metadata,
-      embedding, occurred_at, processing_status, processed_at
+      embedding, salience_score, salience_factors, occurred_at, processing_status, processed_at
     )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, 'processed', NOW())
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'processed', NOW())
      RETURNING *`,
     [
       rawObservationId,
@@ -75,6 +78,8 @@ export async function createMemory(input: CreateMemoryInput): Promise<Memory> {
       source,
       JSON.stringify(source_metadata),
       embeddingStr,
+      salience.score,
+      JSON.stringify(salience.factors),
       occurred_at,
     ]
   );
@@ -142,62 +147,143 @@ export async function deleteMemory(id: string): Promise<boolean> {
 export interface SearchMemoriesOptions {
   limit?: number;
   minSimilarity?: number;
+  /** Include salience in ranking (default: true) */
+  useSalience?: boolean;
 }
 
 export interface SearchResult extends Memory {
   similarity: number;
+  /** Combined score (similarity + salience weighted) */
+  combined_score: number;
 }
 
 /**
- * Semantic search for memories using vector similarity
+ * Scoring weights for search ranking
+ * Balances semantic relevance with salience
+ */
+const SEARCH_WEIGHTS = {
+  similarity: 0.60, // semantic relevance still primary
+  salience: 0.40, // but salience significantly affects ranking
+};
+
+/**
+ * Semantic search for memories using vector similarity + salience
+ *
+ * Slice 2: Search ranking incorporates salience so important
+ * memories float to the top even with slightly lower similarity.
  */
 export async function searchMemories(
   query: string,
   options: SearchMemoriesOptions = {}
 ): Promise<SearchResult[]> {
-  const { limit = 10, minSimilarity = 0.3 } = options;
+  const { limit = 10, minSimilarity = 0.3, useSalience = true } = options;
 
   // Generate embedding for the search query
   const queryEmbedding = await generateEmbedding(query);
   const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
-  // Search using cosine similarity (1 - cosine_distance)
+  // Search using cosine similarity combined with salience
   // pgvector uses <=> for cosine distance, so similarity = 1 - distance
+  // Combined score = (similarity * 0.6) + (salience_normalized * 0.4)
   const result = await pool.query(
     `SELECT *,
-       1 - (embedding <=> $1::vector) as similarity
+       1 - (embedding <=> $1::vector) as similarity,
+       CASE WHEN $4 THEN
+         (1 - (embedding <=> $1::vector)) * $5 + (salience_score / 10.0) * $6
+       ELSE
+         1 - (embedding <=> $1::vector)
+       END as combined_score
      FROM memories
      WHERE embedding IS NOT NULL
        AND 1 - (embedding <=> $1::vector) >= $2
-     ORDER BY embedding <=> $1::vector
+     ORDER BY combined_score DESC
      LIMIT $3`,
-    [embeddingStr, minSimilarity, limit]
+    [
+      embeddingStr,
+      minSimilarity,
+      limit,
+      useSalience,
+      SEARCH_WEIGHTS.similarity,
+      SEARCH_WEIGHTS.salience,
+    ]
   );
 
   return result.rows as SearchResult[];
 }
 
+export interface ContextMemoriesOptions {
+  /** Max relevant memories to return */
+  limit?: number;
+  /** Max recent memories to return */
+  recentCount?: number;
+  /** Minimum salience for inclusion (0-10) */
+  minSalience?: number;
+  /** Include high-salience memories even if not recent/relevant */
+  includeHighSalience?: boolean;
+}
+
+export interface ContextMemoriesResult {
+  /** Most recent memories (sorted by date) */
+  recent: Memory[];
+  /** Semantically relevant memories (if query provided) */
+  relevant: SearchResult[];
+  /** High-salience memories that should be prioritized */
+  highSalience: Memory[];
+}
+
 /**
  * Get memories for context injection
- * Combines recency and semantic relevance
+ *
+ * Slice 2: Context injection prioritizes high-salience memories.
+ * Important memories appear even if not the most recent or relevant.
  */
 export async function getContextMemories(
   query?: string,
-  options: { limit?: number; recentCount?: number } = {}
-): Promise<{ recent: Memory[]; relevant: SearchResult[] }> {
-  const { limit = 10, recentCount = 5 } = options;
+  options: ContextMemoriesOptions = {}
+): Promise<ContextMemoriesResult> {
+  const {
+    limit = 10,
+    recentCount = 5,
+    minSalience = 0,
+    includeHighSalience = true,
+  } = options;
 
-  // Always get recent memories
-  const recent = await listMemories({ limit: recentCount });
+  // Get recent memories, sorted by salience within recency
+  const recentResult = await pool.query(
+    `SELECT * FROM memories
+     WHERE salience_score >= $1
+     ORDER BY created_at DESC, salience_score DESC
+     LIMIT $2`,
+    [minSalience, recentCount]
+  );
+  const recent = recentResult.rows as Memory[];
+  const recentIds = new Set(recent.map((m) => m.id));
 
-  // If query provided, also get semantically relevant memories
+  // If query provided, get semantically relevant memories
   let relevant: SearchResult[] = [];
   if (query) {
-    relevant = await searchMemories(query, { limit });
+    relevant = await searchMemories(query, { limit, minSimilarity: 0.3 });
     // Filter out any that are already in recent
-    const recentIds = new Set(recent.map((m) => m.id));
     relevant = relevant.filter((m) => !recentIds.has(m.id));
   }
+  const relevantIds = new Set(relevant.map((m) => m.id));
 
-  return { recent, relevant };
+  // Get high-salience memories that might not be recent or relevant
+  // These are memories that should be in context because they're important
+  let highSalience: Memory[] = [];
+  if (includeHighSalience) {
+    const highSalienceResult = await pool.query(
+      `SELECT * FROM memories
+       WHERE salience_score >= 6.0
+       ORDER BY salience_score DESC, created_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    // Filter out any already in recent or relevant
+    highSalience = (highSalienceResult.rows as Memory[]).filter(
+      (m) => !recentIds.has(m.id) && !relevantIds.has(m.id)
+    );
+  }
+
+  return { recent, relevant, highSalience };
 }

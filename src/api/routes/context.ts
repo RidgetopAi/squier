@@ -6,6 +6,12 @@ const router = Router();
 interface ContextPackage {
   generated_at: string;
   query?: string;
+  important_memories: Array<{
+    id: string;
+    content: string;
+    created_at: Date;
+    salience: number;
+  }>;
   recent_memories: Array<{
     id: string;
     content: string;
@@ -18,6 +24,7 @@ interface ContextPackage {
     created_at: Date;
     salience: number;
     similarity: number;
+    combined_score: number;
   }>;
   markdown: string;
 }
@@ -35,10 +42,12 @@ function formatSearchResultForContext(result: SearchResult) {
   return {
     ...formatMemoryForContext(result),
     similarity: result.similarity,
+    combined_score: result.combined_score,
   };
 }
 
 function generateMarkdown(
+  highSalience: Memory[],
   recent: Memory[],
   relevant: SearchResult[],
   query?: string
@@ -53,12 +62,26 @@ function generateMarkdown(
   }
   lines.push('');
 
+  // High-salience memories first (most important)
+  if (highSalience.length > 0) {
+    lines.push('## Important Memories');
+    lines.push('');
+    for (const memory of highSalience) {
+      const date = new Date(memory.created_at).toLocaleDateString();
+      const salience = memory.salience_score.toFixed(1);
+      lines.push(`- [${date}] ⭐${salience} ${memory.content}`);
+    }
+    lines.push('');
+  }
+
   if (relevant.length > 0) {
     lines.push('## Relevant Memories');
     lines.push('');
     for (const memory of relevant) {
       const date = new Date(memory.created_at).toLocaleDateString();
-      lines.push(`- [${date}] (similarity: ${(memory.similarity * 100).toFixed(1)}%) ${memory.content}`);
+      const similarity = (memory.similarity * 100).toFixed(1);
+      const salience = memory.salience_score.toFixed(1);
+      lines.push(`- [${date}] ${similarity}% ⭐${salience} ${memory.content}`);
     }
     lines.push('');
   }
@@ -68,7 +91,8 @@ function generateMarkdown(
     lines.push('');
     for (const memory of recent) {
       const date = new Date(memory.created_at).toLocaleDateString();
-      lines.push(`- [${date}] ${memory.content}`);
+      const salience = memory.salience_score.toFixed(1);
+      lines.push(`- [${date}] ⭐${salience} ${memory.content}`);
     }
     lines.push('');
   }
@@ -79,22 +103,26 @@ function generateMarkdown(
 /**
  * POST /api/context
  * Get context package for AI consumption
+ *
+ * Slice 2: Includes high-salience memories for priority context
  */
 router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { query, limit = 10, recent_count = 5 } = req.body;
+    const { query, limit = 10, recent_count = 5, min_salience = 0 } = req.body;
 
-    const { recent, relevant } = await getContextMemories(query, {
+    const { recent, relevant, highSalience } = await getContextMemories(query, {
       limit,
       recentCount: recent_count,
+      minSalience: min_salience,
     });
 
     const contextPackage: ContextPackage = {
       generated_at: new Date().toISOString(),
       query,
+      important_memories: highSalience.map(formatMemoryForContext),
       recent_memories: recent.map(formatMemoryForContext),
       relevant_memories: relevant.map(formatSearchResultForContext),
-      markdown: generateMarkdown(recent, relevant, query),
+      markdown: generateMarkdown(highSalience, recent, relevant, query),
     };
 
     res.json(contextPackage);
@@ -107,24 +135,29 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 /**
  * GET /api/context
  * Get context (simpler interface for CLI)
+ *
+ * Slice 2: Includes high-salience memories for priority context
  */
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const query = req.query.query as string | undefined;
     const limit = parseInt(req.query.limit as string) || 10;
     const recentCount = parseInt(req.query.recent_count as string) || 5;
+    const minSalience = parseFloat(req.query.min_salience as string) || 0;
 
-    const { recent, relevant } = await getContextMemories(query, {
+    const { recent, relevant, highSalience } = await getContextMemories(query, {
       limit,
       recentCount,
+      minSalience,
     });
 
     const contextPackage: ContextPackage = {
       generated_at: new Date().toISOString(),
       query,
+      important_memories: highSalience.map(formatMemoryForContext),
       recent_memories: recent.map(formatMemoryForContext),
       relevant_memories: relevant.map(formatSearchResultForContext),
-      markdown: generateMarkdown(recent, relevant, query),
+      markdown: generateMarkdown(highSalience, recent, relevant, query),
     };
 
     res.json(contextPackage);

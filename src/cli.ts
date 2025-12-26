@@ -110,13 +110,15 @@ program
         for (const memory of results) {
           const date = new Date(memory.created_at).toLocaleString();
           const similarity = (memory.similarity * 100).toFixed(1);
+          const salience = memory.salience_score.toFixed(1);
+          const score = (memory.combined_score * 100).toFixed(1);
           const preview = memory.content.length > 70
             ? memory.content.substring(0, 70) + '...'
             : memory.content;
 
-          console.log(`[${memory.id.substring(0, 8)}] ${similarity}% match`);
+          console.log(`[${memory.id.substring(0, 8)}] score: ${score}%`);
           console.log(`  ${preview}`);
-          console.log(`  ${date} | salience: ${memory.salience_score}`);
+          console.log(`  ${date} | similarity: ${similarity}% | salience: ${salience}`);
           console.log('');
         }
       }
@@ -137,23 +139,27 @@ program
   .option('-q, --query <query>', 'Focus context on this query')
   .option('-l, --limit <limit>', 'Maximum relevant memories', '10')
   .option('-r, --recent <count>', 'Number of recent memories', '5')
+  .option('--min-salience <score>', 'Minimum salience to include', '0')
   .option('--json', 'Output as JSON instead of markdown')
-  .action(async (options: { query?: string; limit: string; recent: string; json?: boolean }) => {
+  .action(async (options: { query?: string; limit: string; recent: string; minSalience: string; json?: boolean }) => {
     try {
       const limit = parseInt(options.limit, 10);
       const recentCount = parseInt(options.recent, 10);
+      const minSalience = parseFloat(options.minSalience);
 
-      const { recent, relevant } = await getContextMemories(options.query, {
+      const { recent, relevant, highSalience } = await getContextMemories(options.query, {
         limit,
         recentCount,
+        minSalience,
       });
 
       if (options.json) {
         console.log(JSON.stringify({
           generated_at: new Date().toISOString(),
           query: options.query,
-          recent,
+          highSalience,
           relevant,
+          recent,
         }, null, 2));
       } else {
         console.log('\n# Memory Context\n');
@@ -163,12 +169,24 @@ program
         }
         console.log('');
 
+        // High-salience memories first (most important)
+        if (highSalience.length > 0) {
+          console.log('## Important Memories\n');
+          for (const memory of highSalience) {
+            const date = new Date(memory.created_at).toLocaleDateString();
+            const salience = memory.salience_score.toFixed(1);
+            console.log(`- [${date}] ⭐${salience} ${memory.content}`);
+          }
+          console.log('');
+        }
+
         if (relevant.length > 0) {
           console.log('## Relevant Memories\n');
           for (const memory of relevant) {
             const date = new Date(memory.created_at).toLocaleDateString();
             const similarity = (memory.similarity * 100).toFixed(1);
-            console.log(`- [${date}] (${similarity}%) ${memory.content}`);
+            const salience = memory.salience_score.toFixed(1);
+            console.log(`- [${date}] ${similarity}% ⭐${salience} ${memory.content}`);
           }
           console.log('');
         }
@@ -177,12 +195,13 @@ program
           console.log('## Recent Memories\n');
           for (const memory of recent) {
             const date = new Date(memory.created_at).toLocaleDateString();
-            console.log(`- [${date}] ${memory.content}`);
+            const salience = memory.salience_score.toFixed(1);
+            console.log(`- [${date}] ⭐${salience} ${memory.content}`);
           }
           console.log('');
         }
 
-        if (recent.length === 0 && relevant.length === 0) {
+        if (recent.length === 0 && relevant.length === 0 && highSalience.length === 0) {
           console.log('No memories available for context.');
           console.log('Use "squier observe <content>" to store memories.');
         }
