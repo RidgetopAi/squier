@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
+import { readFileSync } from 'fs';
 import { createMemory, listMemories, countMemories, searchMemories, getMemory } from './services/memories.js';
 import { generateContext, listProfiles } from './services/context.js';
 import {
@@ -11,6 +12,7 @@ import {
 } from './services/entities.js';
 import { consolidateAll, getConsolidationStats } from './services/consolidation.js';
 import { getRelatedMemories, getEdgeStats } from './services/edges.js';
+import { parseImportFile, importMemories, getImportStats } from './services/import.js';
 import { checkConnection, closePool } from './db/pool.js';
 import { checkEmbeddingHealth } from './providers/embeddings.js';
 import { checkLLMHealth, getLLMInfo } from './providers/llm.js';
@@ -485,6 +487,150 @@ program
       }
     } catch (error) {
       console.error('Failed to get related memories:', error);
+      process.exit(1);
+    } finally {
+      await closePool();
+    }
+  });
+
+/**
+ * import - Import memories from JSON file
+ */
+program
+  .command('import')
+  .description('Import memories from a JSON file (JSONL or array format)')
+  .argument('<file>', 'Path to JSON file containing memories')
+  .option('--allow-duplicates', 'Import even if similar content exists')
+  .option('--skip-entities', 'Skip entity extraction (faster)')
+  .option('--min-length <chars>', 'Minimum content length to import', '10')
+  .option('--dry-run', 'Show what would be imported without importing')
+  .option('-q, --quiet', 'Only show summary, not each memory')
+  .action(async (
+    file: string,
+    options: {
+      allowDuplicates?: boolean;
+      skipEntities?: boolean;
+      minLength: string;
+      dryRun?: boolean;
+      quiet?: boolean;
+    }
+  ) => {
+    try {
+      // Read and parse the file
+      console.log(`\nReading ${file}...`);
+      const content = readFileSync(file, 'utf-8');
+      const memories = parseImportFile(content);
+
+      console.log(`Found ${memories.length} memories to import\n`);
+
+      if (memories.length === 0) {
+        console.log('No valid memories found in file.');
+        console.log('Expected format: JSONL or JSON array with { content, occurred_at?, source?, tags? }');
+        return;
+      }
+
+      // Show preview in dry-run mode
+      if (options.dryRun) {
+        console.log('DRY RUN - would import:\n');
+        for (const mem of memories.slice(0, 10)) {
+          const date = mem.occurred_at
+            ? new Date(mem.occurred_at).toLocaleDateString()
+            : 'no date';
+          const tags = mem.tags?.join(', ') || 'no tags';
+          const preview = mem.content.length > 70
+            ? mem.content.substring(0, 70) + '...'
+            : mem.content;
+
+          console.log(`  [${date}] ${preview}`);
+          console.log(`    source: ${mem.source || 'import'} | tags: ${tags}`);
+          console.log('');
+        }
+        if (memories.length > 10) {
+          console.log(`  ... and ${memories.length - 10} more`);
+        }
+        return;
+      }
+
+      // Import with progress
+      const minLength = parseInt(options.minLength, 10);
+      const result = await importMemories(memories, {
+        allowDuplicates: options.allowDuplicates,
+        skipEntities: options.skipEntities,
+        minLength,
+        onProgress: options.quiet ? undefined : (current, total, preview) => {
+          process.stdout.write(`\r  [${current}/${total}] ${preview.padEnd(60)}`);
+        },
+      });
+
+      if (!options.quiet) {
+        console.log('\n');
+      }
+
+      // Show results
+      console.log('Import complete!\n');
+      console.log(`  Total in file: ${result.total}`);
+      console.log(`  Imported: ${result.imported}`);
+      console.log(`  Skipped: ${result.skipped} (duplicates or too short)`);
+      console.log(`  Errors: ${result.errors}`);
+
+      if (result.imported > 0 && !options.quiet) {
+        console.log('\nSample imported memories:\n');
+        for (const mem of result.memories.slice(0, 5)) {
+          console.log(`  [${mem.id.substring(0, 8)}] salience: ${mem.salience.toFixed(1)} | entities: ${mem.entities}`);
+          console.log(`    ${mem.content}...`);
+          console.log('');
+        }
+        if (result.memories.length > 5) {
+          console.log(`  ... and ${result.memories.length - 5} more`);
+        }
+      }
+
+      if (result.errors > 0) {
+        console.log('\nErrors:');
+        for (const err of result.errorDetails.slice(0, 5)) {
+          console.log(`  ${err}`);
+        }
+      }
+
+      console.log('\nRun `squire consolidate` to form connections between memories.');
+      console.log('');
+    } catch (error) {
+      console.error('Failed to import:', error);
+      process.exit(1);
+    } finally {
+      await closePool();
+    }
+  });
+
+/**
+ * import-stats - Show import statistics
+ */
+program
+  .command('import-stats')
+  .description('Show statistics about imported memories')
+  .action(async () => {
+    try {
+      const stats = await getImportStats();
+
+      console.log('\nImport Statistics\n');
+      console.log(`  Total imported: ${stats.totalImported}`);
+
+      if (Object.keys(stats.bySources).length > 0) {
+        console.log('\n  By source:');
+        for (const [source, count] of Object.entries(stats.bySources)) {
+          console.log(`    ${source}: ${count}`);
+        }
+      }
+
+      if (stats.dateRange.oldest) {
+        console.log('\n  Date range:');
+        console.log(`    Oldest: ${stats.dateRange.oldest.toLocaleDateString()}`);
+        console.log(`    Newest: ${stats.dateRange.newest?.toLocaleDateString()}`);
+      }
+
+      console.log('');
+    } catch (error) {
+      console.error('Failed to get import stats:', error);
       process.exit(1);
     } finally {
       await closePool();
