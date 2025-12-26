@@ -1,4 +1,4 @@
-# SQUIER IMPLEMENTATION ROADMAP
+# SQUIRE IMPLEMENTATION ROADMAP
 
 ## Vertical Slice Approach with Layered Progression
 
@@ -90,13 +90,13 @@
 - [ ] Minimal schema: `raw_observations` + `memories` tables only
 - [ ] Single endpoint: `POST /api/memories` (stores content)
 - [ ] Single query: `GET /api/memories` (retrieves all)
-- [ ] CLI skeleton: `squier observe "text"` and `squier list`
+- [ ] CLI skeleton: `squire observe "text"` and `squire list`
 
 ### Evaluation Criteria
 ```bash
 # These must work:
-squier observe "This is a test memory"
-squier list
+squire observe "This is a test memory"
+squire list
 # → Shows the memory we just stored
 ```
 
@@ -125,22 +125,22 @@ Add embeddings and semantic search.
 - [ ] Embeddings stored in memories table
 - [ ] Semantic search: `GET /api/memories/search?query=...`
 - [ ] Basic context endpoint: `POST /api/context` (returns recent + relevant memories)
-- [ ] CLI: `squier search "query"` and `squier context`
+- [ ] CLI: `squire search "query"` and `squire context`
 - [ ] Vector index (HNSW) on embeddings
 
 ### Evaluation Criteria
 ```bash
 # Store memories
-squier observe "Met Sarah to discuss the AI project due next Friday"
-squier observe "Need to buy groceries - milk, eggs, bread"
-squier observe "The AI project uses vector embeddings for semantic search"
+squire observe "Met Sarah to discuss the AI project due next Friday"
+squire observe "Need to buy groceries - milk, eggs, bread"
+squire observe "The AI project uses vector embeddings for semantic search"
 
 # Semantic search works
-squier search "AI project"
+squire search "AI project"
 # → Returns memory 1 and 3, NOT memory 2
 
 # Context injection works
-squier context --query "project status"
+squire context --query "project status"
 # → Returns relevant memories formatted for AI consumption
 ```
 
@@ -176,13 +176,13 @@ Add salience scoring so important memories rank higher.
 
 ### Evaluation Criteria
 ```bash
-squier observe "Need to pick up dry cleaning"
-squier observe "Sarah offered me the CTO position - deadline to decide is Friday"
+squire observe "Need to pick up dry cleaning"
+squire observe "Sarah offered me the CTO position - deadline to decide is Friday"
 
-squier search "this week"
+squire search "this week"
 # → CTO decision ranks ABOVE dry cleaning (higher salience)
 
-squier context
+squire context
 # → CTO decision appears prominently, dry cleaning may not appear at all
 ```
 
@@ -219,19 +219,19 @@ Make context injection configurable with profiles and proper scoring.
 - [ ] Token budgeting with percentage caps
 - [ ] Dual output format: markdown + JSON
 - [ ] Disclosure logging (what was shown)
-- [ ] CLI: `squier context --profile work --query "status"`
+- [ ] CLI: `squire context --profile work --query "status"`
 
 ### Evaluation Criteria
 ```bash
 # Profile-based context
-squier context --profile work
+squire context --profile work
 # → Prioritizes project/work memories
 
-squier context --profile personal
+squire context --profile personal
 # → Prioritizes people/relationship memories
 
 # Token budgets respected
-squier context --max-tokens 2000
+squire context --max-tokens 2000
 # → Output stays within budget, prioritizes by score
 ```
 
@@ -260,19 +260,19 @@ Extract entities (people, projects) for structured understanding.
 - [ ] MENTIONS edges (memory → entity)
 - [ ] Entity queries: "What do I know about Sarah?"
 - [ ] Entity inclusion in context injection
-- [ ] CLI: `squier entities`, `squier who "Sarah"`
+- [ ] CLI: `squire entities`, `squire who "Sarah"`
 
 ### Evaluation Criteria
 ```bash
-squier observe "Met with Sarah Chen about the Quantum project deadline"
+squire observe "Met with Sarah Chen about the Quantum project deadline"
 
-squier entities
+squire entities
 # → Shows: Sarah Chen (person), Quantum (project)
 
-squier who "Sarah"
+squire who "Sarah"
 # → Returns all memories mentioning Sarah, her extracted attributes
 
-squier context --query "Sarah"
+squire context --query "Sarah"
 # → Context includes entity summary + relevant memories
 ```
 
@@ -303,23 +303,23 @@ Add consolidation for decay, strengthening, and edge maintenance.
 - [ ] Strengthening: high-salience + frequently accessed resist decay
 - [ ] SIMILAR edges (embedding similarity > threshold)
 - [ ] Edge decay and pruning
-- [ ] CLI: `squier consolidate`, `squier sleep`
+- [ ] CLI: `squire consolidate`, `squire sleep`
 
 ### Evaluation Criteria
 ```bash
 # After some time passes...
-squier consolidate
+squire consolidate
 
 # Low-salience, unaccessed memories have reduced strength
-squier search "groceries"
+squire search "groceries"
 # → Old grocery lists have low strength, may not appear
 
 # High-salience memories maintain strength
-squier search "CTO decision"
+squire search "CTO decision"
 # → Still prominent even after time passes
 
 # Similar memories are connected
-squier related <memory-id>
+squire related <memory-id>
 # → Shows connected memories via SIMILAR edges
 ```
 
@@ -330,7 +330,7 @@ squier related <memory-id>
 - Graph connections form automatically
 
 ### Consolidation Trigger Options
-- Manual: `squier consolidate`
+- Manual: `squire consolidate`
 - Session end: when session closes
 - Scheduled: cron job (later)
 
@@ -348,7 +348,7 @@ Add living summaries for distilled understanding.
 - [ ] Category classification (which summaries does a memory touch?)
 - [ ] Incremental summary updates (don't rewrite from scratch)
 - [ ] Summary inclusion in context injection
-- [ ] CLI: `squier summary commitments`, `squier summary people`, etc.
+- [ ] CLI: `squire summary commitments`, `squire summary people`, etc.
 
 ### Categories
 - commitments (things promised/owed)
@@ -361,11 +361,11 @@ Add living summaries for distilled understanding.
 
 ### Evaluation Criteria
 ```bash
-squier summary people
+squire summary people
 # → "Key relationships: Sarah Chen (collaborator on Quantum project,
 #    offered CTO position), Mike (mentioned in weekend plans)..."
 
-squier context
+squire context
 # → Includes relevant summaries, not just raw memories
 ```
 
@@ -397,13 +397,13 @@ Advanced features: beliefs, patterns, insights, active research.
 
 ### Evaluation Criteria
 ```bash
-squier beliefs
+squire beliefs
 # → Shows extracted beliefs with confidence scores
 
-squier insights
+squire insights
 # → Shows generated insights from recent consolidation
 
-squier patterns
+squire patterns
 # → Shows detected patterns (e.g., "stress increases on Mondays")
 ```
 
@@ -504,7 +504,7 @@ Each layer can be made smarter independently:
 
 ## REFERENCE: Full Vision Checklist
 
-From SQUIER-DESIGN-PLAN.md - what "done" looks like:
+From SQUIRE-DESIGN-PLAN.md - what "done" looks like:
 
 - [ ] Can store memories with salience scores
 - [ ] Can retrieve memories by semantic search

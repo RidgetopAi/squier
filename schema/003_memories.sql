@@ -1,4 +1,4 @@
--- Memories: The atomic unit of Squier
+-- Memories: The atomic unit of Squire
 -- Every piece of processed information the AI knows
 
 CREATE TABLE IF NOT EXISTS memories (
@@ -44,4 +44,4 @@ CREATE INDEX IF NOT EXISTS idx_memories_salience ON memories (salience_score DES
 CREATE INDEX IF NOT EXISTS idx_memories_source ON memories (source);
 CREATE INDEX IF NOT EXISTS idx_memories_status ON memories (processing_status);
 
-COMMENT ON TABLE memories IS 'The atomic unit of Squier - every piece of processed information the AI knows';
+COMMENT ON TABLE memories IS 'The atomic unit of Squire - every piece of processed information the AI knows';

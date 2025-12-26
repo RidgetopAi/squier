@@ -9,7 +9,7 @@ import { config } from './config/index.js';
 const program = new Command();
 
 program
-  .name('squier')
+  .name('squire')
   .description('AI memory system - memory that knows the user')
   .version('0.1.0');
 
@@ -60,7 +60,7 @@ program
 
       if (memories.length === 0) {
         console.log('\nNo memories found.');
-        console.log('Use "squier observe <content>" to store your first memory.');
+        console.log('Use "squire observe <content>" to store your first memory.');
       } else {
         console.log(`\nMemories (${memories.length} of ${total}):\n`);
 
@@ -203,7 +203,7 @@ program
 
         if (recent.length === 0 && relevant.length === 0 && highSalience.length === 0) {
           console.log('No memories available for context.');
-          console.log('Use "squier observe <content>" to store memories.');
+          console.log('Use "squire observe <content>" to store memories.');
         }
       }
     } catch (error) {
@@ -222,7 +222,7 @@ program
   .description('Check system health and connection')
   .action(async () => {
     try {
-      console.log('\nSquier Status\n');
+      console.log('\nSquire Status\n');
 
       const [dbConnected, embeddingConnected] = await Promise.all([
         checkConnection(),

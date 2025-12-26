@@ -1,4 +1,4 @@
-# SQUIER DESIGN PLAN
+# SQUIRE DESIGN PLAN
 
 ## AI Memory System - Architecture & Implementation Blueprint
 
@@ -14,13 +14,13 @@
 
 **This is not user memory. This is AI memory that knows the user.**
 
-Traditional approaches store data about users for later retrieval. Squier inverts this: the AI becomes the entity with memory. The AI knows its human partner - their patterns, priorities, emotional landscape, relationships, and goals. Every conversation starts with context, not cold.
+Traditional approaches store data about users for later retrieval. Squire inverts this: the AI becomes the entity with memory. The AI knows its human partner - their patterns, priorities, emotional landscape, relationships, and goals. Every conversation starts with context, not cold.
 
 ## The Goal
 
 **Develop the best personal memory for AI we can.**
 
-This is the unlock. This is the key to better AI. Current AI starts every conversation amnesia-fresh. Squier gives AI genuine knowing - not just data retrieval, but understanding that compounds over time.
+This is the unlock. This is the key to better AI. Current AI starts every conversation amnesia-fresh. Squire gives AI genuine knowing - not just data retrieval, but understanding that compounds over time.
 
 ## Objective (Measurable)
 
@@ -173,7 +173,7 @@ CREATE INDEX idx_raw_obs_source ON raw_observations (source);
 
 ## 4.2 memories (The Foundation)
 
-The atomic unit of Squier. Every piece of processed information the AI knows.
+The atomic unit of Squire. Every piece of processed information the AI knows.
 
 ```sql
 CREATE TABLE memories (
@@ -844,7 +844,7 @@ interface ConsolidationConfig {
 
 ## The "Morning" Phase
 
-Before an AI conversation begins, Squier injects relevant context. The AI "wakes up" knowing things.
+Before an AI conversation begins, Squire injects relevant context. The AI "wakes up" knowing things.
 
 ## Retrieval Recipe
 
@@ -1183,14 +1183,14 @@ By end of Phase 1, these should work:
 
 ```bash
 # 1. Store a memory with context
-squier observe "Met Sarah to discuss the AI project due next Friday" --source chat
+squire observe "Met Sarah to discuss the AI project due next Friday" --source chat
 
 # 2. Semantic search finds it
-squier search "AI project"
+squire search "AI project"
 # → Returns the memory with salience score
 
 # 3. Context injection includes it
-squier context --profile work --query "status"
+squire context --profile work --query "status"
 # → Returns context package that includes:
 #   - The memory
 #   - Extracted time marker (even if crude)
@@ -1202,11 +1202,11 @@ squier context --profile work --query "status"
 # PART 15: FILE STRUCTURE
 
 ```
-squier/
+squire/
 ├── docs/
-│   ├── SQUIER-DESIGN-PLAN.md           # This document (master)
-│   ├── SQUIER-DESIGN-PLAN-SEED.md      # Original v1.0
-│   └── SQUIER-DESIGN-PLAN-GPT52PRO-i1.md  # GPT-5.2 Pro iteration
+│   ├── SQUIRE-DESIGN-PLAN.md           # This document (master)
+│   ├── SQUIRE-DESIGN-PLAN-SEED.md      # Original v1.0
+│   └── SQUIRE-DESIGN-PLAN-GPT52PRO-i1.md  # GPT-5.2 Pro iteration
 ├── schema/
 │   ├── 001_raw_observations.sql
 │   ├── 002_memories.sql

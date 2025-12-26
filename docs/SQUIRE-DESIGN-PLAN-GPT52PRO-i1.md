@@ -1,6 +1,6 @@
-# SQUIER DESIGN PLAN (GPT-5.2 Pro i1 Revision)
+# SQUIRE DESIGN PLAN (GPT-5.2 Pro i1 Revision)
 
-**Source reviewed:** `docs/SQUIER-DESIGN-PLAN-SEED.md`  
+**Source reviewed:** `docs/SQUIRE-DESIGN-PLAN-SEED.md`  
 **Version:** 1.1.0 (editorial + architectural tightening)  
 **Date:** December 25, 2025  
 **Status:** Revised design plan — ready to implement Phase 1 with clearer guardrails
@@ -396,9 +396,9 @@ Add these to your SIRK list:
 
 By end of Phase 1, you should be able to:
 
-1. `squier observe "Met Sarah to discuss the AI project due next Friday" --source chat`
-2. `squier search "AI project"` returns the memory.
-3. `squier context --profile work --query "status"` returns a context package that includes:
+1. `squire observe "Met Sarah to discuss the AI project due next Friday" --source chat`
+2. `squire search "AI project"` returns the memory.
+3. `squire context --profile work --query "status"` returns a context package that includes:
    - the memory
    - extracted time marker (even if crude)
    - salience score > baseline if it contains deadline/relationship/action language

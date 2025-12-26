@@ -1,4 +1,4 @@
-# SQUIER DESIGN PLAN
+# SQUIRE DESIGN PLAN
 
 ## AI Memory System - Architecture & Implementation Blueprint
 
@@ -14,13 +14,13 @@
 
 **This is not user memory. This is AI memory that knows the user.**
 
-Traditional approaches store data about users for later retrieval. Squier inverts this: the AI becomes the entity with memory. The AI knows its human partner - their patterns, priorities, emotional landscape, relationships, and goals. Every conversation starts with context, not cold.
+Traditional approaches store data about users for later retrieval. Squire inverts this: the AI becomes the entity with memory. The AI knows its human partner - their patterns, priorities, emotional landscape, relationships, and goals. Every conversation starts with context, not cold.
 
 ## The Goal
 
 **Develop the best personal memory for AI we can.**
 
-This is the unlock. This is the key to better AI. Current AI starts every conversation amnesia-fresh. Squier gives AI genuine knowing - not just data retrieval, but understanding that compounds over time.
+This is the unlock. This is the key to better AI. Current AI starts every conversation amnesia-fresh. Squire gives AI genuine knowing - not just data retrieval, but understanding that compounds over time.
 
 ## The Three Phases (from Brian's Vision)
 
@@ -124,7 +124,7 @@ Before any AI conversation:
 
 ### 3.1 memories (The Foundation)
 
-The atomic unit of Squier. Every piece of information the AI knows.
+The atomic unit of Squire. Every piece of information the AI knows.
 
 ```sql
 CREATE TABLE memories (
@@ -776,7 +776,7 @@ interface ConsolidationConfig {
 
 ## The "Morning" Phase
 
-Before an AI conversation begins, Squier injects relevant context. The AI "wakes up" knowing things.
+Before an AI conversation begins, Squire injects relevant context. The AI "wakes up" knowing things.
 
 ## Injection Process
 
@@ -1112,9 +1112,9 @@ These are intentionally left unresolved for iterative refinement:
 # PART 13: FILE STRUCTURE
 
 ```
-squier/
+squire/
 ├── docs/
-│   └── SQUIER-DESIGN-PLAN.md       # This document
+│   └── SQUIRE-DESIGN-PLAN.md       # This document
 ├── schema/
 │   ├── 001_core_tables.sql          # memories, edges, entities, beliefs
 │   ├── 002_sessions.sql             # sessions, context_profiles
@@ -1215,12 +1215,12 @@ squier/
 
 # APPENDIX B: Keymaker Gaps Addressed
 
-1. **No Salience** → Squier has per-memory salience scoring
-2. **No Per-Memory Emotions** → Squier tags emotions on each memory
-3. **No Graph Structure** → Squier has edges table for relationships
-4. **No Context Injection** → Squier has profiles and injection pipeline
-5. **Passive Consolidation** → Squier has active research during consolidation
-6. **All Equal** → Squier differentiates what matters
+1. **No Salience** → Squire has per-memory salience scoring
+2. **No Per-Memory Emotions** → Squire tags emotions on each memory
+3. **No Graph Structure** → Squire has edges table for relationships
+4. **No Context Injection** → Squire has profiles and injection pipeline
+5. **Passive Consolidation** → Squire has active research during consolidation
+6. **All Equal** → Squire differentiates what matters
 
 ---
 

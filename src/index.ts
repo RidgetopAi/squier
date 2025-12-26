@@ -1,4 +1,4 @@
-// Squier - AI Memory System
+// Squire - AI Memory System
 // Main entry point
 
 export * from './services/memories.js';

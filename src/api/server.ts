@@ -28,7 +28,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 const port = config.server.port;
 
 app.listen(port, () => {
-  console.log(`Squier API server running on http://localhost:${port}`);
+  console.log(`Squire API server running on http://localhost:${port}`);
   console.log(`Health check: http://localhost:${port}/api/health`);
 });
 

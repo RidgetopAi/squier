@@ -1,11 +1,11 @@
 {
-  "name": "squier",
+  "name": "squire",
   "version": "0.1.0",
   "description": "AI memory system - memory that knows the user",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "squier": "./dist/cli.js"
+    "squire": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
