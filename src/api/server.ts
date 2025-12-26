@@ -4,6 +4,7 @@ import memoriesRouter from './routes/memories.js';
 import healthRouter from './routes/health.js';
 import contextRouter from './routes/context.js';
 import entitiesRouter from './routes/entities.js';
+import consolidationRouter from './routes/consolidation.js';
 
 const app = express();
 
@@ -15,6 +16,7 @@ app.use('/api/health', healthRouter);
 app.use('/api/memories', memoriesRouter);
 app.use('/api/context', contextRouter);
 app.use('/api/entities', entitiesRouter);
+app.use('/api/consolidation', consolidationRouter);
 
 // 404 handler
 app.use((_req, res) => {

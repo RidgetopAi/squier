@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { createMemory, listMemories, countMemories, searchMemories } from './services/memories.js';
+import { createMemory, listMemories, countMemories, searchMemories, getMemory } from './services/memories.js';
 import { generateContext, listProfiles } from './services/context.js';
 import {
   listEntities,
@@ -9,6 +9,8 @@ import {
   countEntitiesByType,
   EntityType,
 } from './services/entities.js';
+import { consolidateAll, getConsolidationStats } from './services/consolidation.js';
+import { getRelatedMemories, getEdgeStats } from './services/edges.js';
 import { checkConnection, closePool } from './db/pool.js';
 import { checkEmbeddingHealth } from './providers/embeddings.js';
 import { checkLLMHealth, getLLMInfo } from './providers/llm.js';
@@ -334,18 +336,155 @@ program
       console.log(`    Configured: ${llmInfo.configured ? 'Yes' : 'No (set GROQ_API_KEY)'}`);
 
       if (dbConnected) {
-        const [total, entityCounts] = await Promise.all([
+        const [total, entityCounts, consolidationStats, edgeStats] = await Promise.all([
           countMemories(),
           countEntitiesByType(),
+          getConsolidationStats(),
+          getEdgeStats(),
         ]);
         const entityTotal = Object.values(entityCounts).reduce((a, b) => a + b, 0);
-        console.log(`  Memories: ${total}`);
+        console.log(`  Memories: ${total} (${consolidationStats.activeMemories} active, ${consolidationStats.dormantMemories} dormant)`);
         console.log(`  Entities: ${entityTotal}`);
+        console.log(`  Edges: ${edgeStats.total} SIMILAR connections`);
       }
 
       console.log('');
     } catch (error) {
       console.error('Failed to check status:', error);
+      process.exit(1);
+    } finally {
+      await closePool();
+    }
+  });
+
+/**
+ * consolidate - Run memory consolidation (decay, strengthen, edges)
+ */
+program
+  .command('consolidate')
+  .description('Run memory consolidation (decay, strengthen, form connections)')
+  .option('-v, --verbose', 'Show detailed output')
+  .action(async (options: { verbose?: boolean }) => {
+    try {
+      console.log('\nRunning consolidation...\n');
+
+      const result = await consolidateAll();
+
+      console.log('Consolidation complete!');
+      console.log(`  Memories processed: ${result.memoriesProcessed}`);
+      console.log(`  Decayed: ${result.memoriesDecayed}`);
+      console.log(`  Strengthened: ${result.memoriesStrengthened}`);
+      console.log(`  Edges created: ${result.edgesCreated}`);
+      console.log(`  Edges reinforced: ${result.edgesReinforced}`);
+      console.log(`  Edges pruned: ${result.edgesPruned}`);
+      console.log(`  Duration: ${result.durationMs}ms`);
+
+      if (options.verbose) {
+        const stats = await getConsolidationStats();
+        console.log('\nCurrent State:');
+        console.log(`  Active memories: ${stats.activeMemories}`);
+        console.log(`  Dormant memories: ${stats.dormantMemories}`);
+        console.log(`  Total edges: ${stats.totalEdges}`);
+        console.log(`  Average edge weight: ${stats.averageWeight.toFixed(2)}`);
+      }
+
+      console.log('');
+    } catch (error) {
+      console.error('Consolidation failed:', error);
+      process.exit(1);
+    } finally {
+      await closePool();
+    }
+  });
+
+/**
+ * sleep - Friendly alias for consolidate
+ */
+program
+  .command('sleep')
+  .description('Let Squire consolidate memories (alias for consolidate)')
+  .option('-v, --verbose', 'Show detailed output')
+  .action(async (options: { verbose?: boolean }) => {
+    try {
+      console.log('\nSquire is sleeping... consolidating memories...\n');
+
+      const result = await consolidateAll();
+
+      console.log('Squire wakes up refreshed!');
+      console.log(`  Processed ${result.memoriesProcessed} memories`);
+      console.log(`  ${result.memoriesDecayed} faded, ${result.memoriesStrengthened} strengthened`);
+      console.log(`  ${result.edgesCreated} new connections formed`);
+
+      if (options.verbose) {
+        console.log(`  ${result.edgesReinforced} connections reinforced`);
+        console.log(`  ${result.edgesPruned} weak connections pruned`);
+      }
+
+      console.log('');
+    } catch (error) {
+      console.error('Sleep failed:', error);
+      process.exit(1);
+    } finally {
+      await closePool();
+    }
+  });
+
+/**
+ * related - Show memories connected via SIMILAR edges
+ */
+program
+  .command('related')
+  .description('Show memories connected to a given memory')
+  .argument('<memory-id>', 'Memory ID (can be partial)')
+  .option('-l, --limit <limit>', 'Maximum number of related memories', '10')
+  .action(async (memoryId: string, options: { limit: string }) => {
+    try {
+      const limit = parseInt(options.limit, 10);
+
+      // Allow partial IDs - find the full ID
+      let fullId = memoryId;
+      if (memoryId.length < 36) {
+        const memory = await getMemory(memoryId);
+        if (!memory) {
+          // Try to find by prefix
+          console.log(`\nLooking for memory starting with "${memoryId}"...`);
+          console.log('Use `squire list` to see available memories.');
+          return;
+        }
+        fullId = memory.id;
+      }
+
+      const memory = await getMemory(fullId);
+      if (!memory) {
+        console.log(`\nMemory not found: ${memoryId}`);
+        return;
+      }
+
+      console.log(`\nMemory: ${memory.id.substring(0, 8)}`);
+      console.log(`  ${memory.content.length > 60 ? memory.content.substring(0, 60) + '...' : memory.content}`);
+      console.log(`  salience: ${memory.salience_score} | strength: ${memory.current_strength.toFixed(2)}`);
+
+      const related = await getRelatedMemories(fullId, { limit });
+
+      if (related.length === 0) {
+        console.log('\nNo connected memories found.');
+        console.log('Run `squire consolidate` to form connections between similar memories.');
+      } else {
+        console.log(`\nConnected Memories (${related.length}):\n`);
+
+        for (const mem of related) {
+          const preview = mem.content.length > 60
+            ? mem.content.substring(0, 60) + '...'
+            : mem.content;
+          const similarity = mem.edge_similarity ? (mem.edge_similarity * 100).toFixed(0) : '?';
+
+          console.log(`  [${mem.id.substring(0, 8)}] weight: ${mem.edge_weight.toFixed(2)} | similarity: ${similarity}%`);
+          console.log(`    ${preview}`);
+          console.log('');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to get related memories:', error);
       process.exit(1);
     } finally {
       await closePool();
