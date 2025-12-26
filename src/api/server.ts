@@ -2,6 +2,7 @@ import express from 'express';
 import { config } from '../config/index.js';
 import memoriesRouter from './routes/memories.js';
 import healthRouter from './routes/health.js';
+import contextRouter from './routes/context.js';
 
 const app = express();
 
@@ -11,6 +12,7 @@ app.use(express.json());
 // Routes
 app.use('/api/health', healthRouter);
 app.use('/api/memories', memoriesRouter);
+app.use('/api/context', contextRouter);
 
 // 404 handler
 app.use((_req, res) => {

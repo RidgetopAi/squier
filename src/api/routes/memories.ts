@@ -5,6 +5,7 @@ import {
   listMemories,
   countMemories,
   deleteMemory,
+  searchMemories,
 } from '../../services/memories.js';
 
 const router = Router();
@@ -61,6 +62,34 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     console.error('Error listing memories:', error);
     res.status(500).json({ error: 'Failed to list memories' });
+  }
+});
+
+/**
+ * GET /api/memories/search
+ * Semantic search for memories
+ */
+router.get('/search', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const query = req.query.query as string;
+    if (!query) {
+      res.status(400).json({ error: 'query parameter is required' });
+      return;
+    }
+
+    const limit = parseInt(req.query.limit as string) || 10;
+    const minSimilarity = parseFloat(req.query.min_similarity as string) || 0.3;
+
+    const results = await searchMemories(query, { limit, minSimilarity });
+
+    res.json({
+      query,
+      results,
+      count: results.length,
+    });
+  } catch (error) {
+    console.error('Error searching memories:', error);
+    res.status(500).json({ error: 'Failed to search memories' });
   }
 });
 

@@ -22,6 +22,12 @@ export const config = {
     port: parseInt(optional('PORT', '3000'), 10),
     nodeEnv: optional('NODE_ENV', 'development'),
   },
+  embedding: {
+    provider: optional('EMBED_PROVIDER', 'ollama') as 'ollama' | 'groq',
+    dimension: parseInt(optional('EMBED_DIMENSION', '768'), 10),
+    model: optional('EMBED_MODEL', 'nomic-embed-text'),
+    ollamaUrl: optional('OLLAMA_URL', 'http://localhost:11434'),
+  },
   features: {
     emotionTagging: optional('ENABLE_EMOTION_TAGGING', 'false') === 'true',
   },

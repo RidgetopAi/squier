@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { createMemory, listMemories, countMemories } from './services/memories.js';
+import { createMemory, listMemories, countMemories, searchMemories, getContextMemories } from './services/memories.js';
 import { checkConnection, closePool } from './db/pool.js';
+import { checkEmbeddingHealth } from './providers/embeddings.js';
+import { config } from './config/index.js';
 
 const program = new Command();
 
@@ -83,6 +85,117 @@ program
   });
 
 /**
+ * search - Semantic search for memories
+ */
+program
+  .command('search')
+  .description('Semantic search for memories')
+  .argument('<query>', 'Search query')
+  .option('-l, --limit <limit>', 'Maximum number of results', '10')
+  .option('-m, --min-similarity <min>', 'Minimum similarity threshold (0-1)', '0.3')
+  .action(async (query: string, options: { limit: string; minSimilarity: string }) => {
+    try {
+      const limit = parseInt(options.limit, 10);
+      const minSimilarity = parseFloat(options.minSimilarity);
+
+      console.log(`\nSearching for: "${query}"\n`);
+
+      const results = await searchMemories(query, { limit, minSimilarity });
+
+      if (results.length === 0) {
+        console.log('No matching memories found.');
+      } else {
+        console.log(`Found ${results.length} matching memories:\n`);
+
+        for (const memory of results) {
+          const date = new Date(memory.created_at).toLocaleString();
+          const similarity = (memory.similarity * 100).toFixed(1);
+          const preview = memory.content.length > 70
+            ? memory.content.substring(0, 70) + '...'
+            : memory.content;
+
+          console.log(`[${memory.id.substring(0, 8)}] ${similarity}% match`);
+          console.log(`  ${preview}`);
+          console.log(`  ${date} | salience: ${memory.salience_score}`);
+          console.log('');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to search memories:', error);
+      process.exit(1);
+    } finally {
+      await closePool();
+    }
+  });
+
+/**
+ * context - Get context package for AI
+ */
+program
+  .command('context')
+  .description('Get context package for AI consumption')
+  .option('-q, --query <query>', 'Focus context on this query')
+  .option('-l, --limit <limit>', 'Maximum relevant memories', '10')
+  .option('-r, --recent <count>', 'Number of recent memories', '5')
+  .option('--json', 'Output as JSON instead of markdown')
+  .action(async (options: { query?: string; limit: string; recent: string; json?: boolean }) => {
+    try {
+      const limit = parseInt(options.limit, 10);
+      const recentCount = parseInt(options.recent, 10);
+
+      const { recent, relevant } = await getContextMemories(options.query, {
+        limit,
+        recentCount,
+      });
+
+      if (options.json) {
+        console.log(JSON.stringify({
+          generated_at: new Date().toISOString(),
+          query: options.query,
+          recent,
+          relevant,
+        }, null, 2));
+      } else {
+        console.log('\n# Memory Context\n');
+        console.log(`Generated: ${new Date().toISOString()}`);
+        if (options.query) {
+          console.log(`Query: "${options.query}"`);
+        }
+        console.log('');
+
+        if (relevant.length > 0) {
+          console.log('## Relevant Memories\n');
+          for (const memory of relevant) {
+            const date = new Date(memory.created_at).toLocaleDateString();
+            const similarity = (memory.similarity * 100).toFixed(1);
+            console.log(`- [${date}] (${similarity}%) ${memory.content}`);
+          }
+          console.log('');
+        }
+
+        if (recent.length > 0) {
+          console.log('## Recent Memories\n');
+          for (const memory of recent) {
+            const date = new Date(memory.created_at).toLocaleDateString();
+            console.log(`- [${date}] ${memory.content}`);
+          }
+          console.log('');
+        }
+
+        if (recent.length === 0 && relevant.length === 0) {
+          console.log('No memories available for context.');
+          console.log('Use "squier observe <content>" to store memories.');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to get context:', error);
+      process.exit(1);
+    } finally {
+      await closePool();
+    }
+  });
+
+/**
  * status - Check system health
  */
 program
@@ -92,8 +205,16 @@ program
     try {
       console.log('\nSquier Status\n');
 
-      const dbConnected = await checkConnection();
+      const [dbConnected, embeddingConnected] = await Promise.all([
+        checkConnection(),
+        checkEmbeddingHealth(),
+      ]);
+
       console.log(`  Database: ${dbConnected ? 'Connected' : 'Disconnected'}`);
+      console.log(`  Embedding: ${embeddingConnected ? 'Connected' : 'Disconnected'}`);
+      console.log(`    Provider: ${config.embedding.provider}`);
+      console.log(`    Model: ${config.embedding.model}`);
+      console.log(`    Dimension: ${config.embedding.dimension}`);
 
       if (dbConnected) {
         const total = await countMemories();

@@ -1,4 +1,5 @@
 import { pool } from '../db/pool.js';
+import { generateEmbedding } from '../providers/embeddings.js';
 
 export interface Memory {
   id: string;
@@ -7,6 +8,7 @@ export interface Memory {
   content_type: string;
   source: string;
   source_metadata: Record<string, unknown>;
+  embedding: number[] | null;
   salience_score: number;
   salience_factors: Record<string, unknown>;
   created_at: Date;
@@ -33,7 +35,7 @@ export interface ListMemoriesOptions {
 }
 
 /**
- * Store a new memory
+ * Store a new memory with embedding
  */
 export async function createMemory(input: CreateMemoryInput): Promise<Memory> {
   const {
@@ -53,14 +55,18 @@ export async function createMemory(input: CreateMemoryInput): Promise<Memory> {
   );
   const rawObservationId = rawObsResult.rows[0]?.id as string;
 
-  // Then create the memory referencing the raw observation
-  // For Slice 0, salience is default (5.0) - scoring comes in Slice 2
+  // Generate embedding for semantic search
+  const embedding = await generateEmbedding(content);
+  const embeddingStr = `[${embedding.join(',')}]`;
+
+  // Create the memory with embedding
+  // For Slice 1, salience is default (5.0) - scoring comes in Slice 2
   const result = await pool.query(
     `INSERT INTO memories (
       raw_observation_id, content, content_type, source, source_metadata,
-      occurred_at, processing_status, processed_at
+      embedding, occurred_at, processing_status, processed_at
     )
-     VALUES ($1, $2, $3, $4, $5, $6, 'processed', NOW())
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'processed', NOW())
      RETURNING *`,
     [
       rawObservationId,
@@ -68,6 +74,7 @@ export async function createMemory(input: CreateMemoryInput): Promise<Memory> {
       content_type,
       source,
       JSON.stringify(source_metadata),
+      embeddingStr,
       occurred_at,
     ]
   );
@@ -130,4 +137,67 @@ export async function countMemories(): Promise<number> {
 export async function deleteMemory(id: string): Promise<boolean> {
   const result = await pool.query('DELETE FROM memories WHERE id = $1', [id]);
   return (result.rowCount ?? 0) > 0;
+}
+
+export interface SearchMemoriesOptions {
+  limit?: number;
+  minSimilarity?: number;
+}
+
+export interface SearchResult extends Memory {
+  similarity: number;
+}
+
+/**
+ * Semantic search for memories using vector similarity
+ */
+export async function searchMemories(
+  query: string,
+  options: SearchMemoriesOptions = {}
+): Promise<SearchResult[]> {
+  const { limit = 10, minSimilarity = 0.3 } = options;
+
+  // Generate embedding for the search query
+  const queryEmbedding = await generateEmbedding(query);
+  const embeddingStr = `[${queryEmbedding.join(',')}]`;
+
+  // Search using cosine similarity (1 - cosine_distance)
+  // pgvector uses <=> for cosine distance, so similarity = 1 - distance
+  const result = await pool.query(
+    `SELECT *,
+       1 - (embedding <=> $1::vector) as similarity
+     FROM memories
+     WHERE embedding IS NOT NULL
+       AND 1 - (embedding <=> $1::vector) >= $2
+     ORDER BY embedding <=> $1::vector
+     LIMIT $3`,
+    [embeddingStr, minSimilarity, limit]
+  );
+
+  return result.rows as SearchResult[];
+}
+
+/**
+ * Get memories for context injection
+ * Combines recency and semantic relevance
+ */
+export async function getContextMemories(
+  query?: string,
+  options: { limit?: number; recentCount?: number } = {}
+): Promise<{ recent: Memory[]; relevant: SearchResult[] }> {
+  const { limit = 10, recentCount = 5 } = options;
+
+  // Always get recent memories
+  const recent = await listMemories({ limit: recentCount });
+
+  // If query provided, also get semantically relevant memories
+  let relevant: SearchResult[] = [];
+  if (query) {
+    relevant = await searchMemories(query, { limit });
+    // Filter out any that are already in recent
+    const recentIds = new Set(recent.map((m) => m.id));
+    relevant = relevant.filter((m) => !recentIds.has(m.id));
+  }
+
+  return { recent, relevant };
 }
