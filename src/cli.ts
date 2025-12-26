@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { createMemory, listMemories, countMemories, searchMemories, getContextMemories } from './services/memories.js';
+import { createMemory, listMemories, countMemories, searchMemories } from './services/memories.js';
+import { generateContext, listProfiles } from './services/context.js';
 import { checkConnection, closePool } from './db/pool.js';
 import { checkEmbeddingHealth } from './providers/embeddings.js';
+import { checkLLMHealth, getLLMInfo } from './providers/llm.js';
 import { config } from './config/index.js';
 
 const program = new Command();
@@ -131,83 +133,66 @@ program
   });
 
 /**
- * context - Get context package for AI
+ * context - Get context package for AI (Slice 3)
  */
 program
   .command('context')
   .description('Get context package for AI consumption')
+  .option('-p, --profile <name>', 'Context profile (general, work, personal, creative)')
   .option('-q, --query <query>', 'Focus context on this query')
-  .option('-l, --limit <limit>', 'Maximum relevant memories', '10')
-  .option('-r, --recent <count>', 'Number of recent memories', '5')
-  .option('--min-salience <score>', 'Minimum salience to include', '0')
+  .option('-t, --max-tokens <tokens>', 'Maximum tokens in output')
   .option('--json', 'Output as JSON instead of markdown')
-  .action(async (options: { query?: string; limit: string; recent: string; minSalience: string; json?: boolean }) => {
+  .action(async (options: { profile?: string; query?: string; maxTokens?: string; json?: boolean }) => {
     try {
-      const limit = parseInt(options.limit, 10);
-      const recentCount = parseInt(options.recent, 10);
-      const minSalience = parseFloat(options.minSalience);
+      const maxTokens = options.maxTokens ? parseInt(options.maxTokens, 10) : undefined;
 
-      const { recent, relevant, highSalience } = await getContextMemories(options.query, {
-        limit,
-        recentCount,
-        minSalience,
+      const contextPackage = await generateContext({
+        profile: options.profile,
+        query: options.query,
+        maxTokens,
       });
 
       if (options.json) {
-        console.log(JSON.stringify({
-          generated_at: new Date().toISOString(),
-          query: options.query,
-          highSalience,
-          relevant,
-          recent,
-        }, null, 2));
+        console.log(JSON.stringify(contextPackage.json, null, 2));
       } else {
-        console.log('\n# Memory Context\n');
-        console.log(`Generated: ${new Date().toISOString()}`);
-        if (options.query) {
-          console.log(`Query: "${options.query}"`);
-        }
         console.log('');
-
-        // High-salience memories first (most important)
-        if (highSalience.length > 0) {
-          console.log('## Important Memories\n');
-          for (const memory of highSalience) {
-            const date = new Date(memory.created_at).toLocaleDateString();
-            const salience = memory.salience_score.toFixed(1);
-            console.log(`- [${date}] ⭐${salience} ${memory.content}`);
-          }
-          console.log('');
-        }
-
-        if (relevant.length > 0) {
-          console.log('## Relevant Memories\n');
-          for (const memory of relevant) {
-            const date = new Date(memory.created_at).toLocaleDateString();
-            const similarity = (memory.similarity * 100).toFixed(1);
-            const salience = memory.salience_score.toFixed(1);
-            console.log(`- [${date}] ${similarity}% ⭐${salience} ${memory.content}`);
-          }
-          console.log('');
-        }
-
-        if (recent.length > 0) {
-          console.log('## Recent Memories\n');
-          for (const memory of recent) {
-            const date = new Date(memory.created_at).toLocaleDateString();
-            const salience = memory.salience_score.toFixed(1);
-            console.log(`- [${date}] ⭐${salience} ${memory.content}`);
-          }
-          console.log('');
-        }
-
-        if (recent.length === 0 && relevant.length === 0 && highSalience.length === 0) {
-          console.log('No memories available for context.');
-          console.log('Use "squire observe <content>" to store memories.');
-        }
+        console.log(contextPackage.markdown);
+        console.log(`---`);
+        console.log(`Tokens: ~${contextPackage.token_count} | Memories: ${contextPackage.memories.length} | Disclosure: ${contextPackage.disclosure_id.substring(0, 8)}`);
+        console.log('');
       }
     } catch (error) {
       console.error('Failed to get context:', error);
+      process.exit(1);
+    } finally {
+      await closePool();
+    }
+  });
+
+/**
+ * profiles - List available context profiles
+ */
+program
+  .command('profiles')
+  .description('List available context profiles')
+  .action(async () => {
+    try {
+      const profiles = await listProfiles();
+
+      console.log('\nContext Profiles:\n');
+
+      for (const profile of profiles) {
+        const defaultTag = profile.is_default ? ' (default)' : '';
+        const weights = profile.scoring_weights as { salience: number; relevance: number; recency: number; strength: number };
+
+        console.log(`  ${profile.name}${defaultTag}`);
+        console.log(`    ${profile.description || 'No description'}`);
+        console.log(`    min_salience: ${profile.min_salience} | max_tokens: ${profile.max_tokens}`);
+        console.log(`    weights: sal=${weights.salience} rel=${weights.relevance} rec=${weights.recency} str=${weights.strength}`);
+        console.log('');
+      }
+    } catch (error) {
+      console.error('Failed to list profiles:', error);
       process.exit(1);
     } finally {
       await closePool();
@@ -224,16 +209,23 @@ program
     try {
       console.log('\nSquire Status\n');
 
-      const [dbConnected, embeddingConnected] = await Promise.all([
+      const [dbConnected, embeddingConnected, llmConnected] = await Promise.all([
         checkConnection(),
         checkEmbeddingHealth(),
+        checkLLMHealth(),
       ]);
+
+      const llmInfo = getLLMInfo();
 
       console.log(`  Database: ${dbConnected ? 'Connected' : 'Disconnected'}`);
       console.log(`  Embedding: ${embeddingConnected ? 'Connected' : 'Disconnected'}`);
       console.log(`    Provider: ${config.embedding.provider}`);
       console.log(`    Model: ${config.embedding.model}`);
       console.log(`    Dimension: ${config.embedding.dimension}`);
+      console.log(`  LLM: ${llmConnected ? 'Connected' : 'Disconnected'}`);
+      console.log(`    Provider: ${llmInfo.provider}`);
+      console.log(`    Model: ${llmInfo.model}`);
+      console.log(`    Configured: ${llmInfo.configured ? 'Yes' : 'No (set GROQ_API_KEY)'}`);
 
       if (dbConnected) {
         const total = await countMemories();
