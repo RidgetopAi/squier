@@ -1,0 +1,339 @@
+@import "tailwindcss";
+
+/* ============================================
+   SQUIRE - CYBER-FUTURISTIC THEME
+   ============================================ */
+
+:root {
+  /* Core backgrounds */
+  --background: #0a0a0f;
+  --background-secondary: #12121a;
+  --background-tertiary: #1a1a26;
+  --foreground: #e4e4e7;
+  --foreground-muted: #a1a1aa;
+
+  /* Primary brand colors */
+  --primary: #00d4ff;           /* Electric cyan */
+  --primary-hover: #00b8e6;
+  --primary-glow: rgba(0, 212, 255, 0.4);
+
+  /* Accent colors */
+  --accent-gold: #ffd700;       /* High salience gold */
+  --accent-gold-glow: rgba(255, 215, 0, 0.4);
+  --accent-magenta: #ff00ff;    /* Emphasis */
+  --accent-purple: #9d4edd;     /* Secondary accent */
+
+  /* Status colors */
+  --success: #00ff88;
+  --warning: #ffaa00;
+  --error: #ff4444;
+  --info: #00aaff;
+
+  /* Salience scale (1-10) */
+  --salience-1: #3f3f46;
+  --salience-2: #52525b;
+  --salience-3: #6366f1;
+  --salience-4: #818cf8;
+  --salience-5: #a5b4fc;
+  --salience-6: #c4b5fd;
+  --salience-7: #f472b6;
+  --salience-8: #fb7185;
+  --salience-9: #fbbf24;
+  --salience-10: #ffd700;
+
+  /* Emotion colors */
+  --emotion-joy: #fbbf24;
+  --emotion-sadness: #60a5fa;
+  --emotion-anger: #ef4444;
+  --emotion-fear: #a855f7;
+  --emotion-surprise: #f97316;
+  --emotion-disgust: #22c55e;
+  --emotion-neutral: #71717a;
+
+  /* Entity type colors */
+  --entity-person: #00d4ff;
+  --entity-organization: #9d4edd;
+  --entity-location: #00ff88;
+  --entity-project: #ffd700;
+  --entity-concept: #ff6b6b;
+  --entity-event: #f97316;
+
+  /* Glass effects */
+  --glass-bg: rgba(18, 18, 26, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-highlight: rgba(255, 255, 255, 0.05);
+
+  /* Shadows and glows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px var(--primary-glow);
+  --shadow-gold-glow: 0 0 20px var(--accent-gold-glow);
+
+  /* Animation durations */
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --duration-slow: 500ms;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+}
+
+@theme inline {
+  /* Map CSS vars to Tailwind theme */
+  --color-background: var(--background);
+  --color-background-secondary: var(--background-secondary);
+  --color-background-tertiary: var(--background-tertiary);
+  --color-foreground: var(--foreground);
+  --color-foreground-muted: var(--foreground-muted);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-accent-gold: var(--accent-gold);
+  --color-accent-magenta: var(--accent-magenta);
+  --color-accent-purple: var(--accent-purple);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+
+  /* Salience colors */
+  --color-salience-1: var(--salience-1);
+  --color-salience-2: var(--salience-2);
+  --color-salience-3: var(--salience-3);
+  --color-salience-4: var(--salience-4);
+  --color-salience-5: var(--salience-5);
+  --color-salience-6: var(--salience-6);
+  --color-salience-7: var(--salience-7);
+  --color-salience-8: var(--salience-8);
+  --color-salience-9: var(--salience-9);
+  --color-salience-10: var(--salience-10);
+
+  /* Emotion colors */
+  --color-emotion-joy: var(--emotion-joy);
+  --color-emotion-sadness: var(--emotion-sadness);
+  --color-emotion-anger: var(--emotion-anger);
+  --color-emotion-fear: var(--emotion-fear);
+  --color-emotion-surprise: var(--emotion-surprise);
+  --color-emotion-disgust: var(--emotion-disgust);
+  --color-emotion-neutral: var(--emotion-neutral);
+
+  /* Entity colors */
+  --color-entity-person: var(--entity-person);
+  --color-entity-organization: var(--entity-organization);
+  --color-entity-location: var(--entity-location);
+  --color-entity-project: var(--entity-project);
+  --color-entity-concept: var(--entity-concept);
+  --color-entity-event: var(--entity-event);
+
+  /* Fonts */
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+/* Glass morphism */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+}
+
+.glass-subtle {
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-border);
+}
+
+/* Glow effects */
+.glow-primary {
+  box-shadow: var(--shadow-glow);
+}
+
+.glow-gold {
+  box-shadow: var(--shadow-gold-glow);
+}
+
+.glow-text-primary {
+  text-shadow: 0 0 10px var(--primary-glow);
+}
+
+.glow-text-gold {
+  text-shadow: 0 0 10px var(--accent-gold-glow);
+}
+
+/* Neon border */
+.neon-border {
+  border: 1px solid var(--primary);
+  box-shadow:
+    inset 0 0 10px var(--primary-glow),
+    0 0 10px var(--primary-glow);
+}
+
+.neon-border-gold {
+  border: 1px solid var(--accent-gold);
+  box-shadow:
+    inset 0 0 10px var(--accent-gold-glow),
+    0 0 10px var(--accent-gold-glow);
+}
+
+/* Gradient backgrounds */
+.gradient-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent-purple) 100%);
+}
+
+.gradient-gold {
+  background: linear-gradient(135deg, var(--accent-gold) 0%, #ff8c00 100%);
+}
+
+.gradient-dark {
+  background: linear-gradient(180deg, var(--background) 0%, var(--background-secondary) 100%);
+}
+
+/* Animated gradient border */
+.animated-border {
+  position: relative;
+  background: var(--background-secondary);
+  border-radius: var(--radius-lg);
+}
+
+.animated-border::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: calc(var(--radius-lg) + 2px);
+  background: linear-gradient(
+    45deg,
+    var(--primary),
+    var(--accent-purple),
+    var(--accent-magenta),
+    var(--accent-gold),
+    var(--primary)
+  );
+  background-size: 400% 400%;
+  animation: gradient-shift 8s ease infinite;
+  z-index: -1;
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Pulse animation for active states */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Fade in animation */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in var(--duration-normal) ease-out;
+}
+
+/* Slide animations */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-left {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-right {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-slide-up {
+  animation: slide-up var(--duration-normal) ease-out;
+}
+
+.animate-slide-down {
+  animation: slide-down var(--duration-normal) ease-out;
+}
+
+.animate-slide-left {
+  animation: slide-left var(--duration-normal) ease-out;
+}
+
+.animate-slide-right {
+  animation: slide-right var(--duration-normal) ease-out;
+}
+
+/* Salience glow intensity classes */
+.salience-glow-1 { box-shadow: 0 0 4px var(--salience-1); }
+.salience-glow-2 { box-shadow: 0 0 6px var(--salience-2); }
+.salience-glow-3 { box-shadow: 0 0 8px var(--salience-3); }
+.salience-glow-4 { box-shadow: 0 0 10px var(--salience-4); }
+.salience-glow-5 { box-shadow: 0 0 12px var(--salience-5); }
+.salience-glow-6 { box-shadow: 0 0 14px var(--salience-6); }
+.salience-glow-7 { box-shadow: 0 0 16px var(--salience-7); }
+.salience-glow-8 { box-shadow: 0 0 18px var(--salience-8); }
+.salience-glow-9 { box-shadow: 0 0 20px var(--salience-9); }
+.salience-glow-10 { box-shadow: 0 0 25px var(--salience-10), 0 0 50px var(--accent-gold-glow); }
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--background-tertiary);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground-muted);
+}
+
+/* Selection styling */
+::selection {
+  background: var(--primary);
+  color: var(--background);
+}
+
+/* Focus outline */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

@@ -25,6 +25,15 @@ logs/
 
 # Data (local object storage)
 data/objects/
+storage/
+images/
+
+# Personal data imports
+*.jsonl
+claude-desktop-memories/
+
+# Windows zone identifiers
+*:Zone.Identifier
 
 # Test coverage
 coverage/
