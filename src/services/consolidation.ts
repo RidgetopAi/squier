@@ -13,6 +13,9 @@ import {
 import {
   processInsightsForConsolidation,
 } from './insights.js';
+import {
+  processResearchForConsolidation,
+} from './research.js';
 
 /**
  * Consolidation Configuration
@@ -73,6 +76,10 @@ export interface ConsolidationResult {
   insightsCreated: number;
   insightsValidated: number;
   insightsStale: number;
+  gapsCreated: number;
+  gapsSurfaced: number;
+  questionsCreated: number;
+  questionsExpired: number;
   durationMs: number;
 }
 
@@ -360,6 +367,9 @@ export async function consolidateSession(session: Session): Promise<Consolidatio
     // 6. Process insights (cross-analyze beliefs, patterns, memories)
     const insightResult = await processInsightsForConsolidation();
 
+    // 7. Process active research (detect gaps, generate questions)
+    const researchResult = await processResearchForConsolidation();
+
     // Count total memories processed
     const countResult = await pool.query(`SELECT COUNT(*) as count FROM memories`);
     const memoriesProcessed = parseInt(countResult.rows[0]?.count ?? '0', 10);
@@ -389,6 +399,10 @@ export async function consolidateSession(session: Session): Promise<Consolidatio
       insightsCreated: insightResult.created.length,
       insightsValidated: insightResult.validated.length,
       insightsStale: insightResult.staleMarked,
+      gapsCreated: researchResult.gapsCreated.length,
+      gapsSurfaced: researchResult.gapsSurfaced.length,
+      questionsCreated: researchResult.questionsCreated.length,
+      questionsExpired: researchResult.questionsExpired,
       durationMs: Date.now() - startTime,
     };
   } catch (error) {
@@ -422,6 +436,9 @@ export async function consolidateAll(): Promise<ConsolidationResult> {
   // 6. Process insights (cross-analyze beliefs, patterns, memories)
   const insightResult = await processInsightsForConsolidation();
 
+  // 7. Process active research (detect gaps, generate questions)
+  const researchResult = await processResearchForConsolidation();
+
   // Count total memories processed
   const countResult = await pool.query(`SELECT COUNT(*) as count FROM memories`);
   const memoriesProcessed = parseInt(countResult.rows[0]?.count ?? '0', 10);
@@ -439,6 +456,10 @@ export async function consolidateAll(): Promise<ConsolidationResult> {
     insightsCreated: insightResult.created.length,
     insightsValidated: insightResult.validated.length,
     insightsStale: insightResult.staleMarked,
+    gapsCreated: researchResult.gapsCreated.length,
+    gapsSurfaced: researchResult.gapsSurfaced.length,
+    questionsCreated: researchResult.questionsCreated.length,
+    questionsExpired: researchResult.questionsExpired,
     durationMs: Date.now() - startTime,
   };
 }

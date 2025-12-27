@@ -63,6 +63,32 @@ import {
   type InsightType,
   type InsightPriority,
 } from './services/insights.js';
+import {
+  getAllGaps,
+  getGap,
+  getGapSources,
+  getGapStats,
+  dismissGap,
+  fillGap,
+  getAllQuestions,
+  getQuestion,
+  getQuestionSources,
+  getQuestionStats,
+  askQuestion,
+  answerQuestion,
+  dismissQuestion,
+  GAP_TYPES,
+  GAP_PRIORITIES,
+  QUESTION_TYPES,
+  TIMING_HINTS,
+  getGapTypeEmoji,
+  getQuestionTypeEmoji,
+  getTimingHintDescription,
+  type GapType,
+  type GapPriority,
+  type QuestionType,
+  type TimingHint,
+} from './services/research.js';
 import { pool, checkConnection, closePool } from './db/pool.js';
 import { checkEmbeddingHealth } from './providers/embeddings.js';
 import { checkLLMHealth, getLLMInfo } from './providers/llm.js';
@@ -464,6 +490,12 @@ program
       if (result.insightsStale > 0) {
         console.log(`  Insights stale: ${result.insightsStale}`);
       }
+      if (result.gapsCreated > 0 || result.gapsSurfaced > 0) {
+        console.log(`  Gaps: ${result.gapsCreated} new, ${result.gapsSurfaced} surfaced`);
+      }
+      if (result.questionsCreated > 0 || result.questionsExpired > 0) {
+        console.log(`  Questions: ${result.questionsCreated} new, ${result.questionsExpired} expired`);
+      }
       console.log(`  Duration: ${result.durationMs}ms`);
 
       if (options.verbose) {
@@ -506,6 +538,9 @@ program
       }
       if (result.insightsCreated > 0 || result.insightsValidated > 0) {
         console.log(`  ${result.insightsCreated} insights generated, ${result.insightsValidated} validated`);
+      }
+      if (result.gapsCreated > 0 || result.questionsCreated > 0) {
+        console.log(`  ${result.gapsCreated} gaps found, ${result.questionsCreated} questions generated`);
       }
 
       if (options.verbose) {
@@ -1393,6 +1428,349 @@ program
       console.log('');
     } catch (error) {
       console.error('Failed to get insight:', error);
+      process.exit(1);
+    } finally {
+      await closePool();
+    }
+  });
+
+/**
+ * gaps - List all knowledge gaps
+ */
+program
+  .command('gaps')
+  .description('List knowledge gaps (what we don\'t know)')
+  .option('-t, --type <type>', 'Filter by gap type')
+  .option('-p, --priority <priority>', 'Filter by priority (low, medium, high, critical)')
+  .option('-l, --limit <limit>', 'Maximum number to show', '20')
+  .option('--all', 'Include filled and dismissed gaps')
+  .action(async (options: { type?: string; priority?: string; limit: string; all?: boolean }) => {
+    try {
+      // Validate type if provided
+      if (options.type && !GAP_TYPES.includes(options.type as GapType)) {
+        console.log(`\nInvalid gap type: ${options.type}`);
+        console.log(`Valid types: ${GAP_TYPES.join(', ')}`);
+        return;
+      }
+
+      // Validate priority if provided
+      if (options.priority && !GAP_PRIORITIES.includes(options.priority as GapPriority)) {
+        console.log(`\nInvalid priority: ${options.priority}`);
+        console.log(`Valid priorities: ${GAP_PRIORITIES.join(', ')}`);
+        return;
+      }
+
+      const limit = parseInt(options.limit, 10);
+      const gaps = await getAllGaps({
+        type: options.type as GapType | undefined,
+        priority: options.priority as GapPriority | undefined,
+        status: options.all ? undefined : 'open',
+        limit,
+      });
+
+      const stats = await getGapStats();
+
+      console.log('\nKnowledge Gaps\n');
+      console.log(`  Total: ${stats.total} | Open: ${stats.open} | Partially filled: ${stats.partiallyFilled} | Filled: ${stats.filled}`);
+      console.log(`  Avg severity: ${(stats.avgSeverity * 100).toFixed(0)}%`);
+      console.log('');
+
+      if (gaps.length === 0) {
+        console.log('No knowledge gaps detected yet.');
+        console.log('Gaps are detected during consolidation. Run `squire consolidate`.');
+      } else {
+        for (const g of gaps) {
+          const severity = (g.severity * 100).toFixed(0);
+          const status = g.status !== 'open' ? ` [${g.status}]` : '';
+          const emoji = getGapTypeEmoji(g.gap_type);
+          const surfaced = g.times_surfaced > 1 ? ` (surfaced ${g.times_surfaced}x)` : '';
+          console.log(`${emoji} [${g.id.substring(0, 8)}] ${g.gap_type}${status}${surfaced}`);
+          console.log(`  "${g.content}"`);
+          console.log(`  priority: ${g.priority} | severity: ${severity}%`);
+          console.log('');
+        }
+      }
+
+      if (options.type) {
+        console.log(`Showing ${options.type} gaps only. Remove --type to see all.`);
+      }
+      console.log('');
+    } catch (error) {
+      console.error('Failed to list gaps:', error);
+      process.exit(1);
+    } finally {
+      await closePool();
+    }
+  });
+
+/**
+ * gap - Show a specific gap with sources
+ */
+program
+  .command('gap')
+  .description('Show a specific knowledge gap with its sources')
+  .argument('<id>', 'Gap ID (can be partial)')
+  .option('--dismiss [reason]', 'Dismiss this gap')
+  .option('--fill', 'Mark this gap as filled')
+  .action(async (id: string, options: { dismiss?: string | boolean; fill?: boolean }) => {
+    try {
+      // Try to find by partial ID
+      let gap = null;
+
+      if (id.length === 36) {
+        gap = await getGap(id);
+      } else {
+        // Search for partial match
+        const all = await getAllGaps({ limit: 100 });
+        const match = all.find(g => g.id.startsWith(id));
+        if (match) {
+          gap = match;
+        }
+      }
+
+      if (!gap) {
+        console.log(`\nGap not found: ${id}`);
+        console.log('Use `squire gaps` to see available gaps.');
+        return;
+      }
+
+      // Handle dismiss action
+      if (options.dismiss !== undefined) {
+        const reason = typeof options.dismiss === 'string' ? options.dismiss : undefined;
+        await dismissGap(gap.id, reason);
+        console.log(`\nGap dismissed: ${gap.id.substring(0, 8)}`);
+        if (reason) {
+          console.log(`  Reason: ${reason}`);
+        }
+        return;
+      }
+
+      // Handle fill action
+      if (options.fill) {
+        await fillGap(gap.id);
+        console.log(`\nGap marked as filled: ${gap.id.substring(0, 8)}`);
+        return;
+      }
+
+      const sources = await getGapSources(gap.id);
+
+      const emoji = getGapTypeEmoji(gap.gap_type);
+      console.log(`\n${emoji} Gap: ${gap.id}`);
+      console.log(`${'─'.repeat(50)}`);
+      console.log(`"${gap.content}"`);
+      console.log('');
+      console.log(`  Type: ${gap.gap_type}`);
+      console.log(`  Priority: ${gap.priority}`);
+      console.log(`  Severity: ${(gap.severity * 100).toFixed(0)}%`);
+      console.log(`  Status: ${gap.status}`);
+      console.log(`  Times surfaced: ${gap.times_surfaced}`);
+      console.log(`  Detected: ${gap.created_at.toLocaleString()}`);
+      if (gap.detection_context) {
+        console.log(`  Context: ${gap.detection_context}`);
+      }
+      console.log('');
+
+      if (sources.length > 0) {
+        console.log(`Sources (${sources.length}):`);
+        for (const s of sources) {
+          console.log(`  [${s.source_type}] ${s.source_id.substring(0, 8)} - ${s.revelation_type}`);
+          if (s.explanation) {
+            console.log(`    ${s.explanation}`);
+          }
+        }
+      }
+
+      console.log('');
+      console.log('Actions:');
+      console.log(`  squire gap ${gap.id.substring(0, 8)} --dismiss "reason"  # Not interested in filling`);
+      console.log(`  squire gap ${gap.id.substring(0, 8)} --fill              # Mark as filled`);
+      console.log('');
+    } catch (error) {
+      console.error('Failed to get gap:', error);
+      process.exit(1);
+    } finally {
+      await closePool();
+    }
+  });
+
+/**
+ * questions - List all research questions
+ */
+program
+  .command('questions')
+  .description('List research questions to ask')
+  .option('-t, --type <type>', 'Filter by question type')
+  .option('-p, --priority <priority>', 'Filter by priority (low, medium, high, critical)')
+  .option('--timing <hint>', 'Filter by timing hint')
+  .option('-l, --limit <limit>', 'Maximum number to show', '20')
+  .option('--all', 'Include answered and dismissed questions')
+  .action(async (options: { type?: string; priority?: string; timing?: string; limit: string; all?: boolean }) => {
+    try {
+      // Validate type if provided
+      if (options.type && !QUESTION_TYPES.includes(options.type as QuestionType)) {
+        console.log(`\nInvalid question type: ${options.type}`);
+        console.log(`Valid types: ${QUESTION_TYPES.join(', ')}`);
+        return;
+      }
+
+      // Validate priority if provided
+      if (options.priority && !GAP_PRIORITIES.includes(options.priority as GapPriority)) {
+        console.log(`\nInvalid priority: ${options.priority}`);
+        console.log(`Valid priorities: ${GAP_PRIORITIES.join(', ')}`);
+        return;
+      }
+
+      // Validate timing if provided
+      if (options.timing && !TIMING_HINTS.includes(options.timing as TimingHint)) {
+        console.log(`\nInvalid timing hint: ${options.timing}`);
+        console.log(`Valid hints: ${TIMING_HINTS.join(', ')}`);
+        return;
+      }
+
+      const limit = parseInt(options.limit, 10);
+      const questions = await getAllQuestions({
+        type: options.type as QuestionType | undefined,
+        priority: options.priority as GapPriority | undefined,
+        timingHint: options.timing as TimingHint | undefined,
+        status: options.all ? undefined : 'pending',
+        limit,
+      });
+
+      const stats = await getQuestionStats();
+
+      console.log('\nResearch Questions\n');
+      console.log(`  Total: ${stats.total} | Pending: ${stats.pending} | Asked: ${stats.asked} | Answered: ${stats.answered}`);
+      if (stats.avgUsefulness > 0) {
+        console.log(`  Avg usefulness: ${(stats.avgUsefulness * 100).toFixed(0)}%`);
+      }
+      console.log('');
+
+      if (questions.length === 0) {
+        console.log('No research questions generated yet.');
+        console.log('Questions are generated during consolidation. Run `squire consolidate`.');
+      } else {
+        for (const q of questions) {
+          const status = q.status !== 'pending' ? ` [${q.status}]` : '';
+          const emoji = getQuestionTypeEmoji(q.question_type);
+          const timing = q.timing_hint ? ` (${getTimingHintDescription(q.timing_hint)})` : '';
+          console.log(`${emoji} [${q.id.substring(0, 8)}] ${q.question_type}${status}${timing}`);
+          console.log(`  "${q.content}"`);
+          console.log(`  priority: ${q.priority}`);
+          console.log('');
+        }
+      }
+
+      if (options.type) {
+        console.log(`Showing ${options.type} questions only. Remove --type to see all.`);
+      }
+      console.log('');
+    } catch (error) {
+      console.error('Failed to list questions:', error);
+      process.exit(1);
+    } finally {
+      await closePool();
+    }
+  });
+
+/**
+ * question - Show a specific question with sources
+ */
+program
+  .command('question')
+  .description('Show a specific research question')
+  .argument('<id>', 'Question ID (can be partial)')
+  .option('--ask', 'Mark this question as asked')
+  .option('--answer <text>', 'Record an answer to this question')
+  .option('--dismiss', 'Dismiss this question')
+  .action(async (id: string, options: { ask?: boolean; answer?: string; dismiss?: boolean }) => {
+    try {
+      // Try to find by partial ID
+      let question = null;
+
+      if (id.length === 36) {
+        question = await getQuestion(id);
+      } else {
+        // Search for partial match
+        const all = await getAllQuestions({ limit: 100 });
+        const match = all.find(q => q.id.startsWith(id));
+        if (match) {
+          question = match;
+        }
+      }
+
+      if (!question) {
+        console.log(`\nQuestion not found: ${id}`);
+        console.log('Use `squire questions` to see available questions.');
+        return;
+      }
+
+      // Handle ask action
+      if (options.ask) {
+        await askQuestion(question.id);
+        console.log(`\nQuestion marked as asked: ${question.id.substring(0, 8)}`);
+        return;
+      }
+
+      // Handle answer action
+      if (options.answer) {
+        await answerQuestion(question.id, options.answer);
+        console.log(`\nAnswer recorded for: ${question.id.substring(0, 8)}`);
+        return;
+      }
+
+      // Handle dismiss action
+      if (options.dismiss) {
+        await dismissQuestion(question.id);
+        console.log(`\nQuestion dismissed: ${question.id.substring(0, 8)}`);
+        return;
+      }
+
+      const sources = await getQuestionSources(question.id);
+
+      const emoji = getQuestionTypeEmoji(question.question_type);
+      console.log(`\n${emoji} Question: ${question.id}`);
+      console.log(`${'─'.repeat(50)}`);
+      console.log(`"${question.content}"`);
+      console.log('');
+      console.log(`  Type: ${question.question_type}`);
+      console.log(`  Priority: ${question.priority}`);
+      console.log(`  Status: ${question.status}`);
+      if (question.timing_hint) {
+        console.log(`  Timing: ${getTimingHintDescription(question.timing_hint)}`);
+      }
+      if (question.gap_id) {
+        console.log(`  For gap: ${question.gap_id.substring(0, 8)}`);
+      }
+      console.log(`  Created: ${question.created_at.toLocaleString()}`);
+      if (question.asked_at) {
+        console.log(`  Asked: ${question.asked_at.toLocaleString()}`);
+      }
+      if (question.answered_at) {
+        console.log(`  Answered: ${question.answered_at.toLocaleString()}`);
+        if (question.answer) {
+          console.log(`  Answer: "${question.answer}"`);
+        }
+      }
+      console.log('');
+
+      if (sources.length > 0) {
+        console.log(`Sources (${sources.length}):`);
+        for (const s of sources) {
+          console.log(`  [${s.source_type}] ${s.source_id.substring(0, 8)} - ${s.relation_type}`);
+          if (s.explanation) {
+            console.log(`    ${s.explanation}`);
+          }
+        }
+      }
+
+      console.log('');
+      console.log('Actions:');
+      console.log(`  squire question ${question.id.substring(0, 8)} --ask              # Mark as asked`);
+      console.log(`  squire question ${question.id.substring(0, 8)} --answer "text"    # Record answer`);
+      console.log(`  squire question ${question.id.substring(0, 8)} --dismiss          # Dismiss`);
+      console.log('');
+    } catch (error) {
+      console.error('Failed to get question:', error);
       process.exit(1);
     } finally {
       await closePool();
