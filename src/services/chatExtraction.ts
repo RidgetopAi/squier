@@ -12,6 +12,7 @@ import { createMemory } from './memories.js';
 import { processMemoryForBeliefs } from './beliefs.js';
 import { classifyMemoryCategories, linkMemoryToCategories } from './summaries.js';
 import { createCommitment } from './commitments.js';
+import { createStandaloneReminder } from './reminders.js';
 
 // === TYPES ===
 
@@ -42,6 +43,7 @@ export interface ExtractionResult {
   messagesProcessed: number;
   memoriesCreated: number;
   commitmentsCreated: number;
+  remindersCreated: number;
   beliefsCreated: number;
   beliefsReinforced: number;
   skippedEmpty: number;
@@ -120,6 +122,81 @@ interface CommitmentDetection {
   description: string | null;
   due_at: string | null;
   all_day: boolean;
+}
+
+// === REMINDER DETECTION PROMPT ===
+
+const REMINDER_DETECTION_PROMPT = `Analyze this message and detect if the user is requesting a reminder.
+
+Look for patterns like:
+- "remind me in X minutes/hours/days"
+- "remind me to X"
+- "set a reminder for X"
+- "don't let me forget to X"
+- "ping me about X in Y"
+
+Return JSON with:
+- is_reminder: boolean - true if this is a reminder request
+- title: string | null - what to remind about (extracted from message)
+- delay_minutes: number | null - how many minutes from now (convert hours/days to minutes)
+
+Examples:
+Input: "remind me in 2 hours to call mom"
+Output: {"is_reminder": true, "title": "Call mom", "delay_minutes": 120}
+
+Input: "remind me to pick up groceries tomorrow"
+Output: {"is_reminder": true, "title": "Pick up groceries", "delay_minutes": 1440}
+
+Input: "set a reminder for 30 minutes to take a break"
+Output: {"is_reminder": true, "title": "Take a break", "delay_minutes": 30}
+
+Input: "I need to remember my dentist appointment"
+Output: {"is_reminder": false, "title": null, "delay_minutes": null}
+
+Input: "ping me about the report in 45 minutes"
+Output: {"is_reminder": true, "title": "The report", "delay_minutes": 45}
+
+IMPORTANT: Return ONLY valid JSON object, no markdown, no explanation.`;
+
+interface ReminderDetection {
+  is_reminder: boolean;
+  title: string | null;
+  delay_minutes: number | null;
+}
+
+/**
+ * Detect if a message contains a reminder request
+ */
+async function detectReminderRequest(message: string): Promise<ReminderDetection | null> {
+  // Quick check - skip if no reminder-related keywords
+  const reminderKeywords = /remind|ping|alert|don't forget|dont forget|set.+reminder/i;
+  if (!reminderKeywords.test(message)) {
+    return null;
+  }
+
+  try {
+    const messages: LLMMessage[] = [
+      { role: 'system', content: REMINDER_DETECTION_PROMPT },
+      { role: 'user', content: message },
+    ];
+
+    const result = await complete(messages, {
+      temperature: 0.1,
+      maxTokens: 300,
+    });
+
+    const content = result.content.trim();
+    let jsonStr = content;
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[0];
+    }
+
+    return JSON.parse(jsonStr) as ReminderDetection;
+  } catch (error) {
+    console.error('[ChatExtraction] Reminder detection failed:', error);
+    return null;
+  }
 }
 
 /**
@@ -295,6 +372,7 @@ async function extractFromConversation(
 ): Promise<{
   memoriesCreated: number;
   commitmentsCreated: number;
+  remindersCreated: number;
   beliefsCreated: number;
   beliefsReinforced: number;
   messagesProcessed: number;
@@ -307,6 +385,7 @@ async function extractFromConversation(
     return {
       memoriesCreated: 0,
       commitmentsCreated: 0,
+      remindersCreated: 0,
       beliefsCreated: 0,
       beliefsReinforced: 0,
       messagesProcessed: 0,
@@ -321,16 +400,36 @@ async function extractFromConversation(
     // Extract memories via LLM
     const extracted = await extractFromTranscript(transcript);
 
+    // First, check raw messages for reminder requests (before memory extraction)
+    let remindersCreated = 0;
+    for (const msg of messages) {
+      try {
+        const reminderInfo = await detectReminderRequest(msg.content);
+        if (reminderInfo?.is_reminder && reminderInfo.title && reminderInfo.delay_minutes) {
+          await createStandaloneReminder(
+            reminderInfo.title,
+            reminderInfo.delay_minutes,
+            { body: `Reminder from chat: "${msg.content}"` }
+          );
+          remindersCreated++;
+          console.log(`[ChatExtraction] Created reminder: ${reminderInfo.title} in ${reminderInfo.delay_minutes} minutes`);
+        }
+      } catch (reminderError) {
+        console.error('[ChatExtraction] Reminder creation failed:', reminderError);
+      }
+    }
+
     if (extracted.length === 0) {
-      // Nothing worth remembering - mark as skipped
+      // Nothing worth remembering - mark as skipped (but we may have created reminders)
       await markMessagesSkipped(conversation.id, messageIds);
       return {
         memoriesCreated: 0,
         commitmentsCreated: 0,
+        remindersCreated,
         beliefsCreated: 0,
         beliefsReinforced: 0,
         messagesProcessed: messages.length,
-        skipped: true,
+        skipped: remindersCreated === 0,
       };
     }
 
@@ -410,6 +509,7 @@ async function extractFromConversation(
     return {
       memoriesCreated,
       commitmentsCreated,
+      remindersCreated,
       beliefsCreated,
       beliefsReinforced,
       messagesProcessed: messages.length,
@@ -422,6 +522,7 @@ async function extractFromConversation(
     return {
       memoriesCreated: 0,
       commitmentsCreated: 0,
+      remindersCreated: 0,
       beliefsCreated: 0,
       beliefsReinforced: 0,
       messagesProcessed: 0,
@@ -441,6 +542,7 @@ export async function extractMemoriesFromChat(): Promise<ExtractionResult> {
     messagesProcessed: 0,
     memoriesCreated: 0,
     commitmentsCreated: 0,
+    remindersCreated: 0,
     beliefsCreated: 0,
     beliefsReinforced: 0,
     skippedEmpty: 0,
@@ -463,6 +565,7 @@ export async function extractMemoriesFromChat(): Promise<ExtractionResult> {
     result.messagesProcessed += convResult.messagesProcessed;
     result.memoriesCreated += convResult.memoriesCreated;
     result.commitmentsCreated += convResult.commitmentsCreated;
+    result.remindersCreated += convResult.remindersCreated;
     result.beliefsCreated += convResult.beliefsCreated;
     result.beliefsReinforced += convResult.beliefsReinforced;
 
@@ -477,7 +580,8 @@ export async function extractMemoriesFromChat(): Promise<ExtractionResult> {
 
   console.log(
     `[ChatExtraction] Complete: ${result.memoriesCreated} memories, ` +
-    `${result.commitmentsCreated} commitments, ${result.beliefsCreated} beliefs, ${result.skippedEmpty} skipped`
+    `${result.commitmentsCreated} commitments, ${result.remindersCreated} reminders, ` +
+    `${result.beliefsCreated} beliefs, ${result.skippedEmpty} skipped`
   );
 
   return result;

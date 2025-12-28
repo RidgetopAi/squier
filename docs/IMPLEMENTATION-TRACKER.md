@@ -10,7 +10,7 @@
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 1 | Core Commitments | ✅ Complete |
-| 2 | Reminders + PWA Push | 🔄 In Progress |
+| 2 | Reminders + PWA Push | ✅ Complete |
 | 3 | Google Calendar Sync | 🔲 Not Started |
 | 4 | Recurrence (RRULE) | 🔲 Not Started |
 | 5 | Resolution Detection | 🔲 Not Started |
@@ -78,9 +78,12 @@
 
 | Method | Route | Status | Handler | Notes |
 |--------|-------|--------|---------|-------|
-| POST | `/api/notifications/subscribe` | 🔲 | subscribe | Register push endpoint |
-| DELETE | `/api/notifications/unsubscribe` | 🔲 | unsubscribe | Remove subscription |
-| GET | `/api/notifications/vapid-key` | 🔲 | getVapidKey | Public key for client |
+| POST | `/api/notifications/subscribe` | ✅ | subscribe | Register push endpoint |
+| DELETE | `/api/notifications/unsubscribe` | ✅ | unsubscribe | Remove subscription |
+| GET | `/api/notifications/vapid-key` | ✅ | getVapidKey | Public key for client |
+| GET | `/api/notifications/status` | ✅ | getStatus | Config status + stats |
+| GET | `/api/notifications/subscriptions` | ✅ | list | List all subscriptions |
+| GET | `/api/notifications/subscription` | ✅ | check | Check if endpoint subscribed |
 
 ---
 
@@ -119,7 +122,7 @@
 | RecurrenceEditor | `components/calendar/RecurrenceEditor.tsx` | 🔲 | RRULE builder |
 | CommitmentsList | `components/commitments/CommitmentsList.tsx` | 🔲 | Filterable list |
 | CommitmentCard | `components/commitments/CommitmentCard.tsx` | 🔲 | Single display |
-| PushPermission | `components/notifications/PushPermission.tsx` | 🔲 | Request permission |
+| PushPermission | `components/notifications/PushPermission.tsx` | ✅ | Request permission |
 
 ---
 
@@ -177,10 +180,10 @@
 | 2.4 | Create push notification service | `93dcb88a-f2e2-423c-8de1-cb2e9ef94882` | ✅ |
 | 2.5 | Create scheduler service | `d31302d1-554c-4cc3-b90f-03e414fc68c6` | ✅ |
 | 2.6 | Create reminders API routes | `61403daa-970b-4f0f-ab51-a095789cbb26` | ✅ |
-| 2.7 | Create notifications API routes | `b77537ac-33f3-427c-a3bf-bc4e0574113e` | 🔲 |
-| 2.8 | Create service worker for PWA push | `1f225f73-e207-47f4-8e5f-173863701a62` | 🔲 |
-| 2.9 | Add "remind me in X" parsing | `06f9a0b3-e7dc-46b0-b117-f66e6cbe5586` | 🔲 |
-| 2.10 | Create push permission UI component | `f1043002-29c6-4506-9e44-4f6b6049c7e1` | 🔲 |
+| 2.7 | Create notifications API routes | `b77537ac-33f3-427c-a3bf-bc4e0574113e` | ✅ |
+| 2.8 | Create service worker for PWA push | `1f225f73-e207-47f4-8e5f-173863701a62` | ✅ |
+| 2.9 | Add "remind me in X" parsing | `06f9a0b3-e7dc-46b0-b117-f66e6cbe5586` | ✅ |
+| 2.10 | Create push permission UI component | `f1043002-29c6-4506-9e44-4f6b6049c7e1` | ✅ |
 
 ### Phase 3: Google Calendar Sync
 

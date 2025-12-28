@@ -61,3 +61,8 @@ export {
   type InsightCreatedPayload,
   type ConnectionStatusPayload,
 } from './useWebSocket';
+export {
+  usePushNotifications,
+  type PushNotificationState,
+  type UsePushNotificationsReturn,
+} from './usePushNotifications';
