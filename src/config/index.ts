@@ -21,6 +21,7 @@ export const config = {
   server: {
     port: parseInt(optional('PORT', '3000'), 10),
     nodeEnv: optional('NODE_ENV', 'development'),
+    corsOrigin: optional('CORS_ORIGIN', 'http://localhost:3001'),
   },
   embedding: {
     provider: optional('EMBED_PROVIDER', 'ollama') as 'ollama' | 'groq',

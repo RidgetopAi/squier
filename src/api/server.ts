@@ -1,4 +1,6 @@
 import express from 'express';
+import { createServer } from 'http';
+import { Server as SocketIOServer } from 'socket.io';
 import { config } from '../config/index.js';
 import memoriesRouter from './routes/memories.js';
 import healthRouter from './routes/health.js';
@@ -15,6 +17,35 @@ import objectsRouter from './routes/objects.js';
 import chatRouter from './routes/chat.js';
 
 const app = express();
+const httpServer = createServer(app);
+
+// Socket.IO setup with CORS for Next.js dev server
+export const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: config.server.corsOrigin || 'http://localhost:3000',
+    methods: ['GET', 'POST'],
+  },
+});
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log(`[Socket.IO] Client connected: ${socket.id}`);
+
+  // Send connection confirmation
+  socket.emit('connection:status', { connected: true, socketId: socket.id });
+
+  // Handle client disconnect
+  socket.on('disconnect', (reason) => {
+    console.log(`[Socket.IO] Client disconnected: ${socket.id} (${reason})`);
+  });
+
+  // Handle ping for latency check
+  socket.on('ping', (callback) => {
+    if (typeof callback === 'function') {
+      callback();
+    }
+  });
+});
 
 // Middleware
 app.use(express.json());
@@ -47,9 +78,10 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 const port = config.server.port;
 
-app.listen(port, () => {
+httpServer.listen(port, () => {
   console.log(`Squire API server running on http://localhost:${port}`);
   console.log(`Health check: http://localhost:${port}/api/health`);
+  console.log(`Socket.IO enabled for real-time events`);
 });
 
 export default app;

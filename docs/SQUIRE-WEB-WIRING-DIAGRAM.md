@@ -466,6 +466,8 @@ Track changes to wiring as we implement:
 | 2025-12-27 | P5-T4 | GraphControls panel | components/graph/GraphControls.tsx (filters, display options) |
 | 2025-12-27 | P5-T5 | Graph interactions | useGraphInteractions hook, GraphContextMenu, hover highlights, double-click zoom |
 | 2025-12-27 | P5-T6 | SelectionDetailsPanel | components/graph/SelectionDetailsPanel.tsx (entity/memory details) |
+| 2025-12-27 | FIX | Graph hover collapse bug | useMemo for stableGraphData, hasInitialZoomRef |
+| 2025-12-27 | P6-T1 | Socket.IO added to Express | src/api/server.ts, src/config/index.ts, socket.io package |
 
 ---
 
