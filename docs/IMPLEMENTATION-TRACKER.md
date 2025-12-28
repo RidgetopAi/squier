@@ -100,7 +100,7 @@
 |---------|------|--------|-------------|
 | Commitments | `src/services/commitments.ts` | ✅ | create, get, list, update, resolve, snooze |
 | Reminders | `src/services/reminders.ts` | ✅ | create, list, schedule, deliver, snooze |
-| Push | `src/services/push.ts` | 🔲 | send, subscribe, unsubscribe |
+| Push | `src/services/push.ts` | ✅ | send, subscribe, unsubscribe |
 | Scheduler | `src/services/scheduler.ts` | 🔲 | start, stop, processReminders |
 | Google Auth | `src/services/google/auth.ts` | 🔲 | getAuthUrl, handleCallback, refreshToken |
 | Google Calendars | `src/services/google/calendars.ts` | 🔲 | list, sync |
@@ -142,7 +142,7 @@
 | Package | Purpose | Status |
 |---------|---------|--------|
 | `rrule` | Recurrence parsing | 🔲 |
-| `web-push` | PWA notifications | 🔲 |
+| `web-push` | PWA notifications | ✅ |
 | `googleapis` | Google Calendar API | 🔲 |
 
 ---
@@ -174,7 +174,7 @@
 | 2.1 | Create reminders migration (019_reminders.sql) | `31a29a56-326a-4bfb-9561-e9987b31c420` | ✅ |
 | 2.2 | Create push_subscriptions migration (021) | `19e95a01-6760-4338-9145-0df688a6da7a` | ✅ |
 | 2.3 | Create reminders service | `9bad05e1-5d28-4306-ab83-bba0e2db9d04` | ✅ |
-| 2.4 | Create push notification service | `93dcb88a-f2e2-423c-8de1-cb2e9ef94882` | 🔲 |
+| 2.4 | Create push notification service | `93dcb88a-f2e2-423c-8de1-cb2e9ef94882` | ✅ |
 | 2.5 | Create scheduler service | `d31302d1-554c-4cc3-b90f-03e414fc68c6` | 🔲 |
 | 2.6 | Create reminders API routes | `61403daa-970b-4f0f-ab51-a095789cbb26` | 🔲 |
 | 2.7 | Create notifications API routes | `b77537ac-33f3-427c-a3bf-bc4e0574113e` | 🔲 |
