@@ -1,11 +1,19 @@
 import { create } from 'zustand';
 import type { ChatMessage, ContextPackage, ScoredMemory, EntitySummary } from '@/lib/types';
 import {
-  sendChatMessage,
+  sendChatMessage as sendChatMessageHttp,
   prepareHistoryForApi,
   type ChatContextInfo,
 } from '@/lib/api/chat';
 import { fetchContext } from '@/lib/api/context';
+import {
+  getSocketInstance,
+  getConnectionStatus,
+  type ChatChunkPayload,
+  type ChatContextPayload,
+  type ChatDonePayload,
+  type ChatErrorPayload,
+} from '@/lib/hooks/useWebSocket';
 
 // Helper to safely access overlay store (avoids circular dependency issues)
 function clearOverlayCards() {
@@ -34,6 +42,8 @@ interface ChatState {
   messages: ChatMessage[];
   isLoading: boolean;
   isLoadingContext: boolean;
+  isStreaming: boolean;
+  streamingMessageId: string | null;
   conversationId: string | null;
   error: string | null;
   lastContext: ChatContextInfo | null;
@@ -41,12 +51,19 @@ interface ChatState {
 
   // Actions
   addMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => ChatMessage;
+  updateMessage: (id: string, updates: Partial<ChatMessage>) => void;
   setMessages: (messages: ChatMessage[]) => void;
   setLoading: (isLoading: boolean) => void;
   setLoadingContext: (isLoading: boolean) => void;
+  setStreaming: (isStreaming: boolean, messageId?: string | null) => void;
   setError: (error: string | null) => void;
   clearMessages: () => void;
   startNewConversation: () => string;
+
+  // Streaming actions
+  appendToStreamingMessage: (chunk: string) => void;
+  finishStreaming: (usage?: ChatDonePayload['usage']) => void;
+  handleStreamError: (error: string) => void;
 
   // High-level action for sending messages
   sendMessage: (content: string, options?: SendMessageOptions) => Promise<void>;
@@ -55,6 +72,7 @@ interface ChatState {
 interface SendMessageOptions {
   includeContext?: boolean;
   contextProfile?: string;
+  useStreaming?: boolean; // Default: true when WebSocket connected
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -62,6 +80,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   isLoading: false,
   isLoadingContext: false,
+  isStreaming: false,
+  streamingMessageId: null,
   conversationId: null,
   error: null,
   lastContext: null,
@@ -83,6 +103,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return message;
   },
 
+  // Update an existing message
+  updateMessage: (id, updates) => {
+    set((state) => ({
+      messages: state.messages.map((msg) =>
+        msg.id === id ? { ...msg, ...updates } : msg
+      ),
+    }));
+  },
+
   // Replace all messages
   setMessages: (messages) => {
     set({ messages, error: null });
@@ -98,6 +127,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ isLoadingContext });
   },
 
+  // Set streaming state
+  setStreaming: (isStreaming, messageId = null) => {
+    set({ isStreaming, streamingMessageId: messageId });
+  },
+
   // Set error state
   setError: (error) => {
     set({ error });
@@ -105,7 +139,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   // Clear all messages
   clearMessages: () => {
-    set({ messages: [], error: null, lastContext: null, lastContextPackage: null });
+    set({
+      messages: [],
+      error: null,
+      lastContext: null,
+      lastContextPackage: null,
+      isStreaming: false,
+      streamingMessageId: null,
+    });
     // Also clear overlay
     clearOverlayCards();
   },
@@ -119,6 +160,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       error: null,
       isLoading: false,
       isLoadingContext: false,
+      isStreaming: false,
+      streamingMessageId: null,
       lastContext: null,
       lastContextPackage: null,
     });
@@ -127,10 +170,73 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return conversationId;
   },
 
-  // Send a message (handles user message + assistant response via API)
+  // Append chunk to streaming message
+  appendToStreamingMessage: (chunk: string) => {
+    const { streamingMessageId } = get();
+    if (!streamingMessageId) return;
+
+    set((state) => ({
+      messages: state.messages.map((msg) =>
+        msg.id === streamingMessageId
+          ? { ...msg, content: msg.content + chunk }
+          : msg
+      ),
+    }));
+  },
+
+  // Finish streaming
+  finishStreaming: (_usage) => {
+    set({
+      isStreaming: false,
+      streamingMessageId: null,
+      isLoading: false,
+    });
+  },
+
+  // Handle streaming error
+  handleStreamError: (error: string) => {
+    const { streamingMessageId, addMessage } = get();
+
+    // Update the streaming message to show error if it exists
+    if (streamingMessageId) {
+      set((state) => ({
+        messages: state.messages.map((msg) =>
+          msg.id === streamingMessageId
+            ? { ...msg, content: msg.content || `Error: ${error}` }
+            : msg
+        ),
+      }));
+    } else {
+      // Add error message
+      addMessage({
+        role: 'system',
+        content: `Error: ${error}`,
+      });
+    }
+
+    set({
+      isStreaming: false,
+      streamingMessageId: null,
+      isLoading: false,
+      error,
+    });
+  },
+
+  // Send a message (handles user message + assistant response)
   sendMessage: async (content: string, options: SendMessageOptions = {}) => {
-    const { addMessage, setLoading, setLoadingContext, setError } = get();
+    const {
+      addMessage,
+      setLoading,
+      setLoadingContext,
+      setStreaming,
+      setError,
+    } = get();
+
     const { includeContext = true, contextProfile } = options;
+
+    // Determine if we should use streaming (default: use WebSocket if connected)
+    const { connected } = getConnectionStatus();
+    const useStreaming = options.useStreaming ?? connected;
 
     // Ensure we have a conversation
     if (!get().conversationId) {
@@ -147,7 +253,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     setError(null);
 
     try {
-      // Fetch context first if enabled
+      // Fetch context first if enabled (same for both streaming and HTTP)
       let contextPackage: ContextPackage | undefined;
       if (includeContext) {
         setLoadingContext(true);
@@ -163,12 +269,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
           // Push memories to overlay
           if (contextPackage.memories.length > 0) {
-            // Create entities map for the overlay
             const entitiesMap = new Map<string, EntitySummary[]>();
             contextPackage.memories.forEach((m) => {
               entitiesMap.set(m.id, contextPackage!.entities);
             });
-
             pushOverlayCards(contextPackage.memories, entitiesMap);
           }
         } catch (contextError) {
@@ -179,29 +283,62 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       }
 
-      // Get current messages for history (exclude the message we just added)
-      const currentMessages = get().messages;
-      const history = prepareHistoryForApi(currentMessages.slice(0, -1));
+      if (useStreaming && connected) {
+        // === STREAMING PATH (WebSocket) ===
+        const socket = getSocketInstance();
 
-      // Call the API
-      const response = await sendChatMessage({
-        message: content,
-        history,
-        includeContext,
-        contextProfile,
-      });
+        // Create placeholder assistant message for streaming
+        const assistantMessage = addMessage({
+          role: 'assistant',
+          content: '',
+          memoryIds: contextPackage?.memories.map((m) => m.id),
+        });
 
-      // Store context info if available
-      if (response.context) {
-        set({ lastContext: response.context });
+        setStreaming(true, assistantMessage.id);
+
+        // Get history for context
+        const currentMessages = get().messages;
+        const history = prepareHistoryForApi(
+          currentMessages.filter((m) => m.id !== assistantMessage.id).slice(0, -1)
+        );
+
+        // Emit chat message via WebSocket
+        socket.emit('chat:message', {
+          conversationId: get().conversationId,
+          message: content,
+          history,
+          includeContext,
+          contextProfile,
+        });
+
+        // Note: Response handling is done via initWebSocketListeners()
+        // which calls appendToStreamingMessage, finishStreaming, etc.
+      } else {
+        // === HTTP PATH (fallback) ===
+        const currentMessages = get().messages;
+        const history = prepareHistoryForApi(currentMessages.slice(0, -1));
+
+        const response = await sendChatMessageHttp({
+          message: content,
+          history,
+          includeContext,
+          contextProfile,
+        });
+
+        // Store context info if available
+        if (response.context) {
+          set({ lastContext: response.context });
+        }
+
+        // Add assistant response
+        addMessage({
+          role: 'assistant',
+          content: response.message,
+          memoryIds: contextPackage?.memories.map((m) => m.id),
+        });
+
+        setLoading(false);
       }
-
-      // Add assistant response with memory IDs from context package
-      addMessage({
-        role: 'assistant',
-        content: response.message,
-        memoryIds: contextPackage?.memories.map((m) => m.id),
-      });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to get response';
       setError(errorMsg);
@@ -211,16 +348,115 @@ export const useChatStore = create<ChatState>((set, get) => ({
         role: 'system',
         content: `Error: ${errorMsg}`,
       });
-    } finally {
+
       setLoading(false);
+      setStreaming(false);
     }
   },
 }));
+
+// === WEBSOCKET STREAMING INTEGRATION ===
+
+let listenersInitialized = false;
+let cleanupFn: (() => void) | null = null;
+
+/**
+ * Initialize WebSocket listeners for streaming chat.
+ * Call this once when the app mounts (e.g., in a layout or provider).
+ * Returns a cleanup function.
+ */
+export function initWebSocketListeners(): () => void {
+  if (listenersInitialized) {
+    return cleanupFn || (() => {});
+  }
+
+  const socket = getSocketInstance();
+  const store = useChatStore.getState;
+
+  // Handle streaming chunks
+  function handleChatChunk(payload: ChatChunkPayload) {
+    const { conversationId, streamingMessageId } = store();
+    if (payload.conversationId === conversationId && streamingMessageId) {
+      store().appendToStreamingMessage(payload.chunk);
+    }
+  }
+
+  // Handle context info from server
+  function handleChatContext(payload: ChatContextPayload) {
+    const { conversationId } = store();
+    if (payload.conversationId !== conversationId) return;
+
+    // Convert to ScoredMemory format for overlay
+    const memories: ScoredMemory[] = payload.memories.map((m) => ({
+      id: m.id,
+      content: m.content,
+      created_at: new Date().toISOString(),
+      salience_score: m.salience,
+      current_strength: 1,
+      recency_score: 1,
+      final_score: m.salience,
+      token_estimate: Math.ceil(m.content.length / 4),
+      category: 'relevant' as const,
+    }));
+
+    const entities: EntitySummary[] = payload.entities.map((e) => ({
+      id: e.id,
+      name: e.name,
+      type: e.type as EntitySummary['type'],
+      mention_count: 1,
+    }));
+
+    if (memories.length > 0) {
+      const entitiesMap = new Map<string, EntitySummary[]>();
+      memories.forEach((m) => {
+        entitiesMap.set(m.id, entities);
+      });
+      pushOverlayCards(memories, entitiesMap);
+    }
+  }
+
+  // Handle stream completion
+  function handleChatDone(payload: ChatDonePayload) {
+    const { conversationId } = store();
+    if (payload.conversationId === conversationId) {
+      store().finishStreaming(payload.usage);
+    }
+  }
+
+  // Handle stream error
+  function handleChatError(payload: ChatErrorPayload) {
+    const { conversationId } = store();
+    if (payload.conversationId === conversationId) {
+      store().handleStreamError(payload.error);
+    }
+  }
+
+  // Register listeners
+  socket.on('chat:chunk', handleChatChunk);
+  socket.on('chat:context', handleChatContext);
+  socket.on('chat:done', handleChatDone);
+  socket.on('chat:error', handleChatError);
+
+  listenersInitialized = true;
+
+  // Cleanup function
+  cleanupFn = () => {
+    socket.off('chat:chunk', handleChatChunk);
+    socket.off('chat:context', handleChatContext);
+    socket.off('chat:done', handleChatDone);
+    socket.off('chat:error', handleChatError);
+    listenersInitialized = false;
+    cleanupFn = null;
+  };
+
+  return cleanupFn;
+}
 
 // Selector hooks for optimized re-renders
 export const useMessages = () => useChatStore((state) => state.messages);
 export const useIsLoading = () => useChatStore((state) => state.isLoading);
 export const useIsLoadingContext = () => useChatStore((state) => state.isLoadingContext);
+export const useIsStreaming = () => useChatStore((state) => state.isStreaming);
 export const useChatError = () => useChatStore((state) => state.error);
 export const useConversationId = () => useChatStore((state) => state.conversationId);
 export const useLastContext = () => useChatStore((state) => state.lastContext);

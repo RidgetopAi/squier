@@ -320,6 +320,14 @@ export function useWebSocket(): UseWebSocketReturn {
 // === STANDALONE ACCESSORS ===
 
 /**
+ * Get the singleton socket instance
+ * Useful for non-React contexts like Zustand stores
+ */
+export function getSocketInstance(): Socket {
+  return getSocket();
+}
+
+/**
  * Get connection status without using the hook
  * Useful for non-React contexts
  */

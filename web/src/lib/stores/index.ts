@@ -3,10 +3,12 @@ export {
   useMessages,
   useIsLoading,
   useIsLoadingContext,
+  useIsStreaming,
   useChatError,
   useConversationId,
   useLastContext,
   useLastContextPackage,
+  initWebSocketListeners,
 } from './chatStore';
 
 export {
