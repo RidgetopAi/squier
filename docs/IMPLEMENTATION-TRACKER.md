@@ -26,7 +26,7 @@
 | `google_accounts` | 020_google_integration.sql | 🔲 | OAuth tokens |
 | `google_calendars` | 020_google_integration.sql | 🔲 | Which calendars to sync |
 | `google_events` | 020_google_integration.sql | 🔲 | Cached Google events |
-| `push_subscriptions` | 021_push_subscriptions.sql | 🔲 | PWA push endpoints |
+| `push_subscriptions` | 021_push_subscriptions.sql | ✅ | PWA push endpoints |
 
 ---
 
@@ -172,7 +172,7 @@
 | # | Task | Mandrel ID | Status |
 |---|------|------------|--------|
 | 2.1 | Create reminders migration (019_reminders.sql) | `31a29a56-326a-4bfb-9561-e9987b31c420` | ✅ |
-| 2.2 | Create push_subscriptions migration (021) | `19e95a01-6760-4338-9145-0df688a6da7a` | 🔲 |
+| 2.2 | Create push_subscriptions migration (021) | `19e95a01-6760-4338-9145-0df688a6da7a` | ✅ |
 | 2.3 | Create reminders service | `9bad05e1-5d28-4306-ab83-bba0e2db9d04` | 🔲 |
 | 2.4 | Create push notification service | `93dcb88a-f2e2-423c-8de1-cb2e9ef94882` | 🔲 |
 | 2.5 | Create scheduler service | `d31302d1-554c-4cc3-b90f-03e414fc68c6` | 🔲 |
