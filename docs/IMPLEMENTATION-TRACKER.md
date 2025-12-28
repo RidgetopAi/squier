@@ -11,7 +11,7 @@
 |-------|-------|--------|
 | 1 | Core Commitments | ✅ Complete |
 | 2 | Reminders + PWA Push | ✅ Complete |
-| 3 | Google Calendar Sync | 🔄 In Progress |
+| 3 | Google Calendar Sync | ✅ Complete |
 | 4 | Recurrence (RRULE) | 🔲 Not Started |
 | 5 | Resolution Detection | 🔲 Not Started |
 
@@ -91,9 +91,9 @@
 
 | Route | Page | Status | Notes |
 |-------|------|--------|-------|
-| `/app/calendar` | CalendarPage | 🔲 | Week/month view |
+| `/app/calendar` | CalendarPage | ✅ | Week/month view |
 | `/app/commitments` | CommitmentsPage | ✅ | List + management |
-| `/app/settings/integrations` | IntegrationsPage | 🔲 | Google connection |
+| `/app/settings/integrations` | IntegrationsPage | ✅ | Google connection |
 
 ---
 
@@ -116,8 +116,9 @@
 
 | Component | File | Status | Notes |
 |-----------|------|--------|-------|
-| CalendarView | `components/calendar/CalendarView.tsx` | 🔲 | Custom (not FullCalendar) |
-| EventCard | `components/calendar/EventCard.tsx` | 🔲 | Color by source |
+| CalendarView | `app/app/calendar/page.tsx` | ✅ | Week/month view with merged events |
+| EventCard | `app/app/calendar/page.tsx` | ✅ | Color by source (inline) |
+| IntegrationsPage | `app/app/settings/integrations/page.tsx` | ✅ | Google OAuth, calendar settings |
 | CommitmentForm | `components/calendar/CommitmentForm.tsx` | 🔲 | Create/edit |
 | RecurrenceEditor | `components/calendar/RecurrenceEditor.tsx` | 🔲 | RRULE builder |
 | CommitmentsList | `components/commitments/CommitmentsList.tsx` | 🔲 | Filterable list |
@@ -196,8 +197,8 @@
 | 3.5 | Create Google sync orchestration | `2e3263d3-2fb3-4a2b-a55b-3917898bd2ce` | ✅ |
 | 3.6 | Create Google integration API routes | `9116f9c5-e6b6-4ea6-9ffa-6be9019ae958` | ✅ |
 | 3.7 | Create calendar API routes (unified view) | `d2d7bf90-ffb2-42ed-b7c5-49200888f51e` | ✅ |
-| 3.8 | Create settings/integrations page | `0bcbe9ee-6e1f-4437-859e-535e83effae3` | 🔲 |
-| 3.9 | Create calendar page with merged view | `eee91aeb-047f-4c3d-9dcc-e20bc19b89f6` | 🔲 |
+| 3.8 | Create settings/integrations page | `0bcbe9ee-6e1f-4437-859e-535e83effae3` | ✅ |
+| 3.9 | Create calendar page with merged view | `eee91aeb-047f-4c3d-9dcc-e20bc19b89f6` | ✅ |
 
 ### Phase 4: Recurrence (RRULE)
 

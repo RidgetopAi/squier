@@ -293,3 +293,55 @@ export interface ContextProfile {
     relevance: number;
   };
 }
+
+// Google Integration Types
+export interface GoogleAccount {
+  id: string;
+  email: string;
+  display_name: string | null;
+  sync_enabled: boolean;
+  last_full_sync_at: string | null;
+  created_at: string;
+}
+
+export interface GoogleCalendar {
+  id: string;
+  google_account_id: string;
+  calendar_id: string;
+  name: string;
+  description: string | null;
+  background_color: string | null;
+  foreground_color: string | null;
+  is_primary: boolean;
+  access_role: string;
+  sync_enabled: boolean;
+  sync_direction: 'pull_only' | 'push_only' | 'bidirectional';
+  is_default_for_push: boolean;
+  last_sync_at: string | null;
+  created_at: string;
+}
+
+export interface GoogleConnectionStatus {
+  configured: boolean;
+  accounts: GoogleAccount[];
+  error?: string;
+}
+
+// Calendar Event Types (for merged view)
+export interface CalendarEvent {
+  id: string;
+  source: 'squire' | 'google';
+  title: string;
+  description: string | null;
+  start: string;
+  end: string | null;
+  allDay: boolean;
+  timezone: string | null;
+  status: string;
+  color: string | null;
+  commitmentId?: string;
+  googleEventId?: string;
+  googleCalendarName?: string;
+  location?: string | null;
+  htmlLink?: string | null;
+}
