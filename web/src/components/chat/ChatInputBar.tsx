@@ -16,6 +16,7 @@ export function ChatInputBar({
 }: ChatInputBarProps) {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const justSubmittedRef = useRef(false);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -31,9 +32,33 @@ export function ChatInputBar({
     textareaRef.current?.focus();
   }, []);
 
+  // Refocus after submission - aggressive multi-attempt approach
+  useEffect(() => {
+    if (justSubmittedRef.current && input === '') {
+      // Multiple focus attempts to overcome any competing focus changes
+      const focusInput = () => textareaRef.current?.focus();
+
+      // Immediate attempt
+      focusInput();
+      // After microtask
+      queueMicrotask(focusInput);
+      // After paint
+      requestAnimationFrame(focusInput);
+      // After scroll animations (100ms covers most smooth scrolls)
+      setTimeout(focusInput, 100);
+      // Final fallback
+      setTimeout(focusInput, 250);
+      // Clear the flag after all attempts complete
+      setTimeout(() => {
+        justSubmittedRef.current = false;
+      }, 500);
+    }
+  }, [input]);
+
   const handleSubmit = () => {
     const trimmed = input.trim();
     if (trimmed && !isLoading) {
+      justSubmittedRef.current = true;
       onSend(trimmed);
       setInput('');
       // Reset height
@@ -44,12 +69,22 @@ export function ChatInputBar({
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Submit on Enter (without Shift)
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Submit on Enter (without Shift) - but not while loading
+    if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
       e.preventDefault();
       handleSubmit();
     }
   };
+
+  // Prevent focus loss after submission - refocus immediately on blur
+  const handleBlur = useCallback(() => {
+    if (justSubmittedRef.current) {
+      // Something stole focus right after submit - take it back
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
+    }
+  }, []);
 
   // Handle speech-to-text transcript
   const handleSpeechTranscript = useCallback((text: string) => {
@@ -79,19 +114,20 @@ export function ChatInputBar({
             <textarea
               ref={textareaRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => !isLoading && setInput(e.target.value)}
               onKeyDown={handleKeyDown}
+              onBlur={handleBlur}
               placeholder={placeholder}
-              disabled={isLoading}
+              aria-disabled={isLoading}
               rows={1}
-              className="
+              className={`
                 w-full px-4 py-3 rounded-xl resize-none
                 bg-background-tertiary border border-glass-border
                 text-foreground placeholder-foreground-muted
                 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50
-                disabled:opacity-50 disabled:cursor-not-allowed
                 transition-colors
-              "
+                ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+              `}
               style={{ maxHeight: '200px' }}
             />
           </div>

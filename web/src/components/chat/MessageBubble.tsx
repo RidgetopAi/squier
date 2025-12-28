@@ -1,22 +1,25 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ChatMessage } from '@/lib/types';
 import { useToggleOverlayVisible, useOverlayVisible } from '@/lib/stores';
+import { useChatStore } from '@/lib/stores/chatStore';
 
 interface MessageBubbleProps {
   message: ChatMessage;
   isLatest?: boolean;
 }
 
-export function MessageBubble({ message, isLatest = false }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message, isLatest = false }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const toggleVisible = useToggleOverlayVisible();
   const overlayVisible = useOverlayVisible();
   const [badgeHovered, setBadgeHovered] = useState(false);
+  const streamingMessageId = useChatStore((state) => state.streamingMessageId);
 
+  const isStreaming = message.id === streamingMessageId;
   const memoryCount = message.memoryIds?.length ?? 0;
 
   const handleBadgeClick = useCallback(() => {
@@ -39,7 +42,7 @@ export function MessageBubble({ message, isLatest = false }: MessageBubbleProps)
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={isStreaming ? false : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
       className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
@@ -88,7 +91,7 @@ export function MessageBubble({ message, isLatest = false }: MessageBubbleProps)
       </div>
     </motion.div>
   );
-}
+});
 
 // Memory Badge sub-component
 interface MemoryBadgeProps {
