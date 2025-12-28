@@ -7,6 +7,10 @@ import {
 } from '@/lib/api/chat';
 import { fetchContext } from '@/lib/api/context';
 import {
+  fetchRecentConversation,
+  createConversation as apiCreateConversation,
+} from '@/lib/api/conversations';
+import {
   getSocketInstance,
   getConnectionStatus,
   type ChatChunkPayload,
@@ -49,6 +53,11 @@ interface ChatState {
   lastContext: ChatContextInfo | null;
   lastContextPackage: ContextPackage | null;
 
+  // Persistence state
+  dbConversationId: string | null;
+  isLoadingHistory: boolean;
+  hasLoadedInitial: boolean;
+
   // Actions
   addMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => ChatMessage;
   updateMessage: (id: string, updates: Partial<ChatMessage>) => void;
@@ -67,6 +76,9 @@ interface ChatState {
 
   // High-level action for sending messages
   sendMessage: (content: string, options?: SendMessageOptions) => Promise<void>;
+
+  // Persistence actions
+  loadRecentConversation: () => Promise<void>;
 }
 
 interface SendMessageOptions {
@@ -86,6 +98,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   error: null,
   lastContext: null,
   lastContextPackage: null,
+
+  // Persistence state
+  dbConversationId: null,
+  isLoadingHistory: false,
+  hasLoadedInitial: false,
 
   // Add a single message
   addMessage: (messageData) => {
@@ -156,6 +173,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const conversationId = generateConversationId();
     set({
       conversationId,
+      dbConversationId: null,
       messages: [],
       error: null,
       isLoading: false,
@@ -167,6 +185,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
     // Clear overlay for new conversation
     clearOverlayCards();
+
+    // Async create in database (non-blocking)
+    apiCreateConversation({ clientId: conversationId })
+      .then((conv) => {
+        set({ dbConversationId: conv.id });
+      })
+      .catch((err) => {
+        console.error('Failed to create conversation in DB:', err);
+      });
+
     return conversationId;
   },
 
@@ -353,6 +381,50 @@ export const useChatStore = create<ChatState>((set, get) => ({
       setStreaming(false);
     }
   },
+
+  // Load the most recent conversation from the database
+  loadRecentConversation: async () => {
+    const { hasLoadedInitial } = get();
+    if (hasLoadedInitial) return;
+
+    set({ isLoadingHistory: true });
+
+    try {
+      const result = await fetchRecentConversation();
+
+      if (result) {
+        const { conversation, messages } = result;
+
+        // Convert DB messages to ChatMessage format
+        const chatMessages: ChatMessage[] = messages.map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: m.created_at,
+          memoryIds: m.context_memory_ids,
+        }));
+
+        set({
+          conversationId: conversation.client_id || conversation.id,
+          dbConversationId: conversation.id,
+          messages: chatMessages,
+          hasLoadedInitial: true,
+          isLoadingHistory: false,
+        });
+      } else {
+        set({
+          hasLoadedInitial: true,
+          isLoadingHistory: false,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load recent conversation:', error);
+      set({
+        hasLoadedInitial: true,
+        isLoadingHistory: false,
+      });
+    }
+  },
 }));
 
 // === WEBSOCKET STREAMING INTEGRATION ===
@@ -461,3 +533,5 @@ export const useChatError = () => useChatStore((state) => state.error);
 export const useConversationId = () => useChatStore((state) => state.conversationId);
 export const useLastContext = () => useChatStore((state) => state.lastContext);
 export const useLastContextPackage = () => useChatStore((state) => state.lastContextPackage);
+export const useIsLoadingHistory = () => useChatStore((state) => state.isLoadingHistory);
+export const useHasLoadedInitial = () => useChatStore((state) => state.hasLoadedInitial);

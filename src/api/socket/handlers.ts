@@ -7,6 +7,9 @@
 import { Server, Socket } from 'socket.io';
 import { config } from '../../config/index.js';
 import { generateContext } from '../../services/context.js';
+import { getOrCreateConversation, addMessage } from '../../services/conversations.js';
+import { consolidateAll } from '../../services/consolidation.js';
+import { pool } from '../../db/pool.js';
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -20,6 +23,54 @@ type TypedIO = Server<ClientToServerEvents, ServerToClientEvents, object, Socket
 
 // Track active streaming requests for cancellation
 const activeStreams = new Map<string, AbortController>();
+
+// Auto-sleep configuration
+const AUTO_SLEEP_HOURS = 1; // Trigger consolidation after 1 hour of inactivity
+
+/**
+ * Check if auto-sleep should trigger based on last activity
+ * Returns true if consolidation was triggered
+ */
+async function checkAndTriggerAutoSleep(): Promise<boolean> {
+  try {
+    // Get the most recent chat message timestamp
+    const result = await pool.query(`
+      SELECT MAX(created_at) as last_activity
+      FROM chat_messages
+    `);
+
+    const lastActivity = result.rows[0]?.last_activity;
+
+    if (!lastActivity) {
+      // No previous messages - this is the first message, no need to consolidate
+      return false;
+    }
+
+    const hoursSinceLastActivity =
+      (Date.now() - new Date(lastActivity).getTime()) / (1000 * 60 * 60);
+
+    if (hoursSinceLastActivity >= AUTO_SLEEP_HOURS) {
+      console.log(
+        `[AutoSleep] ${hoursSinceLastActivity.toFixed(1)} hours since last activity - triggering consolidation`
+      );
+
+      // Run consolidation (includes chat extraction)
+      const result = await consolidateAll();
+
+      console.log(
+        `[AutoSleep] Consolidation complete: ${result.chatMemoriesCreated} memories extracted, ` +
+        `${result.memoriesProcessed} memories processed`
+      );
+
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('[AutoSleep] Error checking/triggering auto-sleep:', error);
+    return false;
+  }
+}
 
 // System prompt for Squire
 const SQUIRE_SYSTEM_PROMPT = `You are Squire, a personal AI companion with perfect memory.
@@ -51,12 +102,30 @@ async function handleChatMessage(
 
   console.log(`[Socket] chat:message from ${socket.id} - conversation: ${conversationId}`);
 
+  // Check for auto-sleep (consolidation after inactivity)
+  // This runs BEFORE processing the new message so extracted memories are available
+  await checkAndTriggerAutoSleep();
+
   // Create abort controller for this stream
   const abortController = new AbortController();
   activeStreams.set(conversationId, abortController);
 
+  // Track context for persistence
+  let memoryIds: string[] = [];
+  let disclosureId: string | undefined;
+
   try {
-    // Step 1: Fetch context if requested
+    // Step 0: Ensure conversation exists in database
+    const conversation = await getOrCreateConversation(conversationId);
+
+    // Step 1: Persist user message immediately
+    await addMessage({
+      conversationId: conversation.id,
+      role: 'user',
+      content: message,
+    });
+
+    // Step 2: Fetch context if requested
     let contextMarkdown: string | undefined;
     if (includeContext) {
       try {
@@ -66,6 +135,8 @@ async function handleChatMessage(
         });
 
         contextMarkdown = contextPackage.markdown;
+        memoryIds = contextPackage.memories.map((m) => m.id);
+        disclosureId = contextPackage.disclosure_id;
 
         // Emit context to client
         socket.emit('chat:context', {
@@ -88,7 +159,7 @@ async function handleChatMessage(
       }
     }
 
-    // Step 2: Build messages
+    // Step 3: Build messages
     const messages: Array<{ role: string; content: string }> = [];
 
     // System prompt with context
@@ -106,8 +177,22 @@ async function handleChatMessage(
     // Add current message
     messages.push({ role: 'user', content: message });
 
-    // Step 3: Stream LLM response
-    await streamGroqResponse(socket, conversationId, messages, abortController.signal);
+    // Step 4: Stream LLM response
+    const streamResult = await streamGroqResponse(socket, conversationId, messages, abortController.signal);
+
+    // Step 5: Persist assistant message after streaming completes
+    if (streamResult.content) {
+      await addMessage({
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: streamResult.content,
+        memoryIds,
+        disclosureId,
+        contextProfile,
+        promptTokens: streamResult.usage?.promptTokens,
+        completionTokens: streamResult.usage?.completionTokens,
+      });
+    }
   } catch (error) {
     console.error('[Socket] Chat error:', error);
 
@@ -123,13 +208,14 @@ async function handleChatMessage(
 
 /**
  * Stream response from Groq API
+ * Returns the full content and usage for persistence
  */
 async function streamGroqResponse(
   socket: TypedSocket,
   conversationId: string,
   messages: Array<{ role: string; content: string }>,
   signal: AbortSignal
-): Promise<void> {
+): Promise<{ content: string; usage?: { promptTokens: number; completionTokens: number } }> {
   const apiKey = config.llm.groqApiKey;
 
   if (!apiKey) {
@@ -138,7 +224,7 @@ async function streamGroqResponse(
       error: 'LLM service not configured',
       code: 'LLM_NOT_CONFIGURED',
     });
-    return;
+    return { content: '' };
   }
 
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -170,6 +256,7 @@ async function streamGroqResponse(
   const decoder = new TextDecoder();
   let buffer = '';
   let totalTokens = 0;
+  let fullContent = '';
 
   try {
     while (true) {
@@ -199,7 +286,7 @@ async function streamGroqResponse(
               },
               model: config.llm.model,
             });
-            return;
+            return { content: fullContent, usage: { promptTokens: 0, completionTokens: totalTokens } };
           }
 
           try {
@@ -212,6 +299,7 @@ async function streamGroqResponse(
 
             const content = parsed.choices[0]?.delta?.content;
             if (content) {
+              fullContent += content;
               totalTokens++;
               socket.emit('chat:chunk', {
                 conversationId,
@@ -230,7 +318,7 @@ async function streamGroqResponse(
                 },
                 model: config.llm.model,
               });
-              return;
+              return { content: fullContent, usage: { promptTokens: 0, completionTokens: totalTokens } };
             }
           } catch {
             // Skip malformed JSON
@@ -238,6 +326,9 @@ async function streamGroqResponse(
         }
       }
     }
+
+    // If we exit the loop without explicit return, return what we have
+    return { content: fullContent, usage: { promptTokens: 0, completionTokens: totalTokens } };
   } finally {
     reader.releaseLock();
   }

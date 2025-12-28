@@ -16,6 +16,7 @@ import {
 import {
   processResearchForConsolidation,
 } from './research.js';
+import { extractMemoriesFromChat } from './chatExtraction.js';
 
 /**
  * Consolidation Configuration
@@ -64,6 +65,12 @@ export const CONSOLIDATION_CONFIG = {
 
 export interface ConsolidationResult {
   sessionId?: string;
+  // Chat extraction (Step 0)
+  chatConversationsProcessed: number;
+  chatMessagesProcessed: number;
+  chatMemoriesCreated: number;
+  chatBeliefsCreated: number;
+  // Memory processing
   memoriesProcessed: number;
   memoriesDecayed: number;
   memoriesStrengthened: number;
@@ -349,6 +356,9 @@ export async function consolidateSession(session: Session): Promise<Consolidatio
   await updateConsolidationStatus(session.id, 'in_progress');
 
   try {
+    // 0. Extract memories from chat conversations
+    const chatResult = await extractMemoriesFromChat();
+
     // 1. Process memory strength (decay and strengthen)
     const strengthResult = await processMemoryStrength();
 
@@ -387,6 +397,12 @@ export async function consolidateSession(session: Session): Promise<Consolidatio
 
     return {
       sessionId: session.id,
+      // Chat extraction results
+      chatConversationsProcessed: chatResult.conversationsProcessed,
+      chatMessagesProcessed: chatResult.messagesProcessed,
+      chatMemoriesCreated: chatResult.memoriesCreated,
+      chatBeliefsCreated: chatResult.beliefsCreated,
+      // Memory processing results
       memoriesProcessed,
       memoriesDecayed: strengthResult.decayed,
       memoriesStrengthened: strengthResult.strengthened,
@@ -418,32 +434,51 @@ export async function consolidateSession(session: Session): Promise<Consolidatio
 export async function consolidateAll(): Promise<ConsolidationResult> {
   const startTime = Date.now();
 
+  // 0. Extract memories from chat conversations (NEW)
+  console.log('[Consolidation] Step 0: Extracting memories from chat...');
+  const chatResult = await extractMemoriesFromChat();
+
   // 1. Process memory strength (decay and strengthen)
+  console.log('[Consolidation] Step 1: Processing memory strength...');
   const strengthResult = await processMemoryStrength();
 
   // 2. Process SIMILAR edges
+  console.log('[Consolidation] Step 2: Processing SIMILAR edges...');
   const edgeResult = await processSimilarEdges();
 
   // 3. Process edge decay
+  console.log('[Consolidation] Step 3: Processing edge decay...');
   const decayResult = await processEdgeDecay();
 
   // 4. Process patterns (detect new patterns from unanalyzed memories)
+  console.log('[Consolidation] Step 4: Processing patterns...');
   const patternResult = await processPatterns(10);
 
   // 5. Mark stale patterns as dormant
+  console.log('[Consolidation] Step 5: Marking stale patterns dormant...');
   const dormantCount = await markStalePatternsDormant(30);
 
   // 6. Process insights (cross-analyze beliefs, patterns, memories)
+  console.log('[Consolidation] Step 6: Processing insights...');
   const insightResult = await processInsightsForConsolidation();
 
   // 7. Process active research (detect gaps, generate questions)
+  console.log('[Consolidation] Step 7: Processing research...');
   const researchResult = await processResearchForConsolidation();
 
   // Count total memories processed
   const countResult = await pool.query(`SELECT COUNT(*) as count FROM memories`);
   const memoriesProcessed = parseInt(countResult.rows[0]?.count ?? '0', 10);
 
+  console.log(`[Consolidation] Complete in ${Date.now() - startTime}ms`);
+
   return {
+    // Chat extraction results
+    chatConversationsProcessed: chatResult.conversationsProcessed,
+    chatMessagesProcessed: chatResult.messagesProcessed,
+    chatMemoriesCreated: chatResult.memoriesCreated,
+    chatBeliefsCreated: chatResult.beliefsCreated,
+    // Memory processing results
     memoriesProcessed,
     memoriesDecayed: strengthResult.decayed,
     memoriesStrengthened: strengthResult.strengthened,

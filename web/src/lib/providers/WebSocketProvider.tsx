@@ -3,7 +3,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWebSocket } from '@/lib/hooks/useWebSocket';
-import { initWebSocketListeners } from '@/lib/stores/chatStore';
+import { initWebSocketListeners, useChatStore } from '@/lib/stores/chatStore';
 
 interface WebSocketProviderProps {
   children: ReactNode;
@@ -28,6 +28,11 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
   useEffect(() => {
     const cleanup = initWebSocketListeners();
     return cleanup;
+  }, []);
+
+  // Load persisted chat history on mount
+  useEffect(() => {
+    useChatStore.getState().loadRecentConversation();
   }, []);
 
   // Handle memory:created events - invalidate memory queries (P6-T5)
