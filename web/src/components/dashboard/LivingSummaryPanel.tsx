@@ -29,10 +29,17 @@ const categoryMeta: Record<SummaryCategory, {
   },
   relationships: {
     label: 'Relationships',
-    icon: '💬',
+    icon: '👥',
     color: 'text-accent-purple',
     bgColor: 'bg-accent-purple/10',
     borderColor: 'border-accent-purple/30',
+  },
+  projects: {
+    label: 'Projects',
+    icon: '💼',
+    color: 'text-info',
+    bgColor: 'bg-info/10',
+    borderColor: 'border-info/30',
   },
   interests: {
     label: 'Interests',
@@ -41,26 +48,19 @@ const categoryMeta: Record<SummaryCategory, {
     bgColor: 'bg-emotion-joy/10',
     borderColor: 'border-emotion-joy/30',
   },
-  work: {
-    label: 'Work',
-    icon: '💼',
-    color: 'text-info',
-    bgColor: 'bg-info/10',
-    borderColor: 'border-info/30',
-  },
-  health: {
-    label: 'Health',
+  wellbeing: {
+    label: 'Wellbeing',
     icon: '❤️',
     color: 'text-success',
     bgColor: 'bg-success/10',
     borderColor: 'border-success/30',
   },
-  daily: {
-    label: 'Daily',
-    icon: '📅',
-    color: 'text-foreground-muted',
-    bgColor: 'bg-foreground-muted/10',
-    borderColor: 'border-foreground-muted/30',
+  commitments: {
+    label: 'Commitments',
+    icon: '📋',
+    color: 'text-warning',
+    bgColor: 'bg-warning/10',
+    borderColor: 'border-warning/30',
   },
 };
 
@@ -68,11 +68,11 @@ const categoryMeta: Record<SummaryCategory, {
 const categoryOrder: SummaryCategory[] = [
   'personality',
   'goals',
-  'work',
   'relationships',
+  'projects',
   'interests',
-  'health',
-  'daily',
+  'wellbeing',
+  'commitments',
 ];
 
 interface LivingSummaryPanelProps {

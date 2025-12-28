@@ -30,13 +30,13 @@ CREATE TABLE IF NOT EXISTS living_summaries (
 
   -- Constraints
   CONSTRAINT valid_category CHECK (category IN (
-    'commitments',    -- things promised/owed
-    'people',         -- key relationships
-    'projects',       -- active work
-    'tensions',       -- unresolved conflicts
-    'mood',           -- emotional patterns
-    'narrative',      -- self-story
-    'goals'           -- what they're working toward
+    'personality',    -- identity, self-story, who you are
+    'goals',          -- aspirations, what you're working toward
+    'relationships',  -- people, social connections
+    'projects',       -- active work, tasks
+    'interests',      -- hobbies, passions
+    'wellbeing',      -- health, mood, emotional patterns
+    'commitments'     -- promises, obligations
   )),
   CONSTRAINT valid_confidence CHECK (confidence >= 0.0 AND confidence <= 1.0),
   CONSTRAINT valid_staleness CHECK (staleness_score >= 0.0 AND staleness_score <= 1.0)
@@ -76,16 +76,16 @@ CREATE INDEX IF NOT EXISTS idx_summary_links_unincorporated ON memory_summary_li
 
 -- Initialize all categories with empty summaries
 INSERT INTO living_summaries (category, content) VALUES
-  ('commitments', ''),
-  ('people', ''),
+  ('personality', ''),
+  ('goals', ''),
+  ('relationships', ''),
   ('projects', ''),
-  ('tensions', ''),
-  ('mood', ''),
-  ('narrative', ''),
-  ('goals', '')
+  ('interests', ''),
+  ('wellbeing', ''),
+  ('commitments', '')
 ON CONFLICT (category) DO NOTHING;
 
 COMMENT ON TABLE living_summaries IS 'Evolving summaries by category - distilled understanding that compounds over time';
-COMMENT ON COLUMN living_summaries.category IS 'One of: commitments, people, projects, tensions, mood, narrative, goals';
+COMMENT ON COLUMN living_summaries.category IS 'One of: personality, goals, relationships, projects, interests, wellbeing, commitments';
 COMMENT ON COLUMN living_summaries.staleness_score IS 'Increases when new memories arrive but summary not yet updated';
 COMMENT ON TABLE memory_summary_links IS 'Links memories to the summaries they should update';

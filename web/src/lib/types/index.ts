@@ -148,10 +148,10 @@ export type SummaryCategory =
   | 'personality'
   | 'goals'
   | 'relationships'
+  | 'projects'
   | 'interests'
-  | 'work'
-  | 'health'
-  | 'daily';
+  | 'wellbeing'
+  | 'commitments';
 
 // Scored Memory (from context service)
 export interface ScoredMemory {

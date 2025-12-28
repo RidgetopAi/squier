@@ -10,6 +10,7 @@ import { pool } from '../db/pool.js';
 import { complete, type LLMMessage } from '../providers/llm.js';
 import { createMemory } from './memories.js';
 import { processMemoryForBeliefs } from './beliefs.js';
+import { classifyMemoryCategories, linkMemoryToCategories } from './summaries.js';
 
 // === TYPES ===
 
@@ -278,6 +279,17 @@ async function extractFromConversation(
         });
 
         memoriesCreated++;
+
+        // Classify memory for living summaries
+        try {
+          const classifications = await classifyMemoryCategories(mem.content);
+          if (classifications.length > 0) {
+            await linkMemoryToCategories(memory.id, classifications);
+          }
+        } catch (classifyError) {
+          // Log but don't fail - summary classification is secondary
+          console.error('[ChatExtraction] Summary classification failed:', classifyError);
+        }
 
         // Process for beliefs (decisions, preferences often become beliefs)
         if (mem.type === 'decision' || mem.type === 'preference' || mem.type === 'goal') {

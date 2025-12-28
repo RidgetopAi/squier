@@ -11,13 +11,13 @@ import { completeText } from '../providers/llm.js';
 // === TYPES ===
 
 export const SUMMARY_CATEGORIES = [
-  'commitments', // things promised/owed
-  'people', // key relationships
-  'projects', // active work
-  'tensions', // unresolved conflicts
-  'mood', // emotional patterns
-  'narrative', // self-story
-  'goals', // what they're working toward
+  'personality', // identity, self-story, who you are
+  'goals', // aspirations, what you're working toward
+  'relationships', // people, social connections
+  'projects', // active work, tasks, things you're building
+  'interests', // hobbies, passions
+  'wellbeing', // health, mood, emotional patterns
+  'commitments', // promises, obligations, things owed
 ] as const;
 
 export type SummaryCategory = (typeof SUMMARY_CATEGORIES)[number];
@@ -65,13 +65,13 @@ export async function classifyMemoryCategories(
   const systemPrompt = `You are a memory classifier. Given a memory/observation, determine which categories it touches.
 
 Categories:
-- commitments: Promises, obligations, things owed to others or owed by others
-- people: Information about relationships, people mentioned, social connections
-- projects: Active work, tasks, professional or personal projects
-- tensions: Conflicts, unresolved issues, disagreements, stress points
-- mood: Emotional states, feelings, general emotional patterns
-- narrative: Self-story, identity, life direction, personal meaning
+- personality: Identity, self-story, who you are, personal traits, values
 - goals: Aspirations, objectives, things being worked toward
+- relationships: People, social connections, family, friends, colleagues
+- projects: Active work, tasks, professional or personal projects
+- interests: Hobbies, passions, things enjoyed, entertainment preferences
+- wellbeing: Health, mood, emotional states, physical/mental wellness
+- commitments: Promises, obligations, things owed to others or by others
 
 Return ONLY a JSON array of relevant categories with relevance scores (0.0-1.0).
 Only include categories that are clearly relevant (relevance >= 0.3).
@@ -381,13 +381,13 @@ export async function updateAllSummaries(): Promise<{
 
 function getCategoryDescription(category: SummaryCategory): string {
   const descriptions: Record<SummaryCategory, string> = {
-    commitments: 'things you have promised, obligations, and commitments to others',
-    people: 'key relationships, people in your life, and social connections',
-    projects: 'active work, tasks, and projects you are working on',
-    tensions: 'unresolved conflicts, disagreements, and stress points in your life',
-    mood: 'emotional patterns, feelings, and general emotional state over time',
-    narrative: 'your self-story, identity, life direction, and personal meaning',
+    personality: 'your identity, self-story, personal traits, and core values',
     goals: 'aspirations, objectives, and things you are working toward',
+    relationships: 'key people in your life, family, friends, and social connections',
+    projects: 'active work, tasks, and projects you are working on',
+    interests: 'hobbies, passions, things you enjoy, and entertainment preferences',
+    wellbeing: 'your health, mood, emotional patterns, and physical/mental wellness',
+    commitments: 'promises, obligations, and things you owe to others or are owed',
   };
   return descriptions[category];
 }
