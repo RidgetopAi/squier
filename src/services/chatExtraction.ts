@@ -11,6 +11,7 @@ import { complete, type LLMMessage } from '../providers/llm.js';
 import { createMemory } from './memories.js';
 import { processMemoryForBeliefs } from './beliefs.js';
 import { classifyMemoryCategories, linkMemoryToCategories } from './summaries.js';
+import { createCommitment } from './commitments.js';
 
 // === TYPES ===
 
@@ -40,6 +41,7 @@ export interface ExtractionResult {
   conversationsProcessed: number;
   messagesProcessed: number;
   memoriesCreated: number;
+  commitmentsCreated: number;
   beliefsCreated: number;
   beliefsReinforced: number;
   skippedEmpty: number;
@@ -81,6 +83,75 @@ Example output:
 If there's nothing worth remembering, return: []
 
 IMPORTANT: Return ONLY valid JSON array, no markdown, no explanation.`;
+
+// === COMMITMENT DETECTION PROMPT ===
+
+const COMMITMENT_DETECTION_PROMPT = `Analyze this memory content and determine if it represents an actionable commitment.
+
+A commitment is something the user:
+- Needs to do, should do, wants to do, or has promised to do
+- Has a deadline or timeframe (explicit or implied)
+- Is actionable (not just a wish or abstract goal)
+
+Return JSON with:
+- is_commitment: boolean - true if this is an actionable commitment
+- title: string - short actionable title (imperative form, e.g., "Finish report", "Call mom")
+- description: string | null - additional context if any
+- due_at: string | null - ISO date if deadline mentioned (parse "next week", "by Friday", "tomorrow" relative to today)
+- all_day: boolean - true if no specific time mentioned
+
+Examples:
+Input: "Brian wants to ship Squire by January"
+Output: {"is_commitment": true, "title": "Ship Squire", "description": "Goal to complete and launch the Squire project", "due_at": "2025-01-31T23:59:59Z", "all_day": true}
+
+Input: "Brian's wife is named Sarah"
+Output: {"is_commitment": false, "title": null, "description": null, "due_at": null, "all_day": false}
+
+Input: "Brian needs to call the dentist tomorrow"
+Output: {"is_commitment": true, "title": "Call the dentist", "description": null, "due_at": "[TOMORROW_DATE]T12:00:00Z", "all_day": true}
+
+Today's date: ${new Date().toISOString().split('T')[0]}
+
+IMPORTANT: Return ONLY valid JSON object, no markdown, no explanation.`;
+
+interface CommitmentDetection {
+  is_commitment: boolean;
+  title: string | null;
+  description: string | null;
+  due_at: string | null;
+  all_day: boolean;
+}
+
+/**
+ * Detect if a memory represents an actionable commitment
+ */
+async function detectCommitment(memoryContent: string): Promise<CommitmentDetection | null> {
+  try {
+    const messages: LLMMessage[] = [
+      { role: 'system', content: COMMITMENT_DETECTION_PROMPT },
+      { role: 'user', content: memoryContent },
+    ];
+
+    const result = await complete(messages, {
+      temperature: 0.1,
+      maxTokens: 500,
+    });
+
+    const content = result.content.trim();
+
+    // Extract JSON from response
+    let jsonStr = content;
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[0];
+    }
+
+    return JSON.parse(jsonStr) as CommitmentDetection;
+  } catch (error) {
+    console.error('[ChatExtraction] Commitment detection failed:', error);
+    return null;
+  }
+}
 
 // === CORE FUNCTIONS ===
 
@@ -223,6 +294,7 @@ async function extractFromConversation(
   conversation: ConversationForExtraction
 ): Promise<{
   memoriesCreated: number;
+  commitmentsCreated: number;
   beliefsCreated: number;
   beliefsReinforced: number;
   messagesProcessed: number;
@@ -234,6 +306,7 @@ async function extractFromConversation(
   if (messages.length === 0) {
     return {
       memoriesCreated: 0,
+      commitmentsCreated: 0,
       beliefsCreated: 0,
       beliefsReinforced: 0,
       messagesProcessed: 0,
@@ -253,6 +326,7 @@ async function extractFromConversation(
       await markMessagesSkipped(conversation.id, messageIds);
       return {
         memoriesCreated: 0,
+        commitmentsCreated: 0,
         beliefsCreated: 0,
         beliefsReinforced: 0,
         messagesProcessed: messages.length,
@@ -261,6 +335,7 @@ async function extractFromConversation(
     }
 
     let memoriesCreated = 0;
+    let commitmentsCreated = 0;
     let beliefsCreated = 0;
     let beliefsReinforced = 0;
 
@@ -302,6 +377,28 @@ async function extractFromConversation(
             console.error('[ChatExtraction] Belief extraction failed:', beliefError);
           }
         }
+
+        // Detect and create commitments from goals and decisions
+        if (mem.type === 'goal' || mem.type === 'decision') {
+          try {
+            const commitmentInfo = await detectCommitment(mem.content);
+            if (commitmentInfo?.is_commitment && commitmentInfo.title) {
+              await createCommitment({
+                title: commitmentInfo.title,
+                description: commitmentInfo.description ?? mem.content,
+                memory_id: memory.id,
+                source_type: 'chat',
+                due_at: commitmentInfo.due_at ? new Date(commitmentInfo.due_at) : undefined,
+                all_day: commitmentInfo.all_day,
+              });
+              commitmentsCreated++;
+              console.log(`[ChatExtraction] Created commitment: ${commitmentInfo.title}`);
+            }
+          } catch (commitmentError) {
+            // Log but don't fail - commitment creation is secondary
+            console.error('[ChatExtraction] Commitment creation failed:', commitmentError);
+          }
+        }
       } catch (memError) {
         console.error('[ChatExtraction] Failed to create memory:', memError);
       }
@@ -312,6 +409,7 @@ async function extractFromConversation(
 
     return {
       memoriesCreated,
+      commitmentsCreated,
       beliefsCreated,
       beliefsReinforced,
       messagesProcessed: messages.length,
@@ -323,6 +421,7 @@ async function extractFromConversation(
 
     return {
       memoriesCreated: 0,
+      commitmentsCreated: 0,
       beliefsCreated: 0,
       beliefsReinforced: 0,
       messagesProcessed: 0,
@@ -341,6 +440,7 @@ export async function extractMemoriesFromChat(): Promise<ExtractionResult> {
     conversationsProcessed: 0,
     messagesProcessed: 0,
     memoriesCreated: 0,
+    commitmentsCreated: 0,
     beliefsCreated: 0,
     beliefsReinforced: 0,
     skippedEmpty: 0,
@@ -362,6 +462,7 @@ export async function extractMemoriesFromChat(): Promise<ExtractionResult> {
     result.conversationsProcessed++;
     result.messagesProcessed += convResult.messagesProcessed;
     result.memoriesCreated += convResult.memoriesCreated;
+    result.commitmentsCreated += convResult.commitmentsCreated;
     result.beliefsCreated += convResult.beliefsCreated;
     result.beliefsReinforced += convResult.beliefsReinforced;
 
@@ -376,7 +477,7 @@ export async function extractMemoriesFromChat(): Promise<ExtractionResult> {
 
   console.log(
     `[ChatExtraction] Complete: ${result.memoriesCreated} memories, ` +
-    `${result.beliefsCreated} beliefs created, ${result.skippedEmpty} skipped`
+    `${result.commitmentsCreated} commitments, ${result.beliefsCreated} beliefs, ${result.skippedEmpty} skipped`
   );
 
   return result;

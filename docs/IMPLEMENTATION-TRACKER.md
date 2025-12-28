@@ -164,7 +164,7 @@
 | 1.1 | Create commitments migration (018_commitments.sql) | `6dc77d37-12e7-4cf7-a38d-01f60662a7a5` | ✅ |
 | 1.2 | Create commitments service | `7b525561-b250-48dd-bb2e-f1f106aad49f` | ✅ |
 | 1.3 | Create commitments API routes | `df506266-d471-439a-9ef8-1fa67258b1c4` | ✅ |
-| 1.4 | Add commitment detection to chat extraction | `63dbeef4-fc10-4bbf-9ac0-baec97a2586f` | 🔲 |
+| 1.4 | Add commitment detection to chat extraction | `63dbeef4-fc10-4bbf-9ac0-baec97a2586f` | ✅ |
 | 1.5 | Create commitments page and list (frontend) | `66f029ee-8517-4fe1-8740-e997e70121fc` | 🔲 |
 
 ### Phase 2: Reminders + PWA Push
