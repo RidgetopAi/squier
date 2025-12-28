@@ -330,6 +330,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
           currentMessages.filter((m) => m.id !== assistantMessage.id).slice(0, -1)
         );
 
+        // Debug: Log history being sent
+        console.log('[ChatStore] Sending message with history:', {
+          conversationId: get().conversationId,
+          historyLength: history.length,
+          history: history.map(m => ({ role: m.role, content: m.content.slice(0, 50) })),
+        });
+
         // Emit chat message via WebSocket
         socket.emit('chat:message', {
           conversationId: get().conversationId,
@@ -385,12 +392,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Load the most recent conversation from the database
   loadRecentConversation: async () => {
     const { hasLoadedInitial } = get();
+    console.log('[ChatStore] loadRecentConversation called, hasLoadedInitial:', hasLoadedInitial);
     if (hasLoadedInitial) return;
 
     set({ isLoadingHistory: true });
 
     try {
       const result = await fetchRecentConversation();
+      console.log('[ChatStore] loadRecentConversation result:', {
+        hasResult: !!result,
+        messageCount: result?.messages?.length ?? 0,
+        conversationId: result?.conversation?.id,
+      });
 
       if (result) {
         const { conversation, messages } = result;

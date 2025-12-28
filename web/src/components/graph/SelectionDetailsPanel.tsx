@@ -238,8 +238,9 @@ function MemoryDetails({
   const { connectedEntities, similarMemories } = useMemo(() => {
     if (!graphData) return { connectedEntities: [], similarMemories: [] };
 
-    const entities: ForceGraphNode[] = [];
-    const memories: ForceGraphNode[] = [];
+    // Use Maps to dedupe by id (same node can be connected via multiple links)
+    const entitiesMap = new Map<string, ForceGraphNode>();
+    const memoriesMap = new Map<string, ForceGraphNode>();
 
     graphData.links.forEach((link) => {
       const source = typeof link.source === 'string' ? link.source : (link.source as { id: string }).id;
@@ -249,15 +250,18 @@ function MemoryDetails({
         const otherId = source === memoryId ? target : source;
         const otherNode = graphData.nodes.find((n) => n.id === otherId);
 
-        if (otherNode?.type === 'entity') {
-          entities.push(otherNode);
-        } else if (otherNode?.type === 'memory' && link.type === 'SIMILAR') {
-          memories.push(otherNode);
+        if (otherNode?.type === 'entity' && !entitiesMap.has(otherNode.id)) {
+          entitiesMap.set(otherNode.id, otherNode);
+        } else if (otherNode?.type === 'memory' && link.type === 'SIMILAR' && !memoriesMap.has(otherNode.id)) {
+          memoriesMap.set(otherNode.id, otherNode);
         }
       }
     });
 
-    return { connectedEntities: entities, similarMemories: memories };
+    return {
+      connectedEntities: Array.from(entitiesMap.values()),
+      similarMemories: Array.from(memoriesMap.values())
+    };
   }, [graphData, memoryId]);
 
   if (isLoading) {

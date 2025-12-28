@@ -9,6 +9,7 @@ import {
   useOpenInsightDetail,
   useOpenSummaryDetail,
 } from '@/lib/stores';
+import { useMemories, useBeliefStats, usePatternStats, useEntities } from '@/lib/hooks';
 
 // Icons as simple SVG components
 const icons = {
@@ -68,6 +69,12 @@ export default function DashboardPage() {
   const openInsight = useOpenInsightDetail();
   const openSummary = useOpenSummaryDetail();
 
+  // Stats data
+  const { data: memoriesData } = useMemories({ limit: 1 }); // Just need total count
+  const { data: beliefStats } = useBeliefStats();
+  const { data: patternStats } = usePatternStats();
+  const { data: entitiesData } = useEntities({ limit: 1 }); // Just need total count
+
   return (
     <div className="h-full flex flex-col p-6 overflow-auto">
       {/* Detail Modal */}
@@ -84,25 +91,25 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatsCard
           label="Memories"
-          value="--"
+          value={memoriesData?.total ?? '--'}
           icon={icons.brain}
           accent="primary"
         />
         <StatsCard
           label="Beliefs"
-          value="--"
+          value={beliefStats?.total ?? '--'}
           icon={icons.heart}
           accent="gold"
         />
         <StatsCard
           label="Patterns"
-          value="--"
+          value={patternStats?.total ?? '--'}
           icon={icons.chartBar}
           accent="purple"
         />
         <StatsCard
           label="Entities"
-          value="--"
+          value={entitiesData?.total ?? '--'}
           icon={icons.users}
           accent="success"
         />
