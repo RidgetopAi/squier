@@ -468,6 +468,7 @@ Track changes to wiring as we implement:
 | 2025-12-27 | P5-T6 | SelectionDetailsPanel | components/graph/SelectionDetailsPanel.tsx (entity/memory details) |
 | 2025-12-27 | FIX | Graph hover collapse bug | useMemo for stableGraphData, hasInitialZoomRef |
 | 2025-12-27 | P6-T1 | Socket.IO added to Express | src/api/server.ts, src/config/index.ts, socket.io package |
+| 2025-12-27 | P6-T2 | WebSocket event handlers | src/api/socket/types.ts, handlers.ts, index.ts - chat streaming |
 
 ---
 

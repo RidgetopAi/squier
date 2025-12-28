@@ -2,6 +2,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { config } from '../config/index.js';
+import { registerSocketHandlers } from './socket/index.js';
 import memoriesRouter from './routes/memories.js';
 import healthRouter from './routes/health.js';
 import contextRouter from './routes/context.js';
@@ -27,25 +28,8 @@ export const io = new SocketIOServer(httpServer, {
   },
 });
 
-// Socket.IO connection handling
-io.on('connection', (socket) => {
-  console.log(`[Socket.IO] Client connected: ${socket.id}`);
-
-  // Send connection confirmation
-  socket.emit('connection:status', { connected: true, socketId: socket.id });
-
-  // Handle client disconnect
-  socket.on('disconnect', (reason) => {
-    console.log(`[Socket.IO] Client disconnected: ${socket.id} (${reason})`);
-  });
-
-  // Handle ping for latency check
-  socket.on('ping', (callback) => {
-    if (typeof callback === 'function') {
-      callback();
-    }
-  });
-});
+// Register Socket.IO event handlers
+registerSocketHandlers(io);
 
 // Middleware
 app.use(express.json());
