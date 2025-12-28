@@ -28,6 +28,7 @@ export {
 export {
   useEntities,
   useEntity,
+  useEntityDetails,
   useEntitySearch,
   useTopEntities,
 } from './useEntities';

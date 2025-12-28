@@ -52,6 +52,30 @@ export type EntityType =
   | 'concept'
   | 'event';
 
+// Enriched entity types for detail view
+export interface EntityMemoryMention {
+  id: string;
+  content: string;
+  created_at: string;
+  salience_score: number;
+  mention_text: string;
+  relationship_type: string | null;
+}
+
+export interface ConnectedEntity {
+  id: string;
+  name: string;
+  entity_type: EntityType;
+  mention_count: number;
+  shared_memory_count: number;
+}
+
+export interface EntityDetail extends Entity {
+  memories: EntityMemoryMention[];
+  connected_entities: ConnectedEntity[];
+  primary_relationship: string | null;
+}
+
 // Belief Types
 export interface Belief {
   id: string;

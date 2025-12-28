@@ -98,6 +98,8 @@ router.get('/who/:name', async (req: Request, res: Response): Promise<void> => {
 /**
  * GET /api/entities/:id
  * Get a single entity by ID
+ * Query params:
+ *   - include=full: Include memories, connected entities, and relationship info
  */
 router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -107,14 +109,25 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const entity = await getEntity(id);
+    const includeFull = req.query.include === 'full';
 
-    if (!entity) {
-      res.status(404).json({ error: 'Entity not found' });
-      return;
+    if (includeFull) {
+      // Return enriched entity with memories, connected entities, relationships
+      const enrichedEntity = await getEntityWithMemories(id);
+      if (!enrichedEntity) {
+        res.status(404).json({ error: 'Entity not found' });
+        return;
+      }
+      res.json(enrichedEntity);
+    } else {
+      // Return basic entity
+      const entity = await getEntity(id);
+      if (!entity) {
+        res.status(404).json({ error: 'Entity not found' });
+        return;
+      }
+      res.json(entity);
     }
-
-    res.json(entity);
   } catch (error) {
     console.error('Error getting entity:', error);
     res.status(500).json({ error: 'Failed to get entity' });

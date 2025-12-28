@@ -4,11 +4,12 @@ import { useQuery } from '@tanstack/react-query';
 import {
   fetchEntities,
   fetchEntity,
+  fetchEntityDetails,
   searchEntities,
   fetchTopEntities,
   type FetchEntitiesOptions,
 } from '@/lib/api/entities';
-import type { Entity, EntityType } from '@/lib/types';
+import type { Entity, EntityType, EntityDetail } from '@/lib/types';
 
 /**
  * Hook to fetch entities with optional filters
@@ -58,6 +59,19 @@ export function useTopEntities(limit = 12) {
     queryKey: ['entities', 'top', limit],
     queryFn: () => fetchTopEntities(limit),
     staleTime: 1000 * 60 * 5, // 5 minutes
+    refetchOnWindowFocus: false,
+  });
+}
+
+/**
+ * Hook to fetch enriched entity details with memories, connected entities, and relationships
+ */
+export function useEntityDetails(id: string | undefined) {
+  return useQuery<EntityDetail>({
+    queryKey: ['entities', 'details', id],
+    queryFn: () => fetchEntityDetails(id!),
+    enabled: !!id,
+    staleTime: 1000 * 60 * 2, // 2 minutes - shorter since this is detail data
     refetchOnWindowFocus: false,
   });
 }

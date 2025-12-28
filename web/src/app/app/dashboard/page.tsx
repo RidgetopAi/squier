@@ -1,6 +1,21 @@
 'use client';
 
-import { DashboardPanel, StatsCard, LivingSummaryPanel, TodayPanel, BeliefsPanel, PatternsPanel, EntitiesPanel, InsightsPanel, DetailModal } from '@/components/dashboard';
+import { useState } from 'react';
+import {
+  DashboardPanel,
+  StatsCard,
+  LivingSummaryPanel,
+  TodayPanel,
+  BeliefsPanel,
+  PatternsPanel,
+  EntitiesPanel,
+  InsightsPanel,
+  DetailModal,
+  BottomSheet,
+  ExpandedBeliefsList,
+  ExpandedPatternsList,
+  ExpandedInsightsList,
+} from '@/components/dashboard';
 import {
   useOpenMemoryDetail,
   useOpenBeliefDetail,
@@ -10,6 +25,8 @@ import {
   useOpenSummaryDetail,
 } from '@/lib/stores';
 import { useMemories, useBeliefStats, usePatternStats, useEntities } from '@/lib/hooks';
+
+type ExpandedPanel = 'beliefs' | 'patterns' | 'insights' | null;
 
 // Icons as simple SVG components
 const icons = {
@@ -61,6 +78,9 @@ const icons = {
 };
 
 export default function DashboardPage() {
+  // Expanded panel state
+  const [expandedPanel, setExpandedPanel] = useState<ExpandedPanel>(null);
+
   // Detail modal actions
   const openMemory = useOpenMemoryDetail();
   const openBelief = useOpenBeliefDetail();
@@ -75,10 +95,44 @@ export default function DashboardPage() {
   const { data: patternStats } = usePatternStats();
   const { data: entitiesData } = useEntities({ limit: 1 }); // Just need total count
 
+  // Panel expansion handlers
+  const closeExpanded = () => setExpandedPanel(null);
+
   return (
     <div className="h-full flex flex-col p-6 overflow-auto">
       {/* Detail Modal */}
       <DetailModal />
+
+      {/* Expanded Panel Bottom Sheets */}
+      <BottomSheet
+        isOpen={expandedPanel === 'beliefs'}
+        onClose={closeExpanded}
+        title="All Beliefs"
+        icon={icons.heart}
+        accentColor="text-accent-gold"
+      >
+        <ExpandedBeliefsList onBeliefClick={(belief) => { closeExpanded(); openBelief(belief); }} />
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={expandedPanel === 'patterns'}
+        onClose={closeExpanded}
+        title="All Patterns"
+        icon={icons.chartBar}
+        accentColor="text-accent-purple"
+      >
+        <ExpandedPatternsList onPatternClick={(pattern) => { closeExpanded(); openPattern(pattern); }} />
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={expandedPanel === 'insights'}
+        onClose={closeExpanded}
+        title="All Insights"
+        icon={icons.lightbulb}
+        accentColor="text-warning"
+      >
+        <ExpandedInsightsList onInsightClick={(insight) => { closeExpanded(); openInsight(insight); }} />
+      </BottomSheet>
       {/* Page Header */}
       <div className="mb-6 animate-fade-in">
         <h1 className="text-2xl font-bold text-foreground mb-1">Dashboard</h1>
@@ -136,14 +190,16 @@ export default function DashboardPage() {
           <TodayPanel onMemoryClick={openMemory} />
         </DashboardPanel>
 
-        {/* Row 2: Beliefs + Patterns + Insights (3 cols) */}
+        {/* Row 2: Beliefs + Patterns + Insights (3 cols) - Expandable */}
         <DashboardPanel
           title="Beliefs"
           icon={icons.heart}
           accent="gold"
           className="min-h-[260px]"
+          expandable
+          onHeaderClick={() => setExpandedPanel('beliefs')}
         >
-          <BeliefsPanel onBeliefClick={openBelief} />
+          <BeliefsPanel onBeliefClick={openBelief} limit={4} />
         </DashboardPanel>
 
         <DashboardPanel
@@ -151,8 +207,10 @@ export default function DashboardPage() {
           icon={icons.chartBar}
           accent="purple"
           className="min-h-[260px]"
+          expandable
+          onHeaderClick={() => setExpandedPanel('patterns')}
         >
-          <PatternsPanel onPatternClick={openPattern} />
+          <PatternsPanel onPatternClick={openPattern} limit={4} />
         </DashboardPanel>
 
         <DashboardPanel
@@ -160,8 +218,10 @@ export default function DashboardPage() {
           icon={icons.lightbulb}
           accent="warning"
           className="min-h-[260px]"
+          expandable
+          onHeaderClick={() => setExpandedPanel('insights')}
         >
-          <InsightsPanel onInsightClick={openInsight} />
+          <InsightsPanel onInsightClick={openInsight} limit={4} />
         </DashboardPanel>
 
         {/* Row 3: Entities (full width) */}

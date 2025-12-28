@@ -8,11 +8,14 @@ import {
   useCloseDetailModal,
   type DetailItem,
 } from '@/lib/stores/detailModalStore';
+import { useEntityDetails } from '@/lib/hooks';
 import type {
   Memory,
   Belief,
   Pattern,
   Entity,
+  EntityDetail as EntityDetailType,
+  EntityType,
   Insight,
   LivingSummary,
 } from '@/lib/types';
@@ -188,24 +191,49 @@ function PatternDetail({ pattern }: { pattern: Pattern }) {
   );
 }
 
-// Entity Detail
+// Entity Detail - Fetches enriched data with memories and connections
 function EntityDetail({ entity }: { entity: Entity }) {
+  const { data: enrichedEntity, isLoading, error } = useEntityDetails(entity.id);
+
+  // Entity type icons
+  const typeIcons: Record<string, string> = {
+    person: '👤',
+    organization: '🏢',
+    location: '📍',
+    project: '📁',
+    concept: '💡',
+    event: '📅',
+  };
+
   return (
     <div className="space-y-4">
+      {/* Header with name, type, and relationship */}
       <div className="flex items-center gap-3">
         <span className="text-3xl">{getEntityIcon(entity.type)}</span>
-        <div>
+        <div className="flex-1">
           <h3 className="text-xl font-semibold text-foreground">{entity.name}</h3>
-          <p className="text-sm text-foreground-muted">{capitalize(entity.type)}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-foreground-muted">{capitalize(entity.type)}</p>
+            {enrichedEntity?.primary_relationship && (
+              <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-xs font-medium">
+                {enrichedEntity.primary_relationship}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Stats */}
       <div className="grid grid-cols-2 gap-4 pt-4 border-t border-glass-border">
         <MetaItem label="Mentions" value={`${entity.mention_count}×`} />
         <MetaItem label="First Seen" value={formatDateTime(entity.first_seen)} />
         <MetaItem label="Last Seen" value={formatRelativeTime(entity.last_seen)} />
+        {enrichedEntity?.connected_entities && (
+          <MetaItem label="Connected To" value={`${enrichedEntity.connected_entities.length} entities`} />
+        )}
       </div>
 
+      {/* Aliases */}
       {entity.aliases && entity.aliases.length > 0 && (
         <div className="pt-4 border-t border-glass-border">
           <h4 className="text-sm font-medium text-foreground-muted mb-2">Also Known As</h4>
@@ -216,6 +244,86 @@ function EntityDetail({ entity }: { entity: Entity }) {
               </span>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Connected Entities */}
+      {isLoading ? (
+        <div className="pt-4 border-t border-glass-border">
+          <div className="animate-pulse space-y-2">
+            <div className="h-4 w-32 bg-background-tertiary rounded" />
+            <div className="flex gap-2">
+              <div className="h-8 w-24 bg-background-tertiary rounded-lg" />
+              <div className="h-8 w-20 bg-background-tertiary rounded-lg" />
+              <div className="h-8 w-28 bg-background-tertiary rounded-lg" />
+            </div>
+          </div>
+        </div>
+      ) : enrichedEntity?.connected_entities && enrichedEntity.connected_entities.length > 0 ? (
+        <div className="pt-4 border-t border-glass-border">
+          <h4 className="text-sm font-medium text-foreground-muted mb-2">Connected Entities</h4>
+          <div className="flex flex-wrap gap-2">
+            {enrichedEntity.connected_entities.map((connected) => (
+              <div
+                key={connected.id}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-background-tertiary/50 border border-glass-border text-sm"
+              >
+                <span>{typeIcons[connected.entity_type] || '📌'}</span>
+                <span className="text-foreground">{connected.name}</span>
+                <span className="text-foreground-muted text-xs">
+                  ({connected.shared_memory_count})
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Related Memories */}
+      {isLoading ? (
+        <div className="pt-4 border-t border-glass-border">
+          <div className="animate-pulse space-y-2">
+            <div className="h-4 w-32 bg-background-tertiary rounded" />
+            <div className="h-16 bg-background-tertiary rounded-lg" />
+            <div className="h-16 bg-background-tertiary rounded-lg" />
+          </div>
+        </div>
+      ) : enrichedEntity?.memories && enrichedEntity.memories.length > 0 ? (
+        <div className="pt-4 border-t border-glass-border">
+          <h4 className="text-sm font-medium text-foreground-muted mb-2">
+            Related Memories ({enrichedEntity.memories.length})
+          </h4>
+          <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+            {enrichedEntity.memories.slice(0, 5).map((memory) => (
+              <div
+                key={memory.id}
+                className="p-3 rounded-lg bg-background-tertiary/50 border border-glass-border"
+              >
+                <p className="text-sm text-foreground line-clamp-2">{memory.content}</p>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="text-xs text-foreground-muted">
+                    {formatRelativeTime(memory.created_at)}
+                  </span>
+                  {memory.relationship_type && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                      {memory.relationship_type}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+            {enrichedEntity.memories.length > 5 && (
+              <p className="text-xs text-foreground-muted text-center py-1">
+                +{enrichedEntity.memories.length - 5} more memories
+              </p>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {error && (
+        <div className="pt-4 border-t border-glass-border">
+          <p className="text-sm text-error">Failed to load entity details</p>
         </div>
       )}
     </div>

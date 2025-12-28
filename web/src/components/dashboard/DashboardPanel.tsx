@@ -16,6 +16,8 @@ interface DashboardPanelProps {
   emptyMessage?: string;
   emptyIcon?: ReactNode;
   headerAction?: ReactNode;
+  onHeaderClick?: () => void;
+  expandable?: boolean;
 }
 
 // Accent color mappings
@@ -68,8 +70,11 @@ export function DashboardPanel({
   emptyMessage = 'No data available',
   emptyIcon,
   headerAction,
+  onHeaderClick,
+  expandable = false,
 }: DashboardPanelProps) {
   const styles = accentStyles[accent];
+  const isClickable = expandable && onHeaderClick;
 
   return (
     <motion.div
@@ -83,26 +88,48 @@ export function DashboardPanel({
       `}
     >
       {/* Panel Header */}
-      <div className={`
-        px-5 py-4 border-b border-glass-border
-        flex items-center justify-between
-      `}>
+      <div
+        onClick={isClickable ? onHeaderClick : undefined}
+        className={`
+          px-5 py-4 border-b border-glass-border
+          flex items-center justify-between
+          ${isClickable ? 'cursor-pointer hover:bg-background-tertiary/50 transition-colors group' : ''}
+        `}
+      >
         <div className="flex items-center gap-3">
           {icon && (
             <div className={`
               w-8 h-8 rounded-lg flex items-center justify-center
               ${styles.bg} ${styles.border} border
+              ${isClickable ? 'group-hover:scale-105 transition-transform' : ''}
             `}>
               <span className={styles.text}>{icon}</span>
             </div>
           )}
           <h3 className="font-semibold text-foreground">{title}</h3>
+          {isClickable && (
+            <span className="text-xs text-foreground-muted opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+              tap to expand
+            </span>
+          )}
         </div>
-        {headerAction && (
-          <div className="flex items-center">
-            {headerAction}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {headerAction && (
+            <div className="flex items-center">
+              {headerAction}
+            </div>
+          )}
+          {isClickable && (
+            <svg
+              className="w-4 h-4 text-foreground-muted group-hover:text-foreground transition-colors"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+          )}
+        </div>
       </div>
 
       {/* Panel Content */}

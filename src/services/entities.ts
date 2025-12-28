@@ -778,14 +778,27 @@ export async function searchEntities(
   return result.rows as Entity[];
 }
 
+export interface EntityMemoryMention {
+  id: string;
+  content: string;
+  created_at: Date;
+  salience_score: number;
+  mention_text: string;
+  relationship_type: string | null;
+}
+
+export interface ConnectedEntity {
+  id: string;
+  name: string;
+  entity_type: EntityType;
+  mention_count: number;
+  shared_memory_count: number;
+}
+
 export interface EntityWithMemories extends Entity {
-  memories: Array<{
-    id: string;
-    content: string;
-    created_at: Date;
-    salience_score: number;
-    mention_text: string;
-  }>;
+  memories: EntityMemoryMention[];
+  connected_entities?: ConnectedEntity[];
+  primary_relationship?: string | null;
 }
 
 /**
@@ -799,9 +812,10 @@ export async function getEntityWithMemories(
   const entity = await getEntity(entityId);
   if (!entity) return null;
 
-  // Get all memories that mention this entity
+  // Get all memories that mention this entity, including relationship_type
   const memoriesResult = await pool.query(
-    `SELECT m.id, m.content, m.created_at, m.salience_score, em.mention_text
+    `SELECT m.id, m.content, m.created_at, m.salience_score,
+            em.mention_text, em.relationship_type
      FROM memories m
      JOIN entity_mentions em ON em.memory_id = m.id
      WHERE em.entity_id = $1
@@ -810,9 +824,40 @@ export async function getEntityWithMemories(
     [entityId]
   );
 
+  // Get connected entities (entities that appear in the same memories)
+  const connectedResult = await pool.query(
+    `SELECT e.id, e.name, e.entity_type, e.mention_count,
+            COUNT(DISTINCT em2.memory_id) as shared_memory_count
+     FROM entity_mentions em1
+     JOIN entity_mentions em2 ON em1.memory_id = em2.memory_id
+     JOIN entities e ON em2.entity_id = e.id
+     WHERE em1.entity_id = $1
+       AND em2.entity_id != $1
+       AND e.is_merged = FALSE
+     GROUP BY e.id, e.name, e.entity_type, e.mention_count
+     ORDER BY shared_memory_count DESC, e.mention_count DESC
+     LIMIT 10`,
+    [entityId]
+  );
+
+  // Find primary relationship (most common relationship_type for this entity)
+  const relationshipResult = await pool.query(
+    `SELECT relationship_type, COUNT(*) as count
+     FROM entity_mentions
+     WHERE entity_id = $1 AND relationship_type IS NOT NULL
+     GROUP BY relationship_type
+     ORDER BY count DESC
+     LIMIT 1`,
+    [entityId]
+  );
+
+  const primaryRelationship = relationshipResult.rows[0]?.relationship_type || null;
+
   return {
     ...entity,
     memories: memoriesResult.rows,
+    connected_entities: connectedResult.rows,
+    primary_relationship: primaryRelationship,
   };
 }
 

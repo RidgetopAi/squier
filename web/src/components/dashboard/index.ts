@@ -9,3 +9,5 @@ export { PatternsPanel } from './PatternsPanel';
 export { EntitiesPanel } from './EntitiesPanel';
 export { InsightsPanel } from './InsightsPanel';
 export { DetailModal } from './DetailModal';
+export { BottomSheet } from './BottomSheet';
+export { ExpandedBeliefsList, ExpandedPatternsList, ExpandedInsightsList } from './ExpandedLists';

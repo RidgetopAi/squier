@@ -3,7 +3,7 @@
 // ============================================
 
 import { apiGet } from './client';
-import type { Entity, EntityType } from '@/lib/types';
+import type { Entity, EntityType, EntityDetail, EntityMemoryMention, ConnectedEntity } from '@/lib/types';
 
 // ============================================
 // DATA TYPE MAPPING
@@ -25,6 +25,12 @@ interface BackendEntity {
   attributes?: Record<string, unknown>;
 }
 
+interface BackendEntityDetail extends BackendEntity {
+  memories: EntityMemoryMention[];
+  connected_entities: ConnectedEntity[];
+  primary_relationship: string | null;
+}
+
 /**
  * Transform backend entity to frontend Entity type
  */
@@ -38,6 +44,18 @@ function transformEntity(backend: BackendEntity): Entity {
     first_seen: backend.first_seen_at,
     last_seen: backend.last_seen_at,
     metadata: backend.attributes,
+  };
+}
+
+/**
+ * Transform backend enriched entity to frontend EntityDetail type
+ */
+function transformEntityDetail(backend: BackendEntityDetail): EntityDetail {
+  return {
+    ...transformEntity(backend),
+    memories: backend.memories,
+    connected_entities: backend.connected_entities,
+    primary_relationship: backend.primary_relationship,
   };
 }
 
@@ -122,4 +140,14 @@ export async function fetchTopEntities(limit = 12): Promise<{
     entities: sorted,
     counts: response.counts,
   };
+}
+
+/**
+ * Fetch enriched entity details including memories, connected entities, and relationships
+ */
+export async function fetchEntityDetails(id: string): Promise<EntityDetail> {
+  const response = await apiGet<BackendEntityDetail>(`/api/entities/${id}`, {
+    params: { include: 'full' },
+  });
+  return transformEntityDetail(response);
 }
