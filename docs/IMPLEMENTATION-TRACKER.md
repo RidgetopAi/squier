@@ -147,11 +147,11 @@
 
 ---
 
-## Open Decisions
+## Decisions Made
 
-| Decision | Options | Status |
-|----------|---------|--------|
-| Recurrence storage | Materialize vs on-the-fly | ❓ Needs decision |
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Recurrence storage | **Hybrid** | Template + 3-month materialized window. Reminders/resolution need real rows. |
 
 ---
 
