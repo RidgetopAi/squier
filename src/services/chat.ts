@@ -45,6 +45,28 @@ export interface ChatResponse {
 
 // === SYSTEM PROMPT ===
 
+/**
+ * Generate current date/time string for grounding the model
+ * Returns something like: "Monday, December 29, 2025 at 8:14 AM EST"
+ */
+function getCurrentDateTimeString(): string {
+  const now = new Date();
+
+  // Format: "Monday, December 29, 2025 at 8:14 AM EST"
+  const options: Intl.DateTimeFormatOptions = {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+    timeZone: 'America/New_York', // User's timezone - could be configurable
+  };
+
+  return now.toLocaleString('en-US', options);
+}
+
 const SQUIRE_SYSTEM_PROMPT = `You are Squire, a personal AI companion with perfect memory.
 
 Your role is to be a helpful, thoughtful assistant who remembers everything about your conversations with the user. You have access to:
@@ -75,8 +97,9 @@ function buildMessages(
 ): LLMMessage[] {
   const messages: LLMMessage[] = [];
 
-  // System prompt with optional context
-  let systemContent = SQUIRE_SYSTEM_PROMPT;
+  // System prompt with date/time grounding and optional context
+  const dateTimeGrounding = `**Current date and time**: ${getCurrentDateTimeString()}\n\n`;
+  let systemContent = dateTimeGrounding + SQUIRE_SYSTEM_PROMPT;
   if (contextMarkdown) {
     systemContent += `\n\n---\n\n${contextMarkdown}`;
   }
