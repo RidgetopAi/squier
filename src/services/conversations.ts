@@ -298,7 +298,9 @@ export async function getRecentConversationWithMessages(): Promise<{
   const conversation = conversations[0];
   if (!conversation) return null;
 
-  const messages = await getMessages(conversation.id);
+  // Load ALL messages for the current conversation (no limit)
+  // We need the complete history for the chat UI
+  const messages = await getMessages(conversation.id, { limit: 10000 });
 
   return { conversation, messages };
 }

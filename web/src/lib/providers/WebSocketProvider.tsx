@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWebSocket } from '@/lib/hooks/useWebSocket';
+import { joinConversationRoom } from '@/lib/hooks/useWebSocket';
 import { initWebSocketListeners, useChatStore } from '@/lib/stores/chatStore';
 
 interface WebSocketProviderProps {
@@ -62,6 +63,22 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
 
     return unsubscribe;
   }, [onInsightCreated, queryClient]);
+
+  // Track previous connection state to detect reconnections
+  const wasConnected = useRef(false);
+
+  // Rejoin conversation room on reconnection
+  useEffect(() => {
+    if (isConnected && !wasConnected.current) {
+      // Just connected (initial or reconnect)
+      const conversationId = useChatStore.getState().conversationId;
+      if (conversationId) {
+        console.log('[WebSocketProvider] Rejoining room after connect:', conversationId);
+        joinConversationRoom(conversationId);
+      }
+    }
+    wasConnected.current = isConnected;
+  }, [isConnected]);
 
   // Log connection status in development
   useEffect(() => {

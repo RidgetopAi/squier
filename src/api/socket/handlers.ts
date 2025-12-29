@@ -526,6 +526,9 @@ function broadcastMessageSynced(
   originSocketId?: string
 ): void {
   const room = getConversationRoom(conversationId);
+  const socketsInRoom = io.sockets.adapter.rooms.get(room);
+  const socketCount = socketsInRoom?.size ?? 0;
+  console.log(`[Broadcast] message:synced to room ${room} (${socketCount} sockets) - ${message.role} from ${originSocketId}`);
   io.to(room).emit('message:synced', {
     conversationId,
     message,
