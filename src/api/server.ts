@@ -21,6 +21,7 @@ import remindersRouter from './routes/reminders.js';
 import notificationsRouter from './routes/notifications.js';
 import googleRouter from './routes/google.js';
 import calendarRouter from './routes/calendar.js';
+import { initScheduler, shutdownScheduler } from '../services/scheduler.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -79,6 +80,23 @@ httpServer.listen(port, () => {
   console.log(`Squire API server running on http://localhost:${port}`);
   console.log(`Health check: http://localhost:${port}/api/health`);
   console.log(`Socket.IO enabled for real-time events`);
+
+  // Start the reminder scheduler
+  initScheduler();
+  console.log(`Reminder scheduler started`);
 });
+
+// Graceful shutdown
+const shutdown = () => {
+  console.log('Shutting down gracefully...');
+  shutdownScheduler();
+  httpServer.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 export default app;
