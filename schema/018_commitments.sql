@@ -48,8 +48,8 @@ CREATE TABLE IF NOT EXISTS commitments (
   tags TEXT[] DEFAULT '{}',
   metadata JSONB DEFAULT '{}',
 
-  -- Embedding for resolution matching (384-dim from nomic-embed-text)
-  embedding vector(384),
+  -- Embedding for resolution matching (768-dim to match memories table)
+  embedding vector(768),
 
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

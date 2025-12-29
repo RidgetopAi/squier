@@ -3,9 +3,34 @@
 import { useState, useEffect } from 'react';
 import { HeaderBar } from './HeaderBar';
 import { SideNav } from './SideNav';
+import { ToastProvider, useToast } from '@/components/shared/Toast';
+import { useWebSocket } from '@/lib/hooks';
 
 interface AppLayoutProps {
   children: React.ReactNode;
+}
+
+// Component that listens for socket events and shows toasts
+function SocketToastListener() {
+  const { showToast } = useToast();
+  const { onCommitmentCreated, onReminderCreated } = useWebSocket();
+
+  useEffect(() => {
+    const unsubCommitment = onCommitmentCreated((data) => {
+      showToast(`Scheduled: ${data.title}`, 'success', 4000);
+    });
+
+    const unsubReminder = onReminderCreated((data) => {
+      showToast(`Reminder set: ${data.title}`, 'info', 4000);
+    });
+
+    return () => {
+      unsubCommitment();
+      unsubReminder();
+    };
+  }, [onCommitmentCreated, onReminderCreated, showToast]);
+
+  return null;
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
@@ -38,28 +63,31 @@ export function AppLayout({ children }: AppLayoutProps) {
   }, [isSideNavOpen]);
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
-      {/* Header */}
-      <HeaderBar
-        onMenuToggle={() => setIsSideNavOpen(!isSideNavOpen)}
-        isSideNavOpen={isSideNavOpen}
-      />
-
-      {/* Main content area with sidebar */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <SideNav
-          isOpen={isSideNavOpen}
-          onClose={() => setIsSideNavOpen(false)}
-          isCollapsed={isSideNavCollapsed}
-          onToggleCollapse={() => setIsSideNavCollapsed(!isSideNavCollapsed)}
+    <ToastProvider>
+      <SocketToastListener />
+      <div className="h-screen flex flex-col bg-background overflow-hidden">
+        {/* Header */}
+        <HeaderBar
+          onMenuToggle={() => setIsSideNavOpen(!isSideNavOpen)}
+          isSideNavOpen={isSideNavOpen}
         />
 
-        {/* Page content */}
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
+        {/* Main content area with sidebar */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Sidebar */}
+          <SideNav
+            isOpen={isSideNavOpen}
+            onClose={() => setIsSideNavOpen(false)}
+            isCollapsed={isSideNavCollapsed}
+            onToggleCollapse={() => setIsSideNavCollapsed(!isSideNavCollapsed)}
+          />
+
+          {/* Page content */}
+          <main className="flex-1 overflow-auto">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </ToastProvider>
   );
 }

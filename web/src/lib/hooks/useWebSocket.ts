@@ -74,6 +74,17 @@ export interface ConnectionStatusPayload {
   latency?: number;
 }
 
+export interface CommitmentCreatedPayload {
+  id: string;
+  title: string;
+}
+
+export interface ReminderCreatedPayload {
+  id: string;
+  title: string;
+  remind_at: string;
+}
+
 // Client → Server event payloads
 export interface ChatMessagePayload {
   conversationId: string;
@@ -102,6 +113,8 @@ export interface UseWebSocketReturn {
   onChatDone: (callback: (payload: ChatDonePayload) => void) => () => void;
   onMemoryCreated: (callback: (payload: MemoryCreatedPayload) => void) => () => void;
   onInsightCreated: (callback: (payload: InsightCreatedPayload) => void) => () => void;
+  onCommitmentCreated: (callback: (payload: CommitmentCreatedPayload) => void) => () => void;
+  onReminderCreated: (callback: (payload: ReminderCreatedPayload) => void) => () => void;
 
   // Utilities
   measureLatency: () => Promise<number>;
@@ -279,6 +292,22 @@ export function useWebSocket(): UseWebSocketReturn {
     };
   }, []);
 
+  const onCommitmentCreated = useCallback((callback: (payload: CommitmentCreatedPayload) => void) => {
+    const sock = getSocket();
+    sock.on('commitment:created', callback);
+    return () => {
+      sock.off('commitment:created', callback);
+    };
+  }, []);
+
+  const onReminderCreated = useCallback((callback: (payload: ReminderCreatedPayload) => void) => {
+    const sock = getSocket();
+    sock.on('reminder:created', callback);
+    return () => {
+      sock.off('reminder:created', callback);
+    };
+  }, []);
+
   // === UTILITIES ===
 
   const measureLatency = useCallback(async (): Promise<number> => {
@@ -313,6 +342,8 @@ export function useWebSocket(): UseWebSocketReturn {
     onChatDone,
     onMemoryCreated,
     onInsightCreated,
+    onCommitmentCreated,
+    onReminderCreated,
     measureLatency,
   };
 }
