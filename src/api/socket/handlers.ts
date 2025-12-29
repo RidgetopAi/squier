@@ -118,6 +118,24 @@ When responding:
 If memory context is provided below, use it to personalize your responses. Don't explicitly say "according to my memories" - just naturally incorporate the knowledge.`;
 
 /**
+ * Get current timestamp for system prompt grounding
+ */
+function getCurrentTimeContext(): string {
+  const now = new Date();
+  const options: Intl.DateTimeFormatOptions = {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  };
+  const formatted = now.toLocaleString('en-US', options);
+  return `\n\nCurrent date and time: ${formatted}`;
+}
+
+/**
  * Handle chat:message event - stream LLM response
  */
 async function handleChatMessage(
@@ -202,8 +220,9 @@ async function handleChatMessage(
     // Step 3: Build messages
     const messages: Array<{ role: string; content: string }> = [];
 
-    // System prompt with context
+    // System prompt with time grounding and context
     let systemContent = SQUIRE_SYSTEM_PROMPT;
+    systemContent += getCurrentTimeContext();
     if (contextMarkdown) {
       systemContent += `\n\n---\n\n${contextMarkdown}`;
     }
