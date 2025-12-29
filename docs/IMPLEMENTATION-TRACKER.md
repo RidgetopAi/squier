@@ -13,7 +13,7 @@
 | 2 | Reminders + PWA Push | ✅ Complete |
 | 3 | Google Calendar Sync | ✅ Complete |
 | 4 | Recurrence (RRULE) | ✅ Complete |
-| 5 | Resolution Detection | 🔲 Not Started |
+| 5 | Resolution Detection | ✅ Complete |
 
 ---
 
@@ -105,6 +105,8 @@
 | Reminders | `src/services/reminders.ts` | ✅ | create, list, schedule, deliver, snooze |
 | Push | `src/services/push.ts` | ✅ | send, subscribe, unsubscribe |
 | Scheduler | `src/services/scheduler.ts` | ✅ | start, stop, processReminders |
+| Resolution | `src/services/resolution.ts` | ✅ | detectResolution, findMatchingCommitments, confirmResolution |
+| Edges | `src/services/edges.ts` | ✅ | createEdge, getRelatedMemories, getEdgesForMemory |
 | Google Auth | `src/services/google/auth.ts` | ✅ | getAuthUrl, handleCallback, refreshToken |
 | Google Calendars | `src/services/google/calendars.ts` | ✅ | list, sync |
 | Google Events | `src/services/google/events.ts` | ✅ | pull, push, detectConflicts |
@@ -123,6 +125,7 @@
 | RecurrenceEditor | `components/calendar/RecurrenceEditor.tsx` | ✅ | RRULE builder |
 | CommitmentsList | `components/commitments/CommitmentsList.tsx` | 🔲 | Filterable list |
 | CommitmentCard | `components/commitments/CommitmentCard.tsx` | 🔲 | Single display |
+| ResolutionConfirmation | `components/commitments/ResolutionConfirmation.tsx` | ✅ | Confirm/dismiss resolutions |
 | PushPermission | `components/notifications/PushPermission.tsx` | ✅ | Request permission |
 
 ---
@@ -213,11 +216,11 @@
 
 | # | Task | Mandrel ID | Status |
 |---|------|------------|--------|
-| 5.1 | Create resolution classification prompt | `7541cf20-496a-4400-b7df-dd9bbeb9c5d0` | 🔲 |
-| 5.2 | Add embedding similarity search | `53189833-3129-42cb-92b6-998511fc3f6c` | 🔲 |
-| 5.3 | Integrate resolution detection into chat | `32b1e6b3-bbc7-48b4-98f4-21ac41e4ecb5` | 🔲 |
-| 5.4 | Create memory edges on resolution | `650d7e28-27e5-4e2b-bb50-3955f6d99d39` | 🔲 |
-| 5.5 | Create resolution confirmation UI | `bb235709-3ef8-4a40-8a93-6671b4eb1e75` | 🔲 |
+| 5.1 | Create resolution classification prompt | `7541cf20-496a-4400-b7df-dd9bbeb9c5d0` | ✅ |
+| 5.2 | Add embedding similarity search | `53189833-3129-42cb-92b6-998511fc3f6c` | ✅ |
+| 5.3 | Integrate resolution detection into chat | `32b1e6b3-bbc7-48b4-98f4-21ac41e4ecb5` | ✅ |
+| 5.4 | Create memory edges on resolution | `650d7e28-27e5-4e2b-bb50-3955f6d99d39` | ✅ |
+| 5.5 | Create resolution confirmation UI | `bb235709-3ef8-4a40-8a93-6671b4eb1e75` | ✅ |
 
 ---
 

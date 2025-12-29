@@ -1,7 +1,58 @@
 import { pool } from '../db/pool.js';
 import { Memory } from './memories.js';
 
-export type EdgeType = 'SIMILAR' | 'FOLLOWS' | 'CONTRADICTS' | 'ELABORATES';
+export type EdgeType = 'SIMILAR' | 'FOLLOWS' | 'CONTRADICTS' | 'ELABORATES' | 'RESOLVES';
+
+export interface CreateEdgeInput {
+  source_memory_id: string;
+  target_memory_id: string;
+  edge_type: EdgeType;
+  weight?: number;
+  similarity?: number;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Create or update an edge between two memories
+ * If an edge of the same type already exists, updates weight/similarity
+ */
+export async function createEdge(input: CreateEdgeInput): Promise<MemoryEdge> {
+  const {
+    source_memory_id,
+    target_memory_id,
+    edge_type,
+    weight = 1.0,
+    similarity,
+    metadata = {},
+  } = input;
+
+  const result = await pool.query<MemoryEdge>(
+    `INSERT INTO memory_edges (source_memory_id, target_memory_id, edge_type, weight, similarity, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (source_memory_id, target_memory_id, edge_type)
+     DO UPDATE SET
+       weight = GREATEST(memory_edges.weight, EXCLUDED.weight),
+       similarity = COALESCE(EXCLUDED.similarity, memory_edges.similarity),
+       metadata = memory_edges.metadata || EXCLUDED.metadata,
+       last_reinforced_at = NOW(),
+       reinforcement_count = memory_edges.reinforcement_count + 1
+     RETURNING *`,
+    [
+      source_memory_id,
+      target_memory_id,
+      edge_type,
+      weight,
+      similarity ?? null,
+      JSON.stringify(metadata),
+    ]
+  );
+
+  const edge = result.rows[0];
+  if (!edge) {
+    throw new Error('Failed to create edge - no row returned');
+  }
+  return edge;
+}
 
 export interface MemoryEdge {
   id: string;
@@ -122,6 +173,7 @@ export async function getEdgeStats(): Promise<{
     FOLLOWS: 0,
     CONTRADICTS: 0,
     ELABORATES: 0,
+    RESOLVES: 0,
   };
 
   for (const row of typeResult.rows) {

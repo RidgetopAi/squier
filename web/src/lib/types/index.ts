@@ -281,6 +281,28 @@ export interface Commitment {
 export type CommitmentStatus = 'open' | 'in_progress' | 'completed' | 'canceled' | 'snoozed';
 export type ResolutionType = 'completed' | 'canceled' | 'no_longer_relevant' | 'superseded';
 
+// Resolution Detection Types
+export interface ResolutionDetection {
+  is_resolution: boolean;
+  resolution_type: ResolutionType | null;
+  subject_hint: string | null;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+export interface CommitmentMatch {
+  commitment: Commitment;
+  similarity: number;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+export interface ResolutionCandidate {
+  message_content: string;
+  detection: ResolutionDetection;
+  matches: CommitmentMatch[];
+  best_match: CommitmentMatch | null;
+  requires_confirmation: boolean;
+}
+
 // Profile Types
 export interface ContextProfile {
   id: string;

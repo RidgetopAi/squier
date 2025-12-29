@@ -13,6 +13,7 @@ import { processMemoryForBeliefs } from './beliefs.js';
 import { classifyMemoryCategories, linkMemoryToCategories } from './summaries.js';
 import { createCommitment } from './commitments.js';
 import { createStandaloneReminder } from './reminders.js';
+import { processMessagesForResolutions, type ResolutionCandidate } from './resolution.js';
 
 // === TYPES ===
 
@@ -43,6 +44,8 @@ export interface ExtractionResult {
   messagesProcessed: number;
   memoriesCreated: number;
   commitmentsCreated: number;
+  commitmentsResolved: number;
+  resolutionsPending: ResolutionCandidate[];
   remindersCreated: number;
   beliefsCreated: number;
   beliefsReinforced: number;
@@ -372,6 +375,8 @@ async function extractFromConversation(
 ): Promise<{
   memoriesCreated: number;
   commitmentsCreated: number;
+  commitmentsResolved: number;
+  resolutionsPending: ResolutionCandidate[];
   remindersCreated: number;
   beliefsCreated: number;
   beliefsReinforced: number;
@@ -385,6 +390,8 @@ async function extractFromConversation(
     return {
       memoriesCreated: 0,
       commitmentsCreated: 0,
+      commitmentsResolved: 0,
+      resolutionsPending: [],
       remindersCreated: 0,
       beliefsCreated: 0,
       beliefsReinforced: 0,
@@ -419,17 +426,39 @@ async function extractFromConversation(
       }
     }
 
+    // Check for resolution of existing commitments
+    let commitmentsResolved = 0;
+    const resolutionsPending: ResolutionCandidate[] = [];
+    try {
+      const resolutionResult = await processMessagesForResolutions(
+        messages.map((m) => ({ id: m.id, content: m.content }))
+      );
+      commitmentsResolved = resolutionResult.resolved.length;
+      resolutionsPending.push(...resolutionResult.pendingConfirmation.map((p) => p.candidate));
+
+      if (resolutionResult.resolved.length > 0) {
+        console.log(`[ChatExtraction] Auto-resolved ${resolutionResult.resolved.length} commitment(s)`);
+      }
+      if (resolutionResult.pendingConfirmation.length > 0) {
+        console.log(`[ChatExtraction] ${resolutionResult.pendingConfirmation.length} resolution(s) need confirmation`);
+      }
+    } catch (resolutionError) {
+      console.error('[ChatExtraction] Resolution detection failed:', resolutionError);
+    }
+
     if (extracted.length === 0) {
-      // Nothing worth remembering - mark as skipped (but we may have created reminders)
+      // Nothing worth remembering - mark as skipped (but we may have created reminders/resolutions)
       await markMessagesSkipped(conversation.id, messageIds);
       return {
         memoriesCreated: 0,
         commitmentsCreated: 0,
+        commitmentsResolved,
+        resolutionsPending,
         remindersCreated,
         beliefsCreated: 0,
         beliefsReinforced: 0,
         messagesProcessed: messages.length,
-        skipped: remindersCreated === 0,
+        skipped: remindersCreated === 0 && commitmentsResolved === 0,
       };
     }
 
@@ -509,6 +538,8 @@ async function extractFromConversation(
     return {
       memoriesCreated,
       commitmentsCreated,
+      commitmentsResolved,
+      resolutionsPending,
       remindersCreated,
       beliefsCreated,
       beliefsReinforced,
@@ -522,6 +553,8 @@ async function extractFromConversation(
     return {
       memoriesCreated: 0,
       commitmentsCreated: 0,
+      commitmentsResolved: 0,
+      resolutionsPending: [],
       remindersCreated: 0,
       beliefsCreated: 0,
       beliefsReinforced: 0,
@@ -542,6 +575,8 @@ export async function extractMemoriesFromChat(): Promise<ExtractionResult> {
     messagesProcessed: 0,
     memoriesCreated: 0,
     commitmentsCreated: 0,
+    commitmentsResolved: 0,
+    resolutionsPending: [],
     remindersCreated: 0,
     beliefsCreated: 0,
     beliefsReinforced: 0,
@@ -565,6 +600,8 @@ export async function extractMemoriesFromChat(): Promise<ExtractionResult> {
     result.messagesProcessed += convResult.messagesProcessed;
     result.memoriesCreated += convResult.memoriesCreated;
     result.commitmentsCreated += convResult.commitmentsCreated;
+    result.commitmentsResolved += convResult.commitmentsResolved;
+    result.resolutionsPending.push(...convResult.resolutionsPending);
     result.remindersCreated += convResult.remindersCreated;
     result.beliefsCreated += convResult.beliefsCreated;
     result.beliefsReinforced += convResult.beliefsReinforced;
@@ -580,8 +617,8 @@ export async function extractMemoriesFromChat(): Promise<ExtractionResult> {
 
   console.log(
     `[ChatExtraction] Complete: ${result.memoriesCreated} memories, ` +
-    `${result.commitmentsCreated} commitments, ${result.remindersCreated} reminders, ` +
-    `${result.beliefsCreated} beliefs, ${result.skippedEmpty} skipped`
+    `${result.commitmentsCreated} commitments created, ${result.commitmentsResolved} resolved, ` +
+    `${result.remindersCreated} reminders, ${result.beliefsCreated} beliefs, ${result.skippedEmpty} skipped`
   );
 
   return result;
