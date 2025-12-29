@@ -61,20 +61,24 @@ export function HeaderBar({ onMenuToggle, isSideNavOpen }: HeaderBarProps) {
       {/* Right: Status + Profile */}
       <div className="flex items-center gap-4">
         {/* WebSocket connection status (P6-T6) */}
-        <div className="flex items-center gap-2">
+        <div
+          className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+            isConnected ? '' : 'bg-error/20 border border-error/50'
+          }`}
+        >
           <div
             className={`w-2 h-2 rounded-full ${
               isConnected
                 ? 'bg-success animate-pulse'
-                : 'bg-error'
+                : 'bg-error animate-pulse'
             }`}
-            title={isConnected ? `Connected${latency ? ` (${latency}ms)` : ''}` : 'Disconnected'}
+            title={isConnected ? `Connected${latency ? ` (${latency}ms)` : ''}` : 'Disconnected - messages may not be saved'}
           />
-          <span className="hidden sm:inline text-xs text-foreground-muted">
+          <span className={`text-xs ${isConnected ? 'hidden sm:inline text-foreground-muted' : 'text-error font-medium'}`}>
             {isConnected ? (
               <>Live{latency ? <span className="text-foreground-subtle ml-1">({latency}ms)</span> : ''}</>
             ) : (
-              'Offline'
+              'Offline - Refresh'
             )}
           </span>
         </div>

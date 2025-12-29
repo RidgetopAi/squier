@@ -17,6 +17,8 @@ import type {
   SocketData,
   ChatMessagePayload,
   ChatCancelPayload,
+  ConversationJoinPayload,
+  ConversationLeavePayload,
 } from './types.js';
 
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents, object, SocketData>;
@@ -142,6 +144,7 @@ function getCurrentTimeContext(): string {
  */
 async function handleChatMessage(
   socket: TypedSocket,
+  io: TypedIO,
   payload: ChatMessagePayload
 ): Promise<void> {
   const { conversationId, message, history = [], includeContext = true, contextProfile } = payload;
@@ -170,11 +173,19 @@ async function handleChatMessage(
     console.log(`[Socket] Conversation ready: ${conversation.id}`);
 
     // Step 1: Persist user message immediately
-    await addMessage({
+    const userMessage = await addMessage({
       conversationId: conversation.id,
       role: 'user',
       content: message,
     });
+
+    // Broadcast user message to all devices in this conversation room
+    broadcastMessageSynced(io, conversationId, {
+      id: userMessage.id,
+      role: 'user',
+      content: message,
+      timestamp: userMessage.created_at.toISOString(),
+    }, socket.id);
 
     // Step 1.5: Start real-time extraction for commitments/reminders
     // Runs in parallel with context fetch and LLM response - awaited after streaming
@@ -294,7 +305,7 @@ async function handleChatMessage(
 
     // Step 6: Persist assistant message (including follow-up) after streaming completes
     if (fullContent) {
-      await addMessage({
+      const assistantMessage = await addMessage({
         conversationId: conversation.id,
         role: 'assistant',
         content: fullContent,
@@ -304,6 +315,14 @@ async function handleChatMessage(
         promptTokens: streamResult.usage?.promptTokens,
         completionTokens: streamResult.usage?.completionTokens,
       });
+
+      // Broadcast assistant message to all devices in this conversation room
+      broadcastMessageSynced(io, conversationId, {
+        id: assistantMessage.id,
+        role: 'assistant',
+        content: fullContent,
+        timestamp: assistantMessage.created_at.toISOString(),
+      }, socket.id);
     }
   } catch (error) {
     console.error('[Socket] Chat error:', error);
@@ -469,6 +488,52 @@ function handleChatCancel(socket: TypedSocket, payload: ChatCancelPayload): void
 }
 
 /**
+ * Get room name for a conversation
+ */
+function getConversationRoom(conversationId: string): string {
+  return `conversation:${conversationId}`;
+}
+
+/**
+ * Handle conversation:join event - join socket to conversation room
+ */
+function handleConversationJoin(socket: TypedSocket, payload: ConversationJoinPayload): void {
+  const { conversationId } = payload;
+  const room = getConversationRoom(conversationId);
+
+  socket.join(room);
+  console.log(`[Socket] ${socket.id} joined room ${room}`);
+}
+
+/**
+ * Handle conversation:leave event - leave conversation room
+ */
+function handleConversationLeave(socket: TypedSocket, payload: ConversationLeavePayload): void {
+  const { conversationId } = payload;
+  const room = getConversationRoom(conversationId);
+
+  socket.leave(room);
+  console.log(`[Socket] ${socket.id} left room ${room}`);
+}
+
+/**
+ * Broadcast a synced message to all sockets in the conversation room
+ */
+function broadcastMessageSynced(
+  io: TypedIO,
+  conversationId: string,
+  message: { id: string; role: 'user' | 'assistant'; content: string; timestamp: string },
+  originSocketId?: string
+): void {
+  const room = getConversationRoom(conversationId);
+  io.to(room).emit('message:synced', {
+    conversationId,
+    message,
+    originSocketId,
+  });
+}
+
+/**
  * Register all socket handlers
  */
 export function registerSocketHandlers(io: TypedIO): void {
@@ -485,8 +550,10 @@ export function registerSocketHandlers(io: TypedIO): void {
     });
 
     // Register event handlers
-    socket.on('chat:message', (payload) => handleChatMessage(socket, payload));
+    socket.on('chat:message', (payload) => handleChatMessage(socket, io, payload));
     socket.on('chat:cancel', (payload) => handleChatCancel(socket, payload));
+    socket.on('conversation:join', (payload) => handleConversationJoin(socket, payload));
+    socket.on('conversation:leave', (payload) => handleConversationLeave(socket, payload));
 
     socket.on('ping', (callback) => {
       if (typeof callback === 'function') {

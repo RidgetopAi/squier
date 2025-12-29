@@ -85,6 +85,17 @@ export interface ReminderCreatedPayload {
   remind_at: string;
 }
 
+export interface MessageSyncedPayload {
+  conversationId: string;
+  message: {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: string;
+  };
+  originSocketId?: string;
+}
+
 // Client → Server event payloads
 export interface ChatMessagePayload {
   conversationId: string;
@@ -106,6 +117,10 @@ export interface UseWebSocketReturn {
   sendChatMessage: (payload: ChatMessagePayload) => void;
   cancelChat: (conversationId: string) => void;
 
+  // Conversation room actions (for cross-device sync)
+  joinConversation: (conversationId: string) => void;
+  leaveConversation: (conversationId: string) => void;
+
   // Event subscriptions
   onChatChunk: (callback: (payload: ChatChunkPayload) => void) => () => void;
   onChatContext: (callback: (payload: ChatContextPayload) => void) => () => void;
@@ -115,6 +130,7 @@ export interface UseWebSocketReturn {
   onInsightCreated: (callback: (payload: InsightCreatedPayload) => void) => () => void;
   onCommitmentCreated: (callback: (payload: CommitmentCreatedPayload) => void) => () => void;
   onReminderCreated: (callback: (payload: ReminderCreatedPayload) => void) => () => void;
+  onMessageSynced: (callback: (payload: MessageSyncedPayload) => void) => () => void;
 
   // Utilities
   measureLatency: () => Promise<number>;
@@ -131,9 +147,9 @@ function getSocket(): Socket {
     socket = io(url, {
       autoConnect: false,
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: Infinity, // Never give up reconnecting
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
+      reconnectionDelayMax: 10000,
       timeout: 10000,
     });
   }
@@ -242,6 +258,24 @@ export function useWebSocket(): UseWebSocketReturn {
     }
   }, []);
 
+  // === CONVERSATION ROOM ACTIONS (for cross-device sync) ===
+
+  const joinConversation = useCallback((conversationId: string) => {
+    const sock = getSocket();
+    if (sock.connected) {
+      sock.emit('conversation:join', { conversationId });
+      console.log('[WebSocket] Joined conversation room:', conversationId);
+    }
+  }, []);
+
+  const leaveConversation = useCallback((conversationId: string) => {
+    const sock = getSocket();
+    if (sock.connected) {
+      sock.emit('conversation:leave', { conversationId });
+      console.log('[WebSocket] Left conversation room:', conversationId);
+    }
+  }, []);
+
   // === EVENT SUBSCRIPTIONS ===
 
   const onChatChunk = useCallback((callback: (payload: ChatChunkPayload) => void) => {
@@ -308,6 +342,14 @@ export function useWebSocket(): UseWebSocketReturn {
     };
   }, []);
 
+  const onMessageSynced = useCallback((callback: (payload: MessageSyncedPayload) => void) => {
+    const sock = getSocket();
+    sock.on('message:synced', callback);
+    return () => {
+      sock.off('message:synced', callback);
+    };
+  }, []);
+
   // === UTILITIES ===
 
   const measureLatency = useCallback(async (): Promise<number> => {
@@ -336,6 +378,8 @@ export function useWebSocket(): UseWebSocketReturn {
     error,
     sendChatMessage,
     cancelChat,
+    joinConversation,
+    leaveConversation,
     onChatChunk,
     onChatContext,
     onChatError,
@@ -344,6 +388,7 @@ export function useWebSocket(): UseWebSocketReturn {
     onInsightCreated,
     onCommitmentCreated,
     onReminderCreated,
+    onMessageSynced,
     measureLatency,
   };
 }
@@ -368,6 +413,30 @@ export function getConnectionStatus(): { connected: boolean; socketId: string | 
     connected: sock?.connected ?? false,
     socketId: sock?.id ?? null,
   };
+}
+
+/**
+ * Join a conversation room for cross-device sync
+ * Useful for non-React contexts like Zustand stores
+ */
+export function joinConversationRoom(conversationId: string): void {
+  const sock = getSocket();
+  if (sock.connected) {
+    sock.emit('conversation:join', { conversationId });
+    console.log('[WebSocket] Joined conversation room:', conversationId);
+  }
+}
+
+/**
+ * Leave a conversation room
+ * Useful for non-React contexts like Zustand stores
+ */
+export function leaveConversationRoom(conversationId: string): void {
+  const sock = getSocket();
+  if (sock.connected) {
+    sock.emit('conversation:leave', { conversationId });
+    console.log('[WebSocket] Left conversation room:', conversationId);
+  }
 }
 
 /**

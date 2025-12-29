@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback, TouchEvent } from 'react';
 import { MessageBubble } from './MessageBubble';
+import { fetchRecentConversation } from '@/lib/api/conversations';
+import { useChatStore } from '@/lib/stores/chatStore';
 import type { ChatMessage } from '@/lib/types';
 
 interface MessageListProps {
@@ -9,9 +11,15 @@ interface MessageListProps {
   isLoading?: boolean;
 }
 
+const PULL_THRESHOLD = 80; // pixels to pull before triggering refresh
+
 export function MessageList({ messages, isLoading = false }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const touchStartY = useRef<number | null>(null);
+  const isPulling = useRef(false);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -19,6 +27,76 @@ export function MessageList({ messages, isLoading = false }: MessageListProps) {
       bottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+  // Refresh conversation from server
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const result = await fetchRecentConversation();
+      if (result) {
+        const chatMessages: ChatMessage[] = result.messages.map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: m.created_at,
+          memoryIds: m.context_memory_ids,
+        }));
+        useChatStore.setState({
+          messages: chatMessages,
+          conversationId: result.conversation.client_id || result.conversation.id,
+          dbConversationId: result.conversation.id,
+        });
+      }
+    } catch (error) {
+      console.error('[MessageList] Refresh failed:', error);
+    } finally {
+      setIsRefreshing(false);
+      setPullDistance(0);
+    }
+  }, []);
+
+  // Touch handlers for pull-to-refresh
+  const handleTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Only enable pull-to-refresh when scrolled to top
+    if (container.scrollTop <= 0) {
+      touchStartY.current = e.touches[0].clientY;
+      isPulling.current = true;
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: TouchEvent<HTMLDivElement>) => {
+    if (!isPulling.current || touchStartY.current === null) return;
+
+    const container = containerRef.current;
+    if (!container || container.scrollTop > 0) {
+      isPulling.current = false;
+      setPullDistance(0);
+      return;
+    }
+
+    const currentY = e.touches[0].clientY;
+    const distance = Math.max(0, currentY - touchStartY.current);
+
+    // Apply resistance (logarithmic) to make it feel natural
+    const resistedDistance = Math.min(distance * 0.5, 120);
+    setPullDistance(resistedDistance);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!isPulling.current) return;
+
+    isPulling.current = false;
+    touchStartY.current = null;
+
+    if (pullDistance >= PULL_THRESHOLD && !isRefreshing) {
+      handleRefresh();
+    } else {
+      setPullDistance(0);
+    }
+  }, [pullDistance, isRefreshing, handleRefresh]);
 
   if (messages.length === 0 && !isLoading) {
     return (
@@ -51,31 +129,69 @@ export function MessageList({ messages, isLoading = false }: MessageListProps) {
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-y-auto p-4 space-y-4"
+      className="flex-1 overflow-y-auto p-4 space-y-4 relative"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
-      {messages.map((message, index) => (
-        <MessageBubble
-          key={message.id}
-          message={message}
-          isLatest={index === messages.length - 1}
-        />
-      ))}
-
-      {/* Typing indicator */}
-      {isLoading && (
-        <div className="flex justify-start">
-          <div className="glass px-4 py-3 rounded-2xl rounded-bl-md">
-            <div className="flex gap-1.5">
-              <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
+      {/* Pull-to-refresh indicator */}
+      {(pullDistance > 0 || isRefreshing) && (
+        <div
+          className="absolute left-0 right-0 flex justify-center transition-transform duration-150"
+          style={{
+            top: isRefreshing ? 8 : Math.min(pullDistance - 40, 20),
+            opacity: isRefreshing ? 1 : Math.min(pullDistance / PULL_THRESHOLD, 1),
+          }}
+        >
+          <div className="glass px-4 py-2 rounded-full flex items-center gap-2">
+            {isRefreshing ? (
+              <>
+                <svg className="w-4 h-4 text-primary animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span className="text-xs text-primary">Refreshing...</span>
+              </>
+            ) : pullDistance >= PULL_THRESHOLD ? (
+              <span className="text-xs text-primary">Release to refresh</span>
+            ) : (
+              <span className="text-xs text-foreground-muted">Pull to refresh</span>
+            )}
           </div>
         </div>
       )}
 
-      {/* Scroll anchor */}
-      <div ref={bottomRef} />
+      {/* Messages container with pull transform */}
+      <div
+        style={{
+          transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : undefined,
+          transition: pullDistance === 0 ? 'transform 0.2s ease-out' : undefined,
+        }}
+      >
+        {messages.map((message, index) => (
+          <MessageBubble
+            key={message.id}
+            message={message}
+            isLatest={index === messages.length - 1}
+          />
+        ))}
+
+        {/* Typing indicator */}
+        {isLoading && (
+          <div className="flex justify-start mt-4">
+            <div className="glass px-4 py-3 rounded-2xl rounded-bl-md">
+              <div className="flex gap-1.5">
+                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Scroll anchor */}
+        <div ref={bottomRef} />
+      </div>
     </div>
   );
 }

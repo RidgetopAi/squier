@@ -2,11 +2,15 @@
 
 import { useState } from 'react';
 import { useConsolidation, formatConsolidationResult } from '@/lib/hooks/useConsolidation';
+import { useConsolidationNavigationGuard } from '@/lib/hooks/useNavigationGuard';
 import type { ConsolidationResult } from '@/lib/api/consolidation';
 
 export default function SettingsPage() {
   const consolidation = useConsolidation();
   const [lastResult, setLastResult] = useState<ConsolidationResult | null>(null);
+
+  // Prevent navigation during consolidation
+  useConsolidationNavigationGuard(consolidation.isPending);
 
   const handleSleep = async () => {
     try {

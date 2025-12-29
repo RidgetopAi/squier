@@ -13,11 +13,20 @@ import {
 import {
   getSocketInstance,
   getConnectionStatus,
+  joinConversationRoom,
+  leaveConversationRoom,
   type ChatChunkPayload,
   type ChatContextPayload,
   type ChatDonePayload,
   type ChatErrorPayload,
+  type MessageSyncedPayload,
 } from '@/lib/hooks/useWebSocket';
+import {
+  savePendingMessage,
+  clearPendingMessage,
+  getPendingMessages,
+  clearAllPendingMessages,
+} from '@/lib/utils/messageBackup';
 
 // Helper to safely access overlay store (avoids circular dependency issues)
 function clearOverlayCards() {
@@ -58,6 +67,9 @@ interface ChatState {
   isLoadingHistory: boolean;
   hasLoadedInitial: boolean;
 
+  // Message backup state
+  pendingUserMessageId: string | null;
+
   // Actions
   addMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => ChatMessage;
   updateMessage: (id: string, updates: Partial<ChatMessage>) => void;
@@ -79,7 +91,14 @@ interface ChatState {
 
   // Persistence actions
   loadRecentConversation: () => Promise<void>;
+
+  // Recovery actions
+  recoverOrphanedMessages: () => PendingMessage[];
+  clearPendingBackup: () => void;
 }
+
+// Re-export PendingMessage type for external use
+import type { PendingMessage } from '@/lib/utils/messageBackup';
 
 interface SendMessageOptions {
   includeContext?: boolean;
@@ -103,6 +122,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   dbConversationId: null,
   isLoadingHistory: false,
   hasLoadedInitial: false,
+
+  // Message backup state
+  pendingUserMessageId: null,
 
   // Add a single message
   addMessage: (messageData) => {
@@ -170,6 +192,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   // Start a new conversation
   startNewConversation: () => {
+    // Leave the old conversation room if we were in one
+    const { conversationId: oldConversationId } = get();
+    if (oldConversationId) {
+      leaveConversationRoom(oldConversationId);
+    }
+
     const conversationId = generateConversationId();
     set({
       conversationId,
@@ -185,6 +213,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
     // Clear overlay for new conversation
     clearOverlayCards();
+
+    // Join the new conversation room for cross-device sync
+    joinConversationRoom(conversationId);
 
     // Async create in database (non-blocking)
     apiCreateConversation({ clientId: conversationId })
@@ -214,10 +245,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   // Finish streaming
   finishStreaming: (_usage) => {
+    // Clear the pending message backup - server has confirmed receipt
+    const { pendingUserMessageId } = get();
+    if (pendingUserMessageId) {
+      clearPendingMessage(pendingUserMessageId);
+    }
+
     set({
       isStreaming: false,
       streamingMessageId: null,
       isLoading: false,
+      pendingUserMessageId: null,
     });
   },
 
@@ -272,10 +310,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     // Add user message
-    addMessage({
+    const userMessage = addMessage({
       role: 'user',
       content,
     });
+
+    // Save to localStorage backup BEFORE sending to server
+    const conversationId = get().conversationId;
+    savePendingMessage({
+      id: userMessage.id,
+      content,
+      conversationId: conversationId || '',
+      timestamp: userMessage.timestamp,
+    });
+    set({ pendingUserMessageId: userMessage.id });
 
     setLoading(true);
     setError(null);
@@ -417,13 +465,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
           memoryIds: m.context_memory_ids,
         }));
 
+        const conversationId = conversation.client_id || conversation.id;
+
         set({
-          conversationId: conversation.client_id || conversation.id,
+          conversationId,
           dbConversationId: conversation.id,
           messages: chatMessages,
           hasLoadedInitial: true,
           isLoadingHistory: false,
         });
+
+        // Join the conversation room for cross-device sync
+        joinConversationRoom(conversationId);
       } else {
         set({
           hasLoadedInitial: true,
@@ -437,6 +490,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
         isLoadingHistory: false,
       });
     }
+  },
+
+  // Recover any orphaned messages from localStorage
+  recoverOrphanedMessages: () => {
+    const orphaned = getPendingMessages();
+    if (orphaned.length > 0) {
+      console.log('[ChatStore] Found orphaned messages:', orphaned.length);
+    }
+    return orphaned;
+  },
+
+  // Clear pending message backup (after user acknowledges recovery)
+  clearPendingBackup: () => {
+    clearAllPendingMessages();
+    set({ pendingUserMessageId: null });
   },
 }));
 
@@ -516,11 +584,49 @@ export function initWebSocketListeners(): () => void {
     }
   }
 
+  // Handle synced messages from other devices
+  function handleMessageSynced(payload: MessageSyncedPayload) {
+    const { conversationId, messages } = store();
+    const { connected, socketId } = getConnectionStatus();
+
+    // Ignore messages from ourselves
+    if (payload.originSocketId === socketId) {
+      return;
+    }
+
+    // Only add messages for the current conversation
+    if (payload.conversationId !== conversationId) {
+      return;
+    }
+
+    // Check if we already have this message (by ID)
+    const existingMessage = messages.find((m) => m.id === payload.message.id);
+    if (existingMessage) {
+      return;
+    }
+
+    console.log('[ChatStore] Synced message from another device:', payload.message.role);
+
+    // Add the synced message
+    useChatStore.setState((state) => ({
+      messages: [
+        ...state.messages,
+        {
+          id: payload.message.id,
+          role: payload.message.role,
+          content: payload.message.content,
+          timestamp: payload.message.timestamp,
+        },
+      ],
+    }));
+  }
+
   // Register listeners
   socket.on('chat:chunk', handleChatChunk);
   socket.on('chat:context', handleChatContext);
   socket.on('chat:done', handleChatDone);
   socket.on('chat:error', handleChatError);
+  socket.on('message:synced', handleMessageSynced);
 
   listenersInitialized = true;
 
@@ -530,6 +636,7 @@ export function initWebSocketListeners(): () => void {
     socket.off('chat:context', handleChatContext);
     socket.off('chat:done', handleChatDone);
     socket.off('chat:error', handleChatError);
+    socket.off('message:synced', handleMessageSynced);
     listenersInitialized = false;
     cleanupFn = null;
   };
@@ -548,3 +655,11 @@ export const useLastContext = () => useChatStore((state) => state.lastContext);
 export const useLastContextPackage = () => useChatStore((state) => state.lastContextPackage);
 export const useIsLoadingHistory = () => useChatStore((state) => state.isLoadingHistory);
 export const useHasLoadedInitial = () => useChatStore((state) => state.hasLoadedInitial);
+export const useHasPendingMessage = () => useChatStore((state) => state.pendingUserMessageId !== null);
+
+// Combined "busy" state - true when chat is processing and navigation should be blocked
+export const useIsChatBusy = () =>
+  useChatStore((state) => state.isLoading || state.isStreaming || state.pendingUserMessageId !== null);
+
+// Re-export PendingMessage type
+export type { PendingMessage } from '@/lib/utils/messageBackup';

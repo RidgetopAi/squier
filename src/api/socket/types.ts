@@ -18,9 +18,19 @@ export interface ChatCancelPayload {
   conversationId: string;
 }
 
+export interface ConversationJoinPayload {
+  conversationId: string;
+}
+
+export interface ConversationLeavePayload {
+  conversationId: string;
+}
+
 export interface ClientToServerEvents {
   'chat:message': (payload: ChatMessagePayload) => void;
   'chat:cancel': (payload: ChatCancelPayload) => void;
+  'conversation:join': (payload: ConversationJoinPayload) => void;
+  'conversation:leave': (payload: ConversationLeavePayload) => void;
   'ping': (callback: () => void) => void;
 }
 
@@ -100,6 +110,18 @@ export interface ReminderCreatedPayload {
   remind_at: string;
 }
 
+export interface MessageSyncedPayload {
+  conversationId: string;
+  message: {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: string;
+  };
+  // Socket ID of the originator (so they can ignore their own messages)
+  originSocketId?: string;
+}
+
 export interface ServerToClientEvents {
   'chat:chunk': (payload: ChatChunkPayload) => void;
   'chat:context': (payload: ChatContextPayload) => void;
@@ -110,6 +132,7 @@ export interface ServerToClientEvents {
   'connection:status': (payload: ConnectionStatusPayload) => void;
   'commitment:created': (payload: CommitmentCreatedPayload) => void;
   'reminder:created': (payload: ReminderCreatedPayload) => void;
+  'message:synced': (payload: MessageSyncedPayload) => void;
 }
 
 // === SOCKET DATA ===

@@ -134,24 +134,42 @@ const PATTERNS = {
   ],
 };
 
-// Words to exclude from entity extraction
+// Words to exclude from entity extraction (include lowercase since regex uses /gi flag)
 const STOP_WORDS = new Set([
-  // Common sentence starters
-  'The', 'This', 'That', 'These', 'Those', 'Here', 'There', 'Where', 'When', 'What', 'Why', 'How',
-  'I', 'We', 'You', 'They', 'He', 'She', 'It',
+  // Common sentence starters (both cases for /gi regex patterns)
+  'The', 'the', 'This', 'this', 'That', 'that', 'These', 'these', 'Those', 'those',
+  'Here', 'here', 'There', 'there', 'Where', 'where', 'When', 'when',
+  'What', 'what', 'Why', 'why', 'How', 'how',
+  // Pronouns (both cases)
+  'I', 'We', 'we', 'You', 'you', 'They', 'they', 'He', 'he', 'She', 'she', 'It', 'it',
+  // Possessive pronouns - common false positives with "X project" pattern
+  'My', 'my', 'Your', 'your', 'Our', 'our', 'Their', 'their', 'His', 'his', 'Her', 'her', 'Its', 'its',
+  // Articles (critical for avoiding "an project" matches)
+  'A', 'a', 'An', 'an',
   // Time words
   'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
   'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
   'September', 'October', 'November', 'December',
-  'Today', 'Tomorrow', 'Yesterday',
-  // Holidays (often match person patterns like "New Year's")
+  'Today', 'today', 'Tomorrow', 'tomorrow', 'Yesterday', 'yesterday',
+  // Holidays
   "New Year's", 'New Years', 'New Year', 'Christmas', 'Thanksgiving', 'Easter',
   'Halloween', 'Valentine', "Valentine's", 'Memorial Day', 'Labor Day',
-  // Common words that get capitalized
-  'Also', 'Just', 'Really', 'Very', 'Now', 'Then', 'So', 'But', 'And', 'Or',
-  'First', 'Second', 'Third', 'Next', 'Last', 'New', 'Old',
-  // Common false positives
-  'Need', 'Met', 'CTO', 'CEO', 'CFO', 'COO', 'VP',
+  // Common words that get capitalized (both cases)
+  'Also', 'also', 'Just', 'just', 'Really', 'really', 'Very', 'very',
+  'Now', 'now', 'Then', 'then', 'So', 'so', 'But', 'but', 'And', 'and', 'Or', 'or',
+  // Ordinals and sequence words (both cases)
+  'First', 'first', 'Second', 'second', 'Third', 'third', 'Fourth', 'fourth', 'Fifth', 'fifth',
+  'Next', 'next', 'Last', 'last', 'New', 'new', 'Old', 'old',
+  // Common adjectives that create false positives like "major project"
+  'Major', 'major', 'Minor', 'minor', 'Big', 'big', 'Small', 'small',
+  'Main', 'main', 'Other', 'other', 'Same', 'same', 'Final', 'final',
+  'Current', 'current', 'Recent', 'recent', 'Latest', 'latest',
+  // Common verbs/words that match patterns
+  'Need', 'need', 'Met', 'met', 'Got', 'got', 'Had', 'had', 'Has', 'has',
+  'Was', 'was', 'Were', 'were', 'Been', 'been', 'Being', 'being',
+  'Some', 'some', 'Any', 'any', 'All', 'all', 'Most', 'most', 'Many', 'many', 'Few', 'few',
+  // Titles/roles without names
+  'CTO', 'CEO', 'CFO', 'COO', 'VP',
 ]);
 
 // =============================================================================
@@ -180,7 +198,9 @@ export function extractEntities(text: string): ExtractedEntity[] {
         if (name.split(/\s+/).every((w) => STOP_WORDS.has(w))) continue;
 
         // Skip very short names (likely false positives)
-        if (name.length < 2) continue;
+        // Projects need 3+ chars to avoid "an", "my", etc. matching with /gi flag
+        const minLength = type === 'project' ? 3 : 2;
+        if (name.length < minLength) continue;
 
         // Skip if already seen at this position
         const posKey = `${match.index}-${name}`;
