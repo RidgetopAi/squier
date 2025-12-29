@@ -65,7 +65,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <ToastProvider>
       <SocketToastListener />
-      <div className="h-screen flex flex-col bg-background overflow-hidden">
+      <div className="h-screen flex flex-col bg-background overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         {/* Header */}
         <HeaderBar
           onMenuToggle={() => setIsSideNavOpen(!isSideNavOpen)}
