@@ -159,6 +159,49 @@ export default function SettingsPage() {
           )}
         </div>
 
+        {/* Integrations Section */}
+        <div className="glass rounded-xl p-6 space-y-4">
+          <a
+            href="/app/settings/integrations"
+            className="flex items-center gap-3 hover:bg-background-tertiary p-3 -m-3 rounded-lg transition-colors"
+          >
+            <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+              <svg
+                className="w-5 h-5 text-blue-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                />
+              </svg>
+            </div>
+            <div className="text-left flex-1">
+              <h2 className="font-semibold text-foreground">Integrations</h2>
+              <p className="text-sm text-foreground-muted">
+                Connect Google Calendar and other services
+              </p>
+            </div>
+            <svg
+              className="w-5 h-5 text-foreground-muted"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </a>
+        </div>
+
         {/* Placeholder for other settings */}
         <p className="text-foreground-muted/50 text-sm">
           More settings coming soon: profiles, preferences, and API keys.
