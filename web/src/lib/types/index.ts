@@ -344,4 +344,128 @@ export interface CalendarEvent {
   googleCalendarName?: string;
   location?: string | null;
   htmlLink?: string | null;
+  // Recurrence data
+  isRecurring?: boolean;
+  isOccurrence?: boolean;
+  occurrenceIndex?: number;
+  rrule?: string | null;
 }
+
+// ============================================
+// Recurrence Types (RRULE)
+// ============================================
+
+/**
+ * Common recurrence frequency options for UI
+ */
+export type RecurrenceFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly';
+
+/**
+ * Day of week codes (RFC 5545 format)
+ */
+export type DayOfWeek = 'MO' | 'TU' | 'WE' | 'TH' | 'FR' | 'SA' | 'SU';
+
+/**
+ * Parsed recurrence rule for display and editing
+ */
+export interface ParsedRecurrence {
+  frequency: RecurrenceFrequency | 'custom';
+  interval: number;
+  daysOfWeek?: DayOfWeek[];
+  dayOfMonth?: number;
+  monthOfYear?: number;
+  until?: string; // ISO date string
+  count?: number;
+  isValid: boolean;
+  rawRule: string;
+}
+
+/**
+ * Recurrence builder input for creating new rules
+ */
+export interface RecurrenceInput {
+  frequency: RecurrenceFrequency;
+  interval?: number;
+  daysOfWeek?: DayOfWeek[];
+  endType: 'never' | 'until' | 'count';
+  until?: string; // ISO date string
+  count?: number;
+}
+
+/**
+ * A single occurrence of a recurring commitment
+ */
+export interface RecurrenceOccurrence {
+  /** ISO date string of this occurrence */
+  date: string;
+  /** Index in the recurrence sequence (0-based) */
+  index: number;
+  /** Whether this is an exception (modified from the rule) */
+  isException?: boolean;
+  /** Whether this occurrence has been resolved/completed */
+  isResolved?: boolean;
+  /** Original commitment ID this occurrence belongs to */
+  commitmentId: string;
+}
+
+/**
+ * Result of expanding a recurrence rule (from API)
+ */
+export interface RecurrenceExpansion {
+  rrule: string;
+  dtstart: string;
+  until?: string;
+  count?: number;
+  occurrences: string[]; // ISO date strings
+  totalCount: number | null;
+  isInfinite: boolean;
+}
+
+/**
+ * Preset recurrence options for quick selection
+ */
+export const RecurrencePresets = {
+  DAILY: 'RRULE:FREQ=DAILY',
+  WEEKLY: 'RRULE:FREQ=WEEKLY',
+  BIWEEKLY: 'RRULE:FREQ=WEEKLY;INTERVAL=2',
+  MONTHLY: 'RRULE:FREQ=MONTHLY',
+  YEARLY: 'RRULE:FREQ=YEARLY',
+  WEEKDAYS: 'RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
+  WEEKENDS: 'RRULE:FREQ=WEEKLY;BYDAY=SA,SU',
+} as const;
+
+export type RecurrencePreset = keyof typeof RecurrencePresets;
+
+/**
+ * Human-readable labels for recurrence frequencies
+ */
+export const RecurrenceFrequencyLabels: Record<RecurrenceFrequency, string> = {
+  daily: 'Daily',
+  weekly: 'Weekly',
+  biweekly: 'Every 2 weeks',
+  monthly: 'Monthly',
+  yearly: 'Yearly',
+};
+
+/**
+ * Day of week labels
+ */
+export const DayOfWeekLabels: Record<DayOfWeek, string> = {
+  MO: 'Monday',
+  TU: 'Tuesday',
+  WE: 'Wednesday',
+  TH: 'Thursday',
+  FR: 'Friday',
+  SA: 'Saturday',
+  SU: 'Sunday',
+};
+
+export const DayOfWeekShortLabels: Record<DayOfWeek, string> = {
+  MO: 'Mon',
+  TU: 'Tue',
+  WE: 'Wed',
+  TH: 'Thu',
+  FR: 'Fri',
+  SA: 'Sat',
+  SU: 'Sun',
+};

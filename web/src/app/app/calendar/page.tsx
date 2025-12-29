@@ -40,14 +40,22 @@ function EventCard({ event, compact = false, onClick }: EventCardProps) {
   const isGoogle = event.source === 'google';
   const color = event.color || (isGoogle ? '#4285f4' : '#3b82f6');
 
+  // Recurrence icon
+  const RecurrenceIcon = () => (
+    <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Recurring event">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+  );
+
   if (compact) {
     return (
       <button
         onClick={() => onClick(event)}
-        className="w-full text-left px-1.5 py-0.5 text-xs rounded truncate hover:opacity-80 transition-opacity"
+        className="w-full text-left px-1.5 py-0.5 text-xs rounded truncate hover:opacity-80 transition-opacity flex items-center gap-1"
         style={{ backgroundColor: color + '30', color: color, borderLeft: `2px solid ${color}` }}
       >
-        {event.title}
+        {event.isRecurring && <RecurrenceIcon />}
+        <span className="truncate">{event.title}</span>
       </button>
     );
   }
@@ -60,7 +68,10 @@ function EventCard({ event, compact = false, onClick }: EventCardProps) {
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-white text-sm truncate">{event.title}</div>
+          <div className="font-medium text-white text-sm truncate flex items-center gap-1.5">
+            {event.isRecurring && <RecurrenceIcon />}
+            {event.title}
+          </div>
           <div className="text-xs text-gray-400 mt-0.5">
             {formatTime(event.start, event.allDay)}
             {event.location && <span className="ml-2">@ {event.location}</span>}
@@ -89,6 +100,9 @@ function EventCard({ event, compact = false, onClick }: EventCardProps) {
         }`}>
           {isGoogle ? (event.googleCalendarName || 'Google') : 'Squire'}
         </span>
+        {event.isRecurring && (
+          <span className="text-xs text-gray-500">Recurring</span>
+        )}
         {event.status && event.status !== 'open' && event.status !== 'confirmed' && (
           <span className="text-xs text-gray-500">{event.status}</span>
         )}
@@ -170,6 +184,22 @@ function EventDetailsPanel({ event, onClose }: EventDetailsPanelProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
               </svg>
               <div className="text-gray-300 text-sm whitespace-pre-wrap">{event.description}</div>
+            </div>
+          )}
+
+          {event.isRecurring && (
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <div>
+                <div className="text-white">Recurring event</div>
+                {event.isOccurrence && event.occurrenceIndex !== undefined && (
+                  <div className="text-gray-400 text-sm">
+                    Occurrence #{event.occurrenceIndex + 1}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -411,6 +441,12 @@ export default function CalendarPage() {
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-full bg-blue-500" />
                 <span className="text-gray-400">Google</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span className="text-gray-400">Recurring</span>
               </div>
             </div>
 

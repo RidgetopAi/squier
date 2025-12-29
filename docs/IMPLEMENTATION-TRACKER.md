@@ -12,7 +12,7 @@
 | 1 | Core Commitments | ✅ Complete |
 | 2 | Reminders + PWA Push | ✅ Complete |
 | 3 | Google Calendar Sync | ✅ Complete |
-| 4 | Recurrence (RRULE) | 🔲 Not Started |
+| 4 | Recurrence (RRULE) | ✅ Complete |
 | 5 | Resolution Detection | 🔲 Not Started |
 
 ---
@@ -120,7 +120,7 @@
 | EventCard | `app/app/calendar/page.tsx` | ✅ | Color by source (inline) |
 | IntegrationsPage | `app/app/settings/integrations/page.tsx` | ✅ | Google OAuth, calendar settings |
 | CommitmentForm | `components/calendar/CommitmentForm.tsx` | 🔲 | Create/edit |
-| RecurrenceEditor | `components/calendar/RecurrenceEditor.tsx` | 🔲 | RRULE builder |
+| RecurrenceEditor | `components/calendar/RecurrenceEditor.tsx` | ✅ | RRULE builder |
 | CommitmentsList | `components/commitments/CommitmentsList.tsx` | 🔲 | Filterable list |
 | CommitmentCard | `components/commitments/CommitmentCard.tsx` | 🔲 | Single display |
 | PushPermission | `components/notifications/PushPermission.tsx` | ✅ | Request permission |
@@ -145,9 +145,9 @@
 
 | Package | Purpose | Status |
 |---------|---------|--------|
-| `rrule` | Recurrence parsing | 🔲 |
+| `rrule` | Recurrence parsing | ✅ |
 | `web-push` | PWA notifications | ✅ |
-| `googleapis` | Google Calendar API | 🔲 |
+| `googleapis` | Google Calendar API | ✅ |
 
 ---
 
@@ -204,10 +204,10 @@
 
 | # | Task | Mandrel ID | Status |
 |---|------|------------|--------|
-| 4.1 | Add rrule dependency and types | `93e25f1f-88b3-486d-9c0e-332309c15953` | 🔲 |
-| 4.2 | Add recurrence expansion to commitments service | `b0a4ce5b-48d9-49e0-be75-0e0ee0446096` | 🔲 |
-| 4.3 | Create RecurrenceEditor component | `1bacd056-6ea8-441a-9a37-e7fc75c77f89` | 🔲 |
-| 4.4 | Update calendar queries to expand recurring | `1d542dcf-feac-40d2-93b5-a963306a0881` | 🔲 |
+| 4.1 | Add rrule dependency and types | `93e25f1f-88b3-486d-9c0e-332309c15953` | ✅ |
+| 4.2 | Add recurrence expansion to commitments service | `b0a4ce5b-48d9-49e0-be75-0e0ee0446096` | ✅ |
+| 4.3 | Create RecurrenceEditor component | `1bacd056-6ea8-441a-9a37-e7fc75c77f89` | ✅ |
+| 4.4 | Update calendar queries to expand recurring | `1d542dcf-feac-40d2-93b5-a963306a0881` | ✅ |
 
 ### Phase 5: Resolution Detection
 

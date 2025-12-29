@@ -1,5 +1,6 @@
 import { pool } from '../db/pool.js';
 import { generateEmbedding } from '../providers/embeddings.js';
+import { expandRecurrence, getNextOccurrence } from './recurrence.js';
 
 // Commitment status values (from IMPLEMENTATION-TRACKER.md locked naming)
 export type CommitmentStatus = 'open' | 'in_progress' | 'completed' | 'canceled' | 'snoozed';
@@ -526,4 +527,219 @@ export async function setGoogleSync(
   );
 
   return (result.rows[0] as Commitment) ?? null;
+}
+
+// ============================================
+// Recurrence Expansion
+// ============================================
+
+/**
+ * An expanded occurrence of a recurring commitment.
+ * This is a "virtual" commitment that represents one instance.
+ */
+export interface ExpandedCommitment extends Commitment {
+  /** Whether this is a virtual occurrence (not persisted) */
+  is_occurrence: boolean;
+  /** The index of this occurrence in the series (0-based) */
+  occurrence_index: number;
+  /** The original recurring commitment ID */
+  recurring_commitment_id: string;
+  /** The original due_at from the template */
+  template_due_at: Date | null;
+}
+
+/**
+ * Options for listing commitments with recurrence expansion
+ */
+export interface ListExpandedOptions extends ListCommitmentsOptions {
+  /** Expand recurring commitments into individual occurrences */
+  expand_recurring?: boolean;
+  /** Maximum occurrences per recurring commitment (default: 50) */
+  max_occurrences?: number;
+}
+
+/**
+ * Expand a single recurring commitment into its occurrences within a date range
+ */
+export function expandCommitmentOccurrences(
+  commitment: Commitment,
+  options: { after?: Date; before: Date; limit?: number }
+): ExpandedCommitment[] {
+  const { after = new Date(), before, limit = 50 } = options;
+
+  // Non-recurring commitments return as-is (single occurrence)
+  if (!commitment.rrule || !commitment.due_at) {
+    return [{
+      ...commitment,
+      is_occurrence: false,
+      occurrence_index: 0,
+      recurring_commitment_id: commitment.id,
+      template_due_at: commitment.due_at,
+    }];
+  }
+
+  // Expand the recurrence rule
+  const expansion = expandRecurrence(commitment.rrule, commitment.due_at, {
+    after,
+    before,
+    limit,
+  });
+
+  // Create an ExpandedCommitment for each occurrence
+  return expansion.occurrences.map((occurrenceDate, index) => {
+    return {
+      ...commitment,
+      // Override the due_at with the occurrence date
+      due_at: occurrenceDate,
+      // Generate a unique ID for this occurrence (commitment_id:occurrence_date)
+      id: `${commitment.id}:${occurrenceDate.toISOString()}`,
+      is_occurrence: true,
+      occurrence_index: index,
+      recurring_commitment_id: commitment.id,
+      template_due_at: commitment.due_at,
+    };
+  });
+}
+
+/**
+ * List commitments with optional recurrence expansion.
+ * Recurring commitments are expanded into individual occurrences within the date range.
+ */
+export async function listCommitmentsExpanded(
+  options: ListExpandedOptions = {}
+): Promise<ExpandedCommitment[]> {
+  const {
+    expand_recurring = true,
+    max_occurrences = 50,
+    due_before,
+    due_after,
+    ...listOptions
+  } = options;
+
+  // Fetch base commitments (including recurring templates)
+  const commitments = await listCommitments({
+    ...listOptions,
+    // For recurring, we need all templates regardless of due_at filter
+    // (their rrule may generate occurrences in the range)
+    due_before: undefined,
+    due_after: undefined,
+  });
+
+  if (!expand_recurring) {
+    // Return as ExpandedCommitment without expansion
+    return commitments.map(c => ({
+      ...c,
+      is_occurrence: false,
+      occurrence_index: 0,
+      recurring_commitment_id: c.id,
+      template_due_at: c.due_at,
+    }));
+  }
+
+  // Expand each commitment
+  const expanded: ExpandedCommitment[] = [];
+  const now = new Date();
+  const rangeStart = due_after ?? now;
+  const rangeEnd = due_before ?? new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // Default 90 days ahead
+
+  for (const commitment of commitments) {
+    if (commitment.rrule && commitment.due_at) {
+      // Recurring: expand into occurrences
+      const occurrences = expandCommitmentOccurrences(commitment, {
+        after: rangeStart,
+        before: rangeEnd,
+        limit: max_occurrences,
+      });
+      expanded.push(...occurrences);
+    } else {
+      // Non-recurring: include if within date range (or no due date)
+      const inRange = !commitment.due_at ||
+        (commitment.due_at >= rangeStart && commitment.due_at <= rangeEnd);
+
+      if (inRange) {
+        expanded.push({
+          ...commitment,
+          is_occurrence: false,
+          occurrence_index: 0,
+          recurring_commitment_id: commitment.id,
+          template_due_at: commitment.due_at,
+        });
+      }
+    }
+  }
+
+  // Sort by due_at
+  expanded.sort((a, b) => {
+    if (!a.due_at && !b.due_at) return 0;
+    if (!a.due_at) return 1;
+    if (!b.due_at) return -1;
+    return a.due_at.getTime() - b.due_at.getTime();
+  });
+
+  // Apply limit if specified
+  if (listOptions.limit) {
+    return expanded.slice(0, listOptions.limit);
+  }
+
+  return expanded;
+}
+
+/**
+ * Get the next occurrence of a recurring commitment
+ */
+export async function getNextCommitmentOccurrence(
+  id: string,
+  after: Date = new Date()
+): Promise<Date | null> {
+  const commitment = await getCommitment(id);
+  if (!commitment || !commitment.rrule || !commitment.due_at) {
+    return null;
+  }
+
+  return getNextOccurrence(commitment.rrule, commitment.due_at, after);
+}
+
+/**
+ * Check if a commitment is recurring
+ */
+export function isRecurring(commitment: Commitment): boolean {
+  return !!commitment.rrule && !!commitment.due_at;
+}
+
+/**
+ * Get the parent commitment for an occurrence ID.
+ * Occurrence IDs have format: "commitment_id:iso_date"
+ */
+export function parseOccurrenceId(occurrenceId: string): {
+  commitmentId: string;
+  occurrenceDate: Date | null;
+  isOccurrence: boolean;
+} {
+  const parts = occurrenceId.split(':');
+
+  // Check if this looks like an occurrence ID (UUID:ISO date)
+  if (parts.length >= 2) {
+    // UUID has 5 parts separated by -, so reconstruct
+    const uuidParts = parts.slice(0, 5);
+    const datePart = parts.slice(5).join(':');
+
+    // Try to parse as UUID:date format
+    const potentialUuid = uuidParts.join('-');
+    const potentialDate = new Date(datePart);
+
+    if (!isNaN(potentialDate.getTime()) && potentialUuid.length === 36) {
+      return {
+        commitmentId: potentialUuid,
+        occurrenceDate: potentialDate,
+        isOccurrence: true,
+      };
+    }
+  }
+
+  // Not an occurrence ID, return as regular commitment ID
+  return {
+    commitmentId: occurrenceId,
+    occurrenceDate: null,
+    isOccurrence: false,
+  };
 }

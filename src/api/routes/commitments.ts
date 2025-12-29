@@ -3,6 +3,7 @@ import {
   createCommitment,
   getCommitment,
   listCommitments,
+  listCommitmentsExpanded,
   updateCommitment,
   deleteCommitment,
   resolveCommitment,
@@ -12,6 +13,8 @@ import {
   getOverdueCommitments,
   getUpcomingCommitments,
   findMatchingCommitments,
+  getNextCommitmentOccurrence,
+  parseOccurrenceId,
   CommitmentStatus,
 } from '../../services/commitments.js';
 
@@ -48,6 +51,77 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     console.error('Error listing commitments:', error);
     res.status(500).json({ error: 'Failed to list commitments' });
+  }
+});
+
+/**
+ * GET /api/commitments/expanded
+ * List commitments with recurring ones expanded into individual occurrences
+ */
+router.get('/expanded', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 100;
+    const offset = parseInt(req.query.offset as string) || 0;
+    const status = req.query.status as CommitmentStatus | CommitmentStatus[] | undefined;
+    const include_resolved = req.query.include_resolved === 'true';
+    const expand_recurring = req.query.expand !== 'false'; // Default to true
+    const max_occurrences = parseInt(req.query.max_occurrences as string) || 50;
+    const due_before = req.query.due_before ? new Date(req.query.due_before as string) : undefined;
+    const due_after = req.query.due_after ? new Date(req.query.due_after as string) : undefined;
+
+    const commitments = await listCommitmentsExpanded({
+      limit,
+      offset,
+      status,
+      include_resolved,
+      expand_recurring,
+      max_occurrences,
+      due_before,
+      due_after,
+    });
+
+    res.json({
+      commitments,
+      count: commitments.length,
+      expanded: expand_recurring,
+      limit,
+      offset,
+    });
+  } catch (error) {
+    console.error('Error listing expanded commitments:', error);
+    res.status(500).json({ error: 'Failed to list expanded commitments' });
+  }
+});
+
+/**
+ * GET /api/commitments/:id/next-occurrence
+ * Get the next occurrence of a recurring commitment
+ */
+router.get('/:id/next-occurrence', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id;
+    if (!id) {
+      res.status(400).json({ error: 'id is required' });
+      return;
+    }
+    const after = req.query.after ? new Date(req.query.after as string) : new Date();
+
+    // Handle occurrence IDs
+    const { commitmentId } = parseOccurrenceId(id);
+    const nextOccurrence = await getNextCommitmentOccurrence(commitmentId, after);
+
+    if (!nextOccurrence) {
+      res.json({ next_occurrence: null, is_recurring: false });
+      return;
+    }
+
+    res.json({
+      next_occurrence: nextOccurrence.toISOString(),
+      is_recurring: true,
+    });
+  } catch (error) {
+    console.error('Error getting next occurrence:', error);
+    res.status(500).json({ error: 'Failed to get next occurrence' });
   }
 });
 

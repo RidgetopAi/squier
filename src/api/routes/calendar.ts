@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { listCommitments } from '../../services/commitments.js';
+import { listCommitmentsExpanded, ExpandedCommitment } from '../../services/commitments.js';
 import { getAllEvents } from '../../services/google/events.js';
 import { listSyncEnabledAccounts } from '../../services/google/auth.js';
 
@@ -22,6 +22,11 @@ export interface CalendarEvent {
   googleCalendarName?: string;
   location?: string | null;
   htmlLink?: string | null;
+  // Recurrence data
+  isRecurring?: boolean;
+  isOccurrence?: boolean;
+  occurrenceIndex?: number;
+  rrule?: string | null;
 }
 
 /**
@@ -39,33 +44,20 @@ router.get('/events', async (req: Request, res: Response): Promise<void> => {
 
     const events: CalendarEvent[] = [];
 
-    // Get Squire commitments with due dates in range
-    const commitments = await listCommitments({
+    // Get Squire commitments with recurring ones expanded
+    const commitments = await listCommitmentsExpanded({
       due_after: start,
       due_before: end,
       include_resolved: false,
+      expand_recurring: true,
+      max_occurrences: 100,
       limit: 500,
     });
 
     for (const commitment of commitments) {
       if (!commitment.due_at) continue;
 
-      const duration = commitment.duration_minutes || 60;
-      const endTime = new Date(commitment.due_at.getTime() + duration * 60 * 1000);
-
-      events.push({
-        id: `squire-${commitment.id}`,
-        source: 'squire',
-        title: commitment.title,
-        description: commitment.description || null,
-        start: commitment.due_at,
-        end: endTime,
-        allDay: commitment.all_day || false,
-        timezone: commitment.timezone || null,
-        status: commitment.status,
-        color: getStatusColor(commitment.status),
-        commitmentId: commitment.id,
-      });
+      events.push(commitmentToCalendarEvent(commitment));
     }
 
     // Get Google events
@@ -271,37 +263,51 @@ router.get('/upcoming', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// Helper function to convert a commitment to a CalendarEvent
+function commitmentToCalendarEvent(commitment: ExpandedCommitment): CalendarEvent {
+  const duration = commitment.duration_minutes || 60;
+  const endTime = commitment.due_at
+    ? new Date(commitment.due_at.getTime() + duration * 60 * 1000)
+    : null;
+
+  return {
+    id: `squire-${commitment.id}`,
+    source: 'squire',
+    title: commitment.title,
+    description: commitment.description || null,
+    start: commitment.due_at!,
+    end: endTime,
+    allDay: commitment.all_day || false,
+    timezone: commitment.timezone || null,
+    status: commitment.status,
+    color: getStatusColor(commitment.status),
+    commitmentId: commitment.recurring_commitment_id,
+    // Recurrence data
+    isRecurring: !!commitment.rrule,
+    isOccurrence: commitment.is_occurrence,
+    occurrenceIndex: commitment.occurrence_index,
+    rrule: commitment.rrule,
+  };
+}
+
 // Helper function to get events in a range
 async function getEventsInRange(start: Date, end: Date): Promise<CalendarEvent[]> {
   const events: CalendarEvent[] = [];
 
-  // Get Squire commitments
-  const commitments = await listCommitments({
+  // Get Squire commitments with recurring ones expanded
+  const commitments = await listCommitmentsExpanded({
     due_after: start,
     due_before: end,
     include_resolved: false,
+    expand_recurring: true,
+    max_occurrences: 100,
     limit: 500,
   });
 
   for (const commitment of commitments) {
     if (!commitment.due_at) continue;
 
-    const duration = commitment.duration_minutes || 60;
-    const endTime = new Date(commitment.due_at.getTime() + duration * 60 * 1000);
-
-    events.push({
-      id: `squire-${commitment.id}`,
-      source: 'squire',
-      title: commitment.title,
-      description: commitment.description || null,
-      start: commitment.due_at,
-      end: endTime,
-      allDay: commitment.all_day || false,
-      timezone: commitment.timezone || null,
-      status: commitment.status,
-      color: getStatusColor(commitment.status),
-      commitmentId: commitment.id,
-    });
+    events.push(commitmentToCalendarEvent(commitment));
   }
 
   // Get Google events
