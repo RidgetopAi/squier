@@ -168,6 +168,37 @@ interface ReminderDetection {
 }
 
 /**
+ * Safely parse JSON from LLM response, handling common issues
+ */
+function safeParseJSON<T>(content: string): T | null {
+  // Clean up the content
+  let jsonStr = content.trim();
+
+  // Remove markdown code blocks if present
+  jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+
+  // Try to extract JSON object
+  const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    jsonStr = jsonMatch[0];
+  }
+
+  // Try parsing
+  try {
+    return JSON.parse(jsonStr) as T;
+  } catch {
+    // Try fixing common issues: trailing commas, unquoted keys
+    try {
+      // Remove trailing commas before } or ]
+      const fixed = jsonStr.replace(/,\s*([}\]])/g, '$1');
+      return JSON.parse(fixed) as T;
+    } catch {
+      return null;
+    }
+  }
+}
+
+/**
  * Detect if a message contains a reminder request
  */
 async function detectReminderRequest(message: string): Promise<ReminderDetection | null> {
@@ -188,14 +219,13 @@ async function detectReminderRequest(message: string): Promise<ReminderDetection
       maxTokens: 300,
     });
 
-    const content = result.content.trim();
-    let jsonStr = content;
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[0];
+    const parsed = safeParseJSON<ReminderDetection>(result.content);
+    if (!parsed) {
+      console.error('[ChatExtraction] Failed to parse reminder JSON:', result.content.substring(0, 200));
+      return null;
     }
 
-    return JSON.parse(jsonStr) as ReminderDetection;
+    return parsed;
   } catch (error) {
     console.error('[ChatExtraction] Reminder detection failed:', error);
     return null;
@@ -217,16 +247,13 @@ async function detectCommitment(memoryContent: string): Promise<CommitmentDetect
       maxTokens: 500,
     });
 
-    const content = result.content.trim();
-
-    // Extract JSON from response
-    let jsonStr = content;
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[0];
+    const parsed = safeParseJSON<CommitmentDetection>(result.content);
+    if (!parsed) {
+      console.error('[ChatExtraction] Failed to parse commitment JSON:', result.content.substring(0, 200));
+      return null;
     }
 
-    return JSON.parse(jsonStr) as CommitmentDetection;
+    return parsed;
   } catch (error) {
     console.error('[ChatExtraction] Commitment detection failed:', error);
     return null;
