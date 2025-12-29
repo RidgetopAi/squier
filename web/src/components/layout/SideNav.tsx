@@ -158,6 +158,7 @@ export function SideNav({ isOpen, onClose, isCollapsed, onToggleCollapse }: Side
           flex flex-col
           bg-background-secondary border-r border-glass-border
           transition-all duration-300 ease-in-out
+          pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]
           ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           ${isCollapsed ? 'w-16' : 'w-56'}
         `}
