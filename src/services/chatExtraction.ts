@@ -92,17 +92,69 @@ IMPORTANT: Return ONLY valid JSON array, no markdown, no explanation.`;
 // === DATE/TIME HELPERS ===
 
 /**
+ * Get a date formatted in a specific timezone as YYYY-MM-DD
+ */
+function formatDateInTimezone(date: Date, timezone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: timezone,
+  }).formatToParts(date);
+
+  const year = parts.find(p => p.type === 'year')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Get day of week (0=Sunday, 6=Saturday) for a date in a specific timezone
+ */
+function getDayOfWeekInTimezone(date: Date, timezone: string): number {
+  const dayName = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    timeZone: timezone,
+  }).format(date);
+
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days.indexOf(dayName);
+}
+
+/**
+ * Get the date for a specific day of week relative to today, in a timezone
+ * dayOfWeek: 0=Sunday, 1=Monday, ..., 6=Saturday
+ */
+function getDateForDayOfWeek(dayOfWeek: number, timezone: string): string {
+  const now = new Date();
+  const todayDow = getDayOfWeekInTimezone(now, timezone);
+
+  // Calculate days until the target day (this week)
+  let daysUntil = dayOfWeek - todayDow;
+  if (daysUntil < 0) {
+    daysUntil += 7; // Target is next week
+  }
+
+  const targetDate = new Date(now);
+  targetDate.setDate(targetDate.getDate() + daysUntil);
+
+  return formatDateInTimezone(targetDate, timezone);
+}
+
+/**
  * Get current date/time context for LLM prompts (Eastern Time)
+ * All dates are calculated in the user's timezone to avoid off-by-one errors
  */
 function getDateTimeContext(): {
   iso: string;
   formatted: string;
   dayOfWeek: string;
+  todayIso: string;
   tomorrowIso: string;
+  weekdayDates: Record<string, string>;
 } {
   const now = new Date();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const timezone = 'America/New_York';
 
   const options: Intl.DateTimeFormatOptions = {
     weekday: 'long',
@@ -111,14 +163,31 @@ function getDateTimeContext(): {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-    timeZone: 'America/New_York',
+    timeZone: timezone,
+  };
+
+  // Calculate tomorrow in local timezone
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  // Pre-calculate dates for each day of the week
+  const weekdayDates: Record<string, string> = {
+    sunday: getDateForDayOfWeek(0, timezone),
+    monday: getDateForDayOfWeek(1, timezone),
+    tuesday: getDateForDayOfWeek(2, timezone),
+    wednesday: getDateForDayOfWeek(3, timezone),
+    thursday: getDateForDayOfWeek(4, timezone),
+    friday: getDateForDayOfWeek(5, timezone),
+    saturday: getDateForDayOfWeek(6, timezone),
   };
 
   return {
     iso: now.toISOString(),
     formatted: now.toLocaleString('en-US', options),
-    dayOfWeek: now.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/New_York' }),
-    tomorrowIso: tomorrow.toISOString().split('T')[0] as string,
+    dayOfWeek: now.toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone }),
+    todayIso: formatDateInTimezone(now, timezone),
+    tomorrowIso: formatDateInTimezone(tomorrow, timezone),
+    weekdayDates,
   };
 }
 
@@ -126,12 +195,6 @@ function getDateTimeContext(): {
 
 function getCommitmentDetectionPrompt(): string {
   const dt = getDateTimeContext();
-
-  // Calculate example dates for the prompt
-  const today = new Date();
-  const friday = new Date(today);
-  friday.setDate(today.getDate() + ((5 - today.getDay() + 7) % 7 || 7)); // Next Friday
-  const fridayIso = friday.toISOString().split('T')[0];
 
   return `Analyze this memory content and determine if it represents an actionable commitment.
 
@@ -148,9 +211,17 @@ Return JSON with:
 - all_day: boolean - true if no specific time mentioned
 
 CURRENT DATE/TIME: ${dt.formatted}
-TODAY IS: ${dt.dayOfWeek}
-CURRENT ISO DATE: ${dt.iso.split('T')[0]}
-TOMORROW'S DATE: ${dt.tomorrowIso}
+TODAY IS: ${dt.dayOfWeek}, ${dt.todayIso}
+TOMORROW: ${dt.tomorrowIso}
+
+DAY-OF-WEEK TO DATE MAPPING (CRITICAL - use these exact dates):
+- "this Sunday" or "on Sunday" = ${dt.weekdayDates.sunday}
+- "this Monday" or "on Monday" = ${dt.weekdayDates.monday}
+- "this Tuesday" or "on Tuesday" = ${dt.weekdayDates.tuesday}
+- "this Wednesday" or "on Wednesday" = ${dt.weekdayDates.wednesday}
+- "this Thursday" or "on Thursday" = ${dt.weekdayDates.thursday}
+- "this Friday" or "on Friday" = ${dt.weekdayDates.friday}
+- "this Saturday" or "on Saturday" = ${dt.weekdayDates.saturday}
 
 ISO 8601 DATE FORMAT (CRITICAL):
 - Format: YYYY-MM-DDTHH:MM:SSZ
@@ -163,13 +234,14 @@ ISO 8601 DATE FORMAT (CRITICAL):
 For relative dates, calculate from current date:
 - "tomorrow" = ${dt.tomorrowIso}
 - "next week" = 7 days from today
-- "next Monday" = the coming Monday
-- "in 3 days" = add 3 days to today
-- "by Friday" = this coming Friday = ${fridayIso}
+- "in 3 days" = add 3 days to ${dt.todayIso}
 
 Examples:
 Input: "I need to finish the report by Friday"
-Output: {"is_commitment": true, "title": "Finish the report", "description": null, "due_at": "${fridayIso}T23:59:59Z", "all_day": true}
+Output: {"is_commitment": true, "title": "Finish the report", "description": null, "due_at": "${dt.weekdayDates.friday}T23:59:59Z", "all_day": true}
+
+Input: "House chores this Wednesday from 2pm to 5pm"
+Output: {"is_commitment": true, "title": "House chores", "description": null, "due_at": "${dt.weekdayDates.wednesday}T14:00:00Z", "all_day": false}
 
 Input: "Call mom tomorrow at 3pm"
 Output: {"is_commitment": true, "title": "Call mom", "description": null, "due_at": "${dt.tomorrowIso}T15:00:00Z", "all_day": false}
@@ -213,18 +285,29 @@ Look for patterns like:
 - "ping me about X in Y"
 - "remind me tomorrow/tonight/this evening"
 - "remind me on [specific date]"
+- "remind me on Wednesday" (day of week)
 
 CURRENT DATE/TIME: ${dt.formatted}
-TODAY IS: ${dt.dayOfWeek}
-CURRENT ISO DATE: ${dt.iso.split('T')[0]}
+TODAY IS: ${dt.dayOfWeek}, ${dt.todayIso}
+TOMORROW: ${dt.tomorrowIso}
+
+DAY-OF-WEEK TO DATE MAPPING (CRITICAL - use these exact dates for scheduled_at):
+- "this Sunday" or "on Sunday" = ${dt.weekdayDates.sunday}
+- "this Monday" or "on Monday" = ${dt.weekdayDates.monday}
+- "this Tuesday" or "on Tuesday" = ${dt.weekdayDates.tuesday}
+- "this Wednesday" or "on Wednesday" = ${dt.weekdayDates.wednesday}
+- "this Thursday" or "on Thursday" = ${dt.weekdayDates.thursday}
+- "this Friday" or "on Friday" = ${dt.weekdayDates.friday}
+- "this Saturday" or "on Saturday" = ${dt.weekdayDates.saturday}
 
 Return JSON with:
 - is_reminder: boolean - true if this is a reminder request
 - title: string | null - what to remind about (extracted from message)
 - delay_minutes: number | null - for RELATIVE times ("in 2 hours", "tomorrow")
-- scheduled_at: string | null - ISO 8601 date for EXPLICIT dates ("on January 5, 2026")
+- scheduled_at: string | null - ISO 8601 date for EXPLICIT dates or day-of-week
 
-IMPORTANT: Use delay_minutes for relative times. Use scheduled_at for explicit dates.
+IMPORTANT: Use delay_minutes for relative times like "in 2 hours" or "tomorrow".
+Use scheduled_at for explicit dates ("on January 5, 2026") or day-of-week ("on Wednesday").
 Never use both - pick the one that matches the user's request.
 
 ISO 8601 DATE FORMAT (for scheduled_at):
@@ -252,6 +335,9 @@ Output: {"is_reminder": true, "title": "Pick up groceries", "delay_minutes": ${m
 
 Input: "set a reminder for 30 minutes to take a break"
 Output: {"is_reminder": true, "title": "Take a break", "delay_minutes": 30, "scheduled_at": null}
+
+Input: "remind me on Wednesday at 2pm about the meeting"
+Output: {"is_reminder": true, "title": "Meeting", "delay_minutes": null, "scheduled_at": "${dt.weekdayDates.wednesday}T14:00:00Z"}
 
 Input: "remind me on January 5, 2026 at 9am about the PAD-A-THON"
 Output: {"is_reminder": true, "title": "PAD-A-THON", "delay_minutes": null, "scheduled_at": "2026-01-05T09:00:00Z"}
