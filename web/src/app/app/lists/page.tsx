@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import type { List, CreateListInput } from '@/lib/types';
 import {
@@ -12,7 +12,7 @@ import {
 } from '@/lib/api/lists';
 import { ListsList, ListEditor, ListDetailView } from '@/components/lists';
 
-export default function ListsPage() {
+function ListsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const openListId = searchParams.get('open');
@@ -178,5 +178,13 @@ export default function ListsPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function ListsPage() {
+  return (
+    <Suspense fallback={<div className="p-6">Loading...</div>}>
+      <ListsPageContent />
+    </Suspense>
   );
 }
