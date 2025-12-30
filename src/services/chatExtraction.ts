@@ -413,30 +413,36 @@ Look for patterns like:
 - "put X on the Y list"
 - "create a checklist for X"
 - "make a to-do list for X"
+- "create a list with items: A, B, C"
 
 Return JSON with:
 - is_list_action: boolean - true if this is a list operation
 - action: "create" | "add_item" | null - the type of action
 - list_name: string | null - the name of the list (for create or add_item)
-- item_content: string | null - the item to add (for add_item)
+- item_content: string | null - the item to add (for add_item, single item)
+- initial_items: string[] | null - items to add when creating a list (if user provides them)
 - list_type: "checklist" | "simple" | "ranked" | null - type if creating
 - entity_name: string | null - if the list is about a specific entity
+- description: string | null - optional description for the list
 
 Examples:
 Input: "Start a list for Squire bugs"
-Output: {"is_list_action": true, "action": "create", "list_name": "Squire bugs", "item_content": null, "list_type": "checklist", "entity_name": "Squire"}
+Output: {"is_list_action": true, "action": "create", "list_name": "Squire bugs", "item_content": null, "initial_items": null, "list_type": "checklist", "entity_name": "Squire", "description": null}
 
 Input: "Add 'fix modal z-index' to the Squire bugs list"
-Output: {"is_list_action": true, "action": "add_item", "list_name": "Squire bugs", "item_content": "fix modal z-index", "list_type": null, "entity_name": null}
+Output: {"is_list_action": true, "action": "add_item", "list_name": "Squire bugs", "item_content": "fix modal z-index", "initial_items": null, "list_type": null, "entity_name": null, "description": null}
 
-Input: "Create a grocery list"
-Output: {"is_list_action": true, "action": "create", "list_name": "Grocery list", "item_content": null, "list_type": "simple", "entity_name": null}
+Input: "Create a grocery list with milk, eggs, and bread"
+Output: {"is_list_action": true, "action": "create", "list_name": "Grocery list", "item_content": null, "initial_items": ["milk", "eggs", "bread"], "list_type": "simple", "entity_name": null, "description": null}
+
+Input: "Make a checklist for the Atlanta trip: book hotel, pack bags, confirm flight"
+Output: {"is_list_action": true, "action": "create", "list_name": "Atlanta trip", "item_content": null, "initial_items": ["book hotel", "pack bags", "confirm flight"], "list_type": "checklist", "entity_name": null, "description": "Trip preparation checklist"}
 
 Input: "Put milk on my shopping list"
-Output: {"is_list_action": true, "action": "add_item", "list_name": "Shopping list", "item_content": "milk", "list_type": null, "entity_name": null}
+Output: {"is_list_action": true, "action": "add_item", "list_name": "Shopping list", "item_content": "milk", "initial_items": null, "list_type": null, "entity_name": null, "description": null}
 
 Input: "What's on my to-do list?"
-Output: {"is_list_action": false, "action": null, "list_name": null, "item_content": null, "list_type": null, "entity_name": null}
+Output: {"is_list_action": false, "action": null, "list_name": null, "item_content": null, "initial_items": null, "list_type": null, "entity_name": null, "description": null}
 
 IMPORTANT: Return ONLY valid JSON object, no markdown, no explanation.`;
 
@@ -445,8 +451,10 @@ interface ListDetection {
   action: 'create' | 'add_item' | null;
   list_name: string | null;
   item_content: string | null;
+  initial_items: string[] | null;
   list_type: 'checklist' | 'simple' | 'ranked' | null;
   entity_name: string | null;
+  description: string | null;
 }
 
 /**
@@ -1144,9 +1152,18 @@ export async function processMessageRealTime(message: string): Promise<{
 
           const list = await createList({
             name: listResult.list_name,
+            description: listResult.description ?? undefined,
             list_type: listResult.list_type ?? 'checklist',
             primary_entity_id: entityId ?? undefined,
           });
+
+          // Add initial items if provided
+          if (listResult.initial_items && listResult.initial_items.length > 0) {
+            for (const itemContent of listResult.initial_items) {
+              await addItem(list.id, { content: itemContent });
+            }
+            console.log(`[RealTimeExtraction] Added ${listResult.initial_items.length} initial items to list`);
+          }
 
           result.listCreated = {
             id: list.id,
