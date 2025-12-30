@@ -59,6 +59,19 @@ function formatScheduledTime(dateStr: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
+function formatFullDateTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  });
+}
+
 function ReminderCard({
   reminder,
   onSnooze,
@@ -70,11 +83,29 @@ function ReminderCard({
   onAcknowledge: (id: string) => void;
   onCancel: (id: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const isPast = new Date(reminder.scheduled_for) < new Date();
   const canAct = reminder.status === 'pending' || reminder.status === 'sent';
 
+  // Check if body is long enough to warrant expansion
+  const hasLongBody = reminder.body && reminder.body.length > 100;
+  const isExpandable = hasLongBody || reminder.commitment_id;
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't toggle if clicking on action buttons
+    if ((e.target as HTMLElement).closest('button')) return;
+    if (isExpandable) {
+      setExpanded(!expanded);
+    }
+  };
+
   return (
-    <div className={`p-4 rounded-lg border ${isPast && canAct ? 'border-yellow-500/50 bg-yellow-500/5' : 'border-white/10 bg-white/5'} hover:bg-white/10 transition-colors`}>
+    <div
+      onClick={handleCardClick}
+      className={`p-4 rounded-lg border transition-all duration-200 ${
+        isPast && canAct ? 'border-yellow-500/50 bg-yellow-500/5' : 'border-white/10 bg-white/5'
+      } ${isExpandable ? 'cursor-pointer hover:bg-white/10' : ''} ${expanded ? 'bg-white/10' : ''}`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
@@ -82,19 +113,120 @@ function ReminderCard({
               {statusIcons[reminder.status]} {reminder.status}
             </span>
             <span className="text-xs text-gray-500">{reminder.channel}</span>
+            {isExpandable && (
+              <span className="text-xs text-gray-600">
+                {expanded ? '▼' : '▶'}
+              </span>
+            )}
           </div>
-          <h3 className="font-medium text-white truncate">{reminder.title || 'Commitment Reminder'}</h3>
+          <h3 className={`font-medium text-white ${expanded ? '' : 'truncate'}`}>
+            {reminder.title || 'Commitment Reminder'}
+          </h3>
           {reminder.body && (
-            <p className="text-sm text-gray-400 mt-1 line-clamp-2">{reminder.body}</p>
+            <p className={`text-sm text-gray-400 mt-1 ${expanded ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}>
+              {reminder.body}
+            </p>
           )}
           <p className={`text-xs mt-2 ${isPast && canAct ? 'text-yellow-400' : 'text-gray-500'}`}>
-            {formatScheduledTime(reminder.scheduled_for)}
+            {expanded ? formatFullDateTime(reminder.scheduled_for) : formatScheduledTime(reminder.scheduled_for)}
           </p>
+
+          {/* Expanded details */}
+          {expanded && (
+            <div className="mt-4 pt-4 border-t border-white/10 space-y-2">
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-gray-500">Timezone:</span>{' '}
+                  <span className="text-gray-300">{reminder.timezone}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Created:</span>{' '}
+                  <span className="text-gray-300">
+                    {new Date(reminder.created_at).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </div>
+                {reminder.sent_at && (
+                  <div>
+                    <span className="text-gray-500">Sent:</span>{' '}
+                    <span className="text-gray-300">
+                      {new Date(reminder.sent_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                )}
+                {reminder.acknowledged_at && (
+                  <div>
+                    <span className="text-gray-500">Acknowledged:</span>{' '}
+                    <span className="text-gray-300">
+                      {new Date(reminder.acknowledged_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                )}
+                {reminder.snoozed_until && (
+                  <div>
+                    <span className="text-gray-500">Snoozed until:</span>{' '}
+                    <span className="text-purple-400">
+                      {new Date(reminder.snoozed_until).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                )}
+                {reminder.commitment_id && (
+                  <div className="col-span-2">
+                    <span className="text-gray-500">Linked to commitment:</span>{' '}
+                    <span className="text-blue-400 text-xs font-mono">{reminder.commitment_id.slice(0, 8)}...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Extended snooze options when expanded */}
+              {canAct && (
+                <div className="pt-2">
+                  <span className="text-xs text-gray-500 block mb-2">Snooze for:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {[5, 15, 30, 60, 120, 1440].map((mins) => (
+                      <button
+                        key={mins}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSnooze(reminder.id, mins);
+                        }}
+                        className="px-2 py-1 text-xs rounded bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border border-purple-500/30 transition-colors"
+                      >
+                        {mins < 60 ? `${mins}m` : mins < 1440 ? `${mins / 60}h` : '1d'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         {canAct && (
-          <div className="flex gap-1">
+          <div className="flex gap-1 shrink-0">
             <button
-              onClick={() => onAcknowledge(reminder.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAcknowledge(reminder.id);
+              }}
               className="p-2 rounded hover:bg-green-500/20 text-green-400 transition-colors"
               title="Acknowledge"
             >
@@ -103,7 +235,10 @@ function ReminderCard({
               </svg>
             </button>
             <button
-              onClick={() => onSnooze(reminder.id, 15)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSnooze(reminder.id, 15);
+              }}
               className="p-2 rounded hover:bg-purple-500/20 text-purple-400 transition-colors"
               title="Snooze 15 min"
             >
@@ -112,7 +247,10 @@ function ReminderCard({
               </svg>
             </button>
             <button
-              onClick={() => onCancel(reminder.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancel(reminder.id);
+              }}
               className="p-2 rounded hover:bg-red-500/20 text-red-400 transition-colors"
               title="Cancel"
             >
