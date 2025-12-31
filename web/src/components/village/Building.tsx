@@ -123,9 +123,12 @@ export const Building = memo(function Building({
     >
       {/* Animated wrapper for hover lift */}
       <group ref={groupRef} position={[0, baseY, 0]}>
-        {/* LOD: GLTF model near (0-40), simple box far (40+) */}
+        {/* LOD: Simple box far (0-40), GLTF model near (40+) */}
+        {/* NOTE: drei's Detailed shows later children at closer distances */}
         <Detailed distances={[0, 40]}>
-          {/* Near: Full GLTF model */}
+          {/* Far: Simple box geometry (shown when camera > 40 units) */}
+          <SimpleBuilding scale={baseScale} color={building.color} />
+          {/* Near: Full GLTF model (shown when camera < 40 units) */}
           <BuildingModel
             buildingType={building.buildingType}
             scale={baseScale}
@@ -134,8 +137,6 @@ export const Building = memo(function Building({
             castShadow
             receiveShadow
           />
-          {/* Far: Simple box geometry */}
-          <SimpleBuilding scale={baseScale} color={building.color} />
         </Detailed>
       </group>
     </group>
