@@ -63,9 +63,15 @@ function CommitmentCard({
           {commitment.description && (
             <p className="text-sm text-gray-400 mt-1 line-clamp-2">{commitment.description}</p>
           )}
-          <p className={`text-xs mt-2 ${isOverdue ? 'text-red-400' : 'text-gray-500'}`}>
-            {formatDate(commitment.due_at)}
-          </p>
+          <div className="flex items-center justify-between mt-2">
+            <p className={`text-xs ${isOverdue ? 'text-red-400' : 'text-gray-500'}`}>
+              {formatDate(commitment.due_at)}
+            </p>
+            <p className="text-xs text-gray-600" title="Extracted at">
+              {new Date(commitment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{' '}
+              {new Date(commitment.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+            </p>
+          </div>
         </div>
         {commitment.status !== 'completed' && commitment.status !== 'canceled' && (
           <div className="flex gap-1">

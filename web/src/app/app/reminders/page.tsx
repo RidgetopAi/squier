@@ -127,9 +127,15 @@ function ReminderCard({
               {reminder.body}
             </p>
           )}
-          <p className={`text-xs mt-2 ${isPast && canAct ? 'text-yellow-400' : 'text-gray-500'}`}>
-            {expanded ? formatFullDateTime(reminder.scheduled_for) : formatScheduledTime(reminder.scheduled_for)}
-          </p>
+          <div className="flex items-center justify-between mt-2">
+            <p className={`text-xs ${isPast && canAct ? 'text-yellow-400' : 'text-gray-500'}`}>
+              {expanded ? formatFullDateTime(reminder.scheduled_for) : formatScheduledTime(reminder.scheduled_for)}
+            </p>
+            <p className="text-xs text-gray-600" title="Extracted at">
+              {new Date(reminder.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{' '}
+              {new Date(reminder.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+            </p>
+          </div>
 
           {/* Expanded details */}
           {expanded && (
