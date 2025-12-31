@@ -1283,148 +1283,220 @@ export async function processMessageRealTime(message: string): Promise<{
 // === REAL-TIME IDENTITY HELPERS ===
 
 /**
- * Extract user's name from self-introductions with proper replacement
- * Handles "Actually I'm X" / "My name is X" scenarios
+ * LLM-based identity detection prompt
+ * This replaces the fragile regex approach that kept matching words like "confident" and "originally"
+ */
+const IDENTITY_DETECTION_PROMPT = `You are analyzing a message to detect if the user is introducing themselves by name.
+
+Your job is to determine:
+1. Is the user stating their own name (self-introduction)?
+2. If so, what is the name?
+
+IMPORTANT DISTINCTIONS:
+- "I'm Brian" = YES, user is introducing themselves as "Brian"
+- "I'm confident we fixed it" = NO, "confident" is an adjective, not a name
+- "I'm originally from Indiana" = NO, "originally" is an adverb, not a name
+- "My name is Sarah" = YES, user is introducing themselves as "Sarah"
+- "I'm so tired" = NO, "tired" is describing a state, not a name
+- "I'm a developer" = NO, describing profession, not introducing name
+- "Hello, I'm Brian from accounting" = YES, user is introducing themselves as "Brian"
+- "I'm 56 years old" = NO, stating age, not name
+- "Actually, I'm Robert" = YES, user is correcting/stating their name as "Robert"
+- "I'm excited to help" = NO, expressing emotion, not introducing name
+- "I'm working on it" = NO, describing activity, not introducing name
+
+A name is a proper noun used to identify a person. It should:
+- Be capitalized (when written properly)
+- Be a plausible human first name
+- Be used in a context where the user is identifying WHO they are, not WHAT they are doing/feeling
+
+Return JSON:
+{
+  "is_self_introduction": boolean,
+  "name": string | null,
+  "confidence": number (0.0 to 1.0),
+  "reasoning": string (brief explanation)
+}
+
+Examples:
+Input: "Hey there, I'm Brian"
+Output: {"is_self_introduction": true, "name": "Brian", "confidence": 0.95, "reasoning": "User greeting with name introduction"}
+
+Input: "I'm confident this time we got it fixed"
+Output: {"is_self_introduction": false, "name": null, "confidence": 0.98, "reasoning": "'confident' is an adjective describing certainty, not a name"}
+
+Input: "I'm originally from Indiana"
+Output: {"is_self_introduction": false, "name": null, "confidence": 0.99, "reasoning": "'originally' is an adverb describing origin, not a name"}
+
+Input: "Actually my name is Robert, not Brian"
+Output: {"is_self_introduction": true, "name": "Robert", "confidence": 0.95, "reasoning": "User correcting their name to Robert"}
+
+IMPORTANT: Return ONLY valid JSON, no markdown, no explanation outside the JSON.`;
+
+interface IdentityDetectionResult {
+  is_self_introduction: boolean;
+  name: string | null;
+  confidence: number;
+  reasoning: string;
+}
+
+/**
+ * Use LLM to detect if user is introducing themselves
+ * This is the robust replacement for regex-based name detection
+ */
+async function detectIdentityWithLLM(message: string): Promise<IdentityDetectionResult | null> {
+  // Quick pre-filter: skip messages that definitely don't contain identity patterns
+  // This saves LLM calls for messages like "show me my notes" or "what's the weather"
+  const mightContainIdentity = /\b(i'?m|i am|my name|call me|this is)\b/i.test(message);
+  if (!mightContainIdentity) {
+    return null;
+  }
+
+  try {
+    const messages: LLMMessage[] = [
+      { role: 'system', content: IDENTITY_DETECTION_PROMPT },
+      { role: 'user', content: message },
+    ];
+
+    const result = await complete(messages, {
+      temperature: 0.1, // Low temperature for consistent detection
+      maxTokens: 200,
+    });
+
+    const parsed = safeParseJSON<IdentityDetectionResult>(result.content);
+    if (!parsed) {
+      console.error('[IdentityDetection] Failed to parse LLM response:', result.content.substring(0, 200));
+      return null;
+    }
+
+    console.log(`[IdentityDetection] LLM result: is_intro=${parsed.is_self_introduction}, name=${parsed.name}, confidence=${parsed.confidence}, reason="${parsed.reasoning}"`);
+    return parsed;
+  } catch (error) {
+    console.error('[IdentityDetection] LLM detection failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Extract user's name from self-introductions with LLM validation
+ * Uses LLM to understand intent - no more regex false positives
  */
 async function extractIdentityRealTime(
   message: string,
   result: { identityExtracted: { name: string; memoryId: string } | null }
 ): Promise<void> {
-  const namePatterns = [
-    /(?:^|\s)(?:i'?m|i am|my name is|call me|this is)\s+([A-Z][a-z]+)(?:\s|$|,|\.)/i,
-    /(?:^|\s)(?:hello|hi|hey),?\s+(?:i'?m|i am)\s+([A-Z][a-z]+)(?:\s|$|,|\.)/i,
-    /(?:^|\s)(?:actually|no,?)\s+(?:i'?m|i am|my name is|it's)\s+([A-Z][a-z]+)(?:\s|$|,|\.)/i,
-  ];
+  // Use LLM to detect identity - this is the robust approach
+  const detection = await detectIdentityWithLLM(message);
 
-  // Extended list of common words that could be mistakenly matched as names
-  // CRITICAL: "confident" was matched as a name causing identity replacement bug
-  // CRITICAL: "originally" was matched from "I'm originally from Indiana"
-  const commonWords = [
-    // States/feelings
-    'here', 'there', 'ready', 'done', 'back', 'home', 'good', 'fine', 'great',
-    'sorry', 'sure', 'happy', 'excited', 'interested', 'curious', 'wondering',
-    'thinking', 'going', 'looking', 'working', 'trying', 'just', 'really',
-    // Confidence/certainty words (bug fix: "I'm confident" matched as name)
-    'confident', 'certain', 'positive', 'convinced', 'hopeful', 'optimistic',
-    'worried', 'concerned', 'afraid', 'scared', 'nervous', 'anxious',
-    // Common adjectives after "I'm"
-    'tired', 'exhausted', 'busy', 'free', 'available', 'okay', 'alright',
-    'glad', 'pleased', 'proud', 'impressed', 'surprised', 'shocked',
-    'confused', 'lost', 'stuck', 'frustrated', 'annoyed', 'angry',
-    // Activity states
-    'writing', 'reading', 'coding', 'building', 'fixing', 'testing', 'debugging',
-    'planning', 'learning', 'starting', 'finishing', 'waiting', 'running',
-    // Time/situation
-    'late', 'early', 'still', 'almost', 'nearly', 'finally', 'currently',
-    // Origin/location words (bug fix: "I'm originally from" matched as name)
-    'originally', 'actually', 'basically', 'probably', 'definitely', 'certainly',
-    'usually', 'normally', 'typically', 'generally', 'mostly', 'mainly',
-    // Transition/filler words that start sentences
-    'honestly', 'frankly', 'seriously', 'literally', 'apparently', 'supposedly',
-  ];
+  // No identity detected or LLM call failed
+  if (!detection || !detection.is_self_introduction || !detection.name) {
+    return;
+  }
 
-  for (const pattern of namePatterns) {
-    const match = message.match(pattern);
-    if (match && match[1]) {
-      const newName = match[1];
-      if (commonWords.includes(newName.toLowerCase())) continue;
+  // Require high confidence to prevent false positives
+  if (detection.confidence < 0.8) {
+    console.log(`[RealTimeExtraction] Low confidence (${detection.confidence}) for name "${detection.name}", skipping`);
+    return;
+  }
 
-      try {
-        const personalitySummary = await getSummary('personality');
-        const summaryContent = personalitySummary?.content || '';
+  const newName = detection.name;
 
-        // Check if this exact name is already known
-        const nameAlreadyKnown =
-          summaryContent.toLowerCase().includes(`name is ${newName.toLowerCase()}`) ||
-          summaryContent.toLowerCase().includes(`you're ${newName.toLowerCase()}`) ||
-          summaryContent.toLowerCase().includes(`you are ${newName.toLowerCase()}`);
+  try {
+    const personalitySummary = await getSummary('personality');
+    const summaryContent = personalitySummary?.content || '';
 
-        if (nameAlreadyKnown) {
-          console.log(`[RealTimeExtraction] Name "${newName}" already known, skipping`);
-          return;
-        }
+    // Check if this exact name is already known
+    const nameAlreadyKnown =
+      summaryContent.toLowerCase().includes(`name is ${newName.toLowerCase()}`) ||
+      summaryContent.toLowerCase().includes(`you're ${newName.toLowerCase()}`) ||
+      summaryContent.toLowerCase().includes(`you are ${newName.toLowerCase()}`);
 
-        // Check if a DIFFERENT name exists (for replacement scenario)
-        const existingNameMatch = summaryContent.match(
-          /(?:Your name is|You're|You are)\s+([A-Z][a-z]+)/i
-        );
-        const existingName = existingNameMatch ? existingNameMatch[1] : null;
-
-        // If different name exists, we're doing a replacement
-        if (existingName && existingName.toLowerCase() !== newName.toLowerCase()) {
-          console.log(`[RealTimeExtraction] Replacing name "${existingName}" with "${newName}"`);
-
-          // Archive old name memories (set low salience so they fade)
-          await pool.query(
-            `UPDATE memories
-             SET salience_score = 0.5,
-                 source_metadata = jsonb_set(
-                   COALESCE(source_metadata, '{}'::jsonb),
-                   '{superseded_by}',
-                   $2::jsonb
-                 )
-             WHERE content ILIKE $1
-               AND content_type = 'identity'`,
-            [`%user's name is ${existingName}%`, JSON.stringify(newName)]
-          );
-        }
-
-        // Create new identity memory
-        const memoryContent = `The user's name is ${newName}`;
-        const { memory } = await createMemory({
-          content: memoryContent,
-          source: 'chat',
-          content_type: 'identity',
-          source_metadata: {
-            extraction_type: 'identity',
-            real_time: true,
-            salience_hint: 10,
-            replaces: existingName || undefined,
-          },
-        });
-
-        // Force high salience
-        await pool.query(
-          `UPDATE memories SET salience_score = 10.0 WHERE id = $1`,
-          [memory.id]
-        );
-
-        // Link to personality category
-        await linkMemoryToCategories(memory.id, [{
-          category: 'personality',
-          relevance: 1.0,
-          reason: existingName
-            ? `User name update: ${existingName} → ${newName}`
-            : 'User self-introduction - core identity',
-        }]);
-
-        // Update personality summary - handle multiple formats
-        if (personalitySummary) {
-          let updatedContent = summaryContent;
-
-          // Replace various name patterns
-          updatedContent = updatedContent
-            .replace(/Your name is \w+\.\s*/gi, '')
-            .replace(/You're (\w+),/gi, `You're ${newName},`)
-            .replace(/You're (\w+)\./gi, `You're ${newName}.`)
-            .replace(/You are (\w+),/gi, `You are ${newName},`)
-            .replace(/You are (\w+)\./gi, `You are ${newName}.`);
-
-          // If no replacement happened (name not in expected format), prepend
-          if (!updatedContent.toLowerCase().includes(newName.toLowerCase())) {
-            updatedContent = `Your name is ${newName}. ${updatedContent}`;
-          }
-
-          await updateSummary('personality', updatedContent.trim(), 'real-time-extraction', 0);
-        }
-
-        result.identityExtracted = { name: newName, memoryId: memory.id };
-        console.log(`[RealTimeExtraction] Extracted identity: "${newName}" with memory ${memory.id}`);
-        return;
-      } catch (error) {
-        console.error('[RealTimeExtraction] Identity extraction error:', error);
-      }
+    if (nameAlreadyKnown) {
+      console.log(`[RealTimeExtraction] Name "${newName}" already known, skipping`);
+      return;
     }
+
+    // Check if a DIFFERENT name exists (for replacement scenario)
+    const existingNameMatch = summaryContent.match(
+      /(?:Your name is|You're|You are)\s+([A-Z][a-z]+)/i
+    );
+    const existingName = existingNameMatch ? existingNameMatch[1] : null;
+
+    // If different name exists, we're doing a replacement
+    if (existingName && existingName.toLowerCase() !== newName.toLowerCase()) {
+      console.log(`[RealTimeExtraction] LLM validated replacement: "${existingName}" → "${newName}" (confidence: ${detection.confidence})`);
+
+      // Archive old name memories (set low salience so they fade)
+      await pool.query(
+        `UPDATE memories
+         SET salience_score = 0.5,
+             source_metadata = jsonb_set(
+               COALESCE(source_metadata, '{}'::jsonb),
+               '{superseded_by}',
+               $2::jsonb
+             )
+         WHERE content ILIKE $1
+           AND content_type = 'identity'`,
+        [`%user's name is ${existingName}%`, JSON.stringify(newName)]
+      );
+    }
+
+    // Create new identity memory
+    const memoryContent = `The user's name is ${newName}`;
+    const { memory } = await createMemory({
+      content: memoryContent,
+      source: 'chat',
+      content_type: 'identity',
+      source_metadata: {
+        extraction_type: 'identity',
+        real_time: true,
+        salience_hint: 10,
+        replaces: existingName || undefined,
+        llm_validated: true,
+        llm_confidence: detection.confidence,
+        llm_reasoning: detection.reasoning,
+      },
+    });
+
+    // Force high salience
+    await pool.query(
+      `UPDATE memories SET salience_score = 10.0 WHERE id = $1`,
+      [memory.id]
+    );
+
+    // Link to personality category
+    await linkMemoryToCategories(memory.id, [{
+      category: 'personality',
+      relevance: 1.0,
+      reason: existingName
+        ? `User name update: ${existingName} → ${newName} (LLM validated)`
+        : 'User self-introduction - core identity (LLM validated)',
+    }]);
+
+    // Update personality summary - handle multiple formats
+    if (personalitySummary) {
+      let updatedContent = summaryContent;
+
+      // Replace various name patterns
+      updatedContent = updatedContent
+        .replace(/Your name is \w+\.\s*/gi, '')
+        .replace(/You're (\w+),/gi, `You're ${newName},`)
+        .replace(/You're (\w+)\./gi, `You're ${newName}.`)
+        .replace(/You are (\w+),/gi, `You are ${newName},`)
+        .replace(/You are (\w+)\./gi, `You are ${newName}.`);
+
+      // If no replacement happened (name not in expected format), prepend
+      if (!updatedContent.toLowerCase().includes(newName.toLowerCase())) {
+        updatedContent = `Your name is ${newName}. ${updatedContent}`;
+      }
+
+      await updateSummary('personality', updatedContent.trim(), 'real-time-extraction', 0);
+    }
+
+    result.identityExtracted = { name: newName, memoryId: memory.id };
+    console.log(`[RealTimeExtraction] LLM-validated identity: "${newName}" (confidence: ${detection.confidence}) with memory ${memory.id}`);
+  } catch (error) {
+    console.error('[RealTimeExtraction] Identity extraction error:', error);
   }
 }
 
