@@ -82,16 +82,31 @@ export function useVillageLayout(
 
   // Memoize layout transformation
   const layout = useMemo(() => {
+    console.log('[VillageLayout] graphData:', graphData ? {
+      nodeCount: graphData.nodes.length,
+      linkCount: graphData.links.length,
+      sampleNode: graphData.nodes[0],
+    } : 'null');
+
     if (!graphData) {
+      console.log('[VillageLayout] No graphData, returning empty layout');
       return createEmptyLayout();
     }
 
-    return buildVillageLayout(graphData, {
+    const result = buildVillageLayout(graphData, {
       maxBuildings,
       hexSize,
       minSalience,
       districtSpacing,
     });
+
+    console.log('[VillageLayout] Layout result:', {
+      buildings: result.buildings.length,
+      roads: result.roads.length,
+      stats: result.stats,
+    });
+
+    return result;
   }, [graphData, maxBuildings, hexSize, minSalience, districtSpacing]);
 
   // Determine if empty (after loading)

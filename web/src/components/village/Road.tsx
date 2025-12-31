@@ -41,6 +41,15 @@ interface RoadProps {
 export function Road({ road, highlighted = false, opacity = 1 }: RoadProps) {
   const { fromPosition, toPosition, weight, edgeType } = road;
 
+  // Validate positions - skip rendering if invalid
+  const isValidPosition = (pos: { x: number; z: number }) =>
+    Number.isFinite(pos.x) && Number.isFinite(pos.z);
+
+  if (!isValidPosition(fromPosition) || !isValidPosition(toPosition)) {
+    console.warn('[Road] Invalid positions:', road.id, fromPosition, toPosition);
+    return null;
+  }
+
   // Calculate road geometry
   const geometry = useMemo(() => {
     const start = new THREE.Vector3(fromPosition.x, 0.02, fromPosition.z);

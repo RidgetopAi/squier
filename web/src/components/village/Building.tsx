@@ -64,9 +64,16 @@ export function Building({
 }: BuildingProps) {
   const meshRef = useRef<Mesh>(null);
 
-  // Calculate scale based on salience
-  const baseScale = 0.7 + building.salience * 0.6; // 0.7 to 1.3
-  const dimensions = BUILDING_DIMENSIONS[building.buildingType];
+  // Validate position - skip rendering if invalid
+  if (!Number.isFinite(building.position.x) || !Number.isFinite(building.position.z)) {
+    console.warn('[Building] Invalid position:', building.id, building.position);
+    return null;
+  }
+
+  // Calculate scale based on salience (ensure valid number)
+  const salience = Number.isFinite(building.salience) ? building.salience : 0.5;
+  const baseScale = 0.7 + salience * 0.6; // 0.7 to 1.3
+  const dimensions = BUILDING_DIMENSIONS[building.buildingType] || BUILDING_DIMENSIONS.house;
 
   // Y position (half height so building sits on ground)
   const baseY = (dimensions.height * baseScale) / 2;

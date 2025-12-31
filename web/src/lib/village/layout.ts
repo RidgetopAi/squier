@@ -60,6 +60,12 @@ export function buildVillageLayout(
   // Filter to memory nodes only (entities become decorations in Phase 3)
   const memoryNodes = graphData.nodes.filter(node => node.type === 'memory');
 
+  console.log('[buildVillageLayout] Input:', {
+    totalNodes: graphData.nodes.length,
+    memoryNodes: memoryNodes.length,
+    nodeTypes: [...new Set(graphData.nodes.map(n => n.type))],
+  });
+
   // Sort by salience (highest first) and filter by min salience
   const sortedMemories = memoryNodes
     .filter(node => {

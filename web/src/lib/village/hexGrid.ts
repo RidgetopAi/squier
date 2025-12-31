@@ -99,31 +99,34 @@ export function spiralHexPositions(count: number): HexCoord[] {
   if (count === 1) return positions;
 
   // Direction vectors for pointy-top hex (6 directions)
+  // Order: SE, SW, W, NW, NE, E (walking counterclockwise from East start)
   const directions: HexCoord[] = [
-    { q: 1, r: 0 },   // East
-    { q: 0, r: 1 },   // Southeast
-    { q: -1, r: 1 },  // Southwest
-    { q: -1, r: 0 },  // West
-    { q: 0, r: -1 },  // Northwest
-    { q: 1, r: -1 },  // Northeast
+    { q: 0, r: 1 },   // SE
+    { q: -1, r: 1 },  // SW
+    { q: -1, r: 0 },  // W
+    { q: 0, r: -1 },  // NW
+    { q: 1, r: -1 },  // NE
+    { q: 1, r: 0 },   // E
   ];
 
   let current: HexCoord = { q: 0, r: 0 };
   let ring = 1;
 
   while (positions.length < count) {
-    // Move to the start of the next ring (East)
+    // Move to the start of the next ring (East direction)
     current = { q: current.q + 1, r: current.r };
+    // Push the starting position of this ring
+    positions.push({ ...current });
+    if (positions.length >= count) break;
 
-    // Walk around the ring
+    // Walk around the ring (6 sides, each with 'ring' steps)
     for (let side = 0; side < 6 && positions.length < count; side++) {
       // Number of steps per side equals the ring number
-      for (let step = 0; step < ring && positions.length < count; step++) {
-        // Skip the first step of the first side (we already moved there)
-        if (side === 0 && step === 0) continue;
-
+      // On first side, we already pushed the start, so start from step 1
+      const startStep = (side === 0) ? 1 : 0;
+      for (let step = startStep; step < ring && positions.length < count; step++) {
         // Move in the current direction
-        const dir = directions[(side + 2) % 6]; // Offset by 2 for correct spiral
+        const dir = directions[side];
         current = { q: current.q + dir.q, r: current.r + dir.r };
         positions.push({ ...current });
       }

@@ -221,6 +221,8 @@ export function VillageCanvas({ onBuildingSelect }: VillageCanvasProps) {
     minSalience: 0,
   });
 
+  console.log('[VillageCanvas] State:', { isLoading, isError, isEmpty, buildings: layout.buildings.length });
+
   // Selection state
   const {
     selection,
