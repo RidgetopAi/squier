@@ -11,6 +11,13 @@ import { getOrCreateConversation, addMessage } from '../../services/conversation
 import { consolidateAll } from '../../services/consolidation.js';
 import { processMessageRealTime } from '../../services/chatExtraction.js';
 import { pool } from '../../db/pool.js';
+import {
+  getToolDefinitions,
+  hasTools,
+  executeTools,
+  type ToolCall,
+  type ToolDefinition,
+} from '../../tools/index.js';
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -263,9 +270,10 @@ async function handleChatMessage(
     // Add current message
     messages.push({ role: 'user', content: message });
 
-    // Step 4: Stream LLM response
-    console.log(`[Socket] Step 4: Starting Groq stream...`);
-    const streamResult = await streamGroqResponse(socket, conversationId, messages, abortController.signal);
+    // Step 4: Stream LLM response with tools
+    const tools = hasTools() ? getToolDefinitions() : undefined;
+    console.log(`[Socket] Step 4: Starting Groq stream... (${tools?.length ?? 0} tools available)`);
+    const streamResult = await streamGroqResponse(socket, conversationId, messages, abortController.signal, tools);
     console.log(`[Socket] Stream complete: ${streamResult.content.length} chars`);
 
     // Step 5: Await extraction and stream follow-up acknowledgment if needed
@@ -356,15 +364,26 @@ async function handleChatMessage(
   }
 }
 
+// Type for tracking accumulated streaming tool calls
+interface StreamingToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
 /**
- * Stream response from Groq API
+ * Stream response from Groq API with tool calling support
  * Returns the full content and usage for persistence
  */
 async function streamGroqResponse(
   socket: TypedSocket,
   conversationId: string,
-  messages: Array<{ role: string; content: string }>,
-  signal: AbortSignal
+  messages: Array<{ role: string; content: string; tool_calls?: ToolCall[]; tool_call_id?: string }>,
+  signal: AbortSignal,
+  tools?: ToolDefinition[]
 ): Promise<{ content: string; usage?: { promptTokens: number; completionTokens: number } }> {
   const apiKey = config.llm.groqApiKey;
 
@@ -388,6 +407,21 @@ async function streamGroqResponse(
   // Abort if either the external signal or timeout fires
   signal.addEventListener('abort', () => timeoutController.abort());
 
+  // Build request body
+  const requestBody: Record<string, unknown> = {
+    model: config.llm.model,
+    messages,
+    max_tokens: config.llm.maxTokens,
+    temperature: config.llm.temperature,
+    stream: true,
+  };
+
+  // Add tools if available
+  if (tools && tools.length > 0) {
+    requestBody.tools = tools;
+    requestBody.tool_choice = 'auto';
+  }
+
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -395,13 +429,7 @@ async function streamGroqResponse(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: config.llm.model,
-        messages,
-        max_tokens: config.llm.maxTokens,
-        temperature: config.llm.temperature,
-        stream: true,
-      }),
+      body: JSON.stringify(requestBody),
       signal: timeoutController.signal,
     });
 
@@ -420,58 +448,125 @@ async function streamGroqResponse(
     let totalTokens = 0;
     let fullContent = '';
 
+    // Track tool calls as they stream in
+    const accumulatedToolCalls: Map<number, StreamingToolCall> = new Map();
+
     try {
       while (true) {
-      const { done, value } = await reader.read();
+        const { done, value } = await reader.read();
 
-      if (done) {
-        break;
-      }
+        if (done) {
+          break;
+        }
 
-      buffer += decoder.decode(value, { stream: true });
+        buffer += decoder.decode(value, { stream: true });
 
-      // Process complete SSE messages
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+        // Process complete SSE messages
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6);
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
 
-          if (data === '[DONE]') {
-            // Don't emit chat:done here - caller handles it after follow-up
-            return { content: fullContent, usage: { promptTokens: 0, completionTokens: totalTokens } };
-          }
-
-          try {
-            const parsed = JSON.parse(data) as {
-              choices: Array<{
-                delta: { content?: string };
-                finish_reason?: string;
-              }>;
-            };
-
-            const content = parsed.choices[0]?.delta?.content;
-            if (content) {
-              fullContent += content;
-              totalTokens++;
-              socket.emit('chat:chunk', {
-                conversationId,
-                chunk: content,
-                done: false,
-              });
-            }
-
-            if (parsed.choices[0]?.finish_reason === 'stop') {
-              // Don't emit chat:done here - caller handles it after follow-up
+            if (data === '[DONE]') {
+              // Check if we have tool calls to execute
+              if (accumulatedToolCalls.size > 0) {
+                return await handleToolCallsAndContinue(
+                  socket,
+                  conversationId,
+                  messages,
+                  fullContent,
+                  accumulatedToolCalls,
+                  signal,
+                  tools,
+                  totalTokens
+                );
+              }
               return { content: fullContent, usage: { promptTokens: 0, completionTokens: totalTokens } };
             }
-          } catch {
-            // Skip malformed JSON
+
+            try {
+              const parsed = JSON.parse(data) as {
+                choices: Array<{
+                  delta: {
+                    content?: string;
+                    tool_calls?: Array<{
+                      index: number;
+                      id?: string;
+                      type?: 'function';
+                      function?: {
+                        name?: string;
+                        arguments?: string;
+                      };
+                    }>;
+                  };
+                  finish_reason?: string | null;
+                }>;
+              };
+
+              const delta = parsed.choices[0]?.delta;
+
+              // Handle text content
+              if (delta?.content) {
+                fullContent += delta.content;
+                totalTokens++;
+                socket.emit('chat:chunk', {
+                  conversationId,
+                  chunk: delta.content,
+                  done: false,
+                });
+              }
+
+              // Handle streaming tool calls
+              if (delta?.tool_calls) {
+                for (const tc of delta.tool_calls) {
+                  const existing = accumulatedToolCalls.get(tc.index);
+
+                  if (existing) {
+                    // Append to existing tool call arguments
+                    if (tc.function?.arguments) {
+                      existing.function.arguments += tc.function.arguments;
+                    }
+                  } else if (tc.id && tc.function?.name) {
+                    // New tool call
+                    accumulatedToolCalls.set(tc.index, {
+                      id: tc.id,
+                      type: 'function',
+                      function: {
+                        name: tc.function.name,
+                        arguments: tc.function.arguments || '',
+                      },
+                    });
+                  }
+                }
+              }
+
+              const finishReason = parsed.choices[0]?.finish_reason;
+
+              if (finishReason === 'tool_calls') {
+                // Model wants to call tools
+                return await handleToolCallsAndContinue(
+                  socket,
+                  conversationId,
+                  messages,
+                  fullContent,
+                  accumulatedToolCalls,
+                  signal,
+                  tools,
+                  totalTokens
+                );
+              }
+
+              if (finishReason === 'stop') {
+                return { content: fullContent, usage: { promptTokens: 0, completionTokens: totalTokens } };
+              }
+            } catch {
+              // Skip malformed JSON
+            }
           }
         }
       }
-    }
 
       // If we exit the loop without explicit return, return what we have
       return { content: fullContent, usage: { promptTokens: 0, completionTokens: totalTokens } };
@@ -481,6 +576,75 @@ async function streamGroqResponse(
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+/**
+ * Execute accumulated tool calls and continue the conversation
+ */
+async function handleToolCallsAndContinue(
+  socket: TypedSocket,
+  conversationId: string,
+  messages: Array<{ role: string; content: string; tool_calls?: ToolCall[]; tool_call_id?: string }>,
+  contentSoFar: string,
+  accumulatedToolCalls: Map<number, StreamingToolCall>,
+  signal: AbortSignal,
+  tools?: ToolDefinition[],
+  tokensSoFar: number = 0
+): Promise<{ content: string; usage?: { promptTokens: number; completionTokens: number } }> {
+  // Convert accumulated tool calls to array
+  const toolCalls: ToolCall[] = Array.from(accumulatedToolCalls.values()).map((tc) => ({
+    id: tc.id,
+    type: tc.type,
+    function: {
+      name: tc.function.name,
+      arguments: tc.function.arguments,
+    },
+  }));
+
+  console.log(`[Socket] Executing ${toolCalls.length} tool call(s): ${toolCalls.map((tc) => tc.function.name).join(', ')}`);
+
+  // Execute all tool calls
+  const toolResults = await executeTools(toolCalls);
+
+  // Log results
+  for (const result of toolResults) {
+    console.log(`[Socket] Tool ${result.name}: ${result.success ? 'success' : 'failed'} - ${result.result.substring(0, 100)}`);
+  }
+
+  // Build updated messages array
+  const updatedMessages = [
+    ...messages,
+    // Assistant message with tool calls
+    {
+      role: 'assistant',
+      content: contentSoFar || '',
+      tool_calls: toolCalls,
+    },
+    // Tool results
+    ...toolResults.map((result) => ({
+      role: 'tool',
+      tool_call_id: result.toolCallId,
+      content: result.result,
+    })),
+  ];
+
+  // Continue streaming with tool results
+  const continuedResult = await streamGroqResponse(
+    socket,
+    conversationId,
+    updatedMessages,
+    signal,
+    tools
+  );
+
+  // Combine content
+  return {
+    content: contentSoFar + continuedResult.content,
+    usage: {
+      promptTokens: 0,
+      completionTokens: tokensSoFar + (continuedResult.usage?.completionTokens || 0),
+    },
+  };
 }
 
 /**
