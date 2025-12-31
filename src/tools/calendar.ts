@@ -45,8 +45,12 @@ async function handleGetUpcomingEvents(args: GetUpcomingEventsArgs | null): Prom
       });
     }
 
+    // Separate calendar events (google synced) from regular commitments
+    const calendarEvents = commitments.filter((c) => c.google_event_id);
+    const scheduledCommitments = commitments.filter((c) => !c.google_event_id);
+
     // Format for LLM consumption
-    const formattedEvents = commitments.map((c: ExpandedCommitment) => ({
+    const formatItem = (c: ExpandedCommitment) => ({
       id: c.id,
       title: c.title,
       description: c.description,
@@ -55,17 +59,23 @@ async function handleGetUpcomingEvents(args: GetUpcomingEventsArgs | null): Prom
       duration_minutes: c.duration_minutes,
       status: c.status,
       is_recurring: !!c.rrule,
-      is_occurrence: !!c.is_occurrence,
       tags: c.tags,
-    }));
+    });
 
     return JSON.stringify({
-      count: formattedEvents.length,
       date_range: {
         from: now.toISOString(),
         to: endDate.toISOString(),
       },
-      events: formattedEvents,
+      calendar_events: {
+        count: calendarEvents.length,
+        items: calendarEvents.map(formatItem),
+        note: calendarEvents.length === 0 ? 'No Google Calendar events synced' : undefined,
+      },
+      scheduled_commitments: {
+        count: scheduledCommitments.length,
+        items: scheduledCommitments.map(formatItem),
+      },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -76,7 +86,7 @@ async function handleGetUpcomingEvents(args: GetUpcomingEventsArgs | null): Prom
 export const getUpcomingEventsToolName = 'get_upcoming_events';
 
 export const getUpcomingEventsToolDescription =
-  'Get the user\'s upcoming calendar events and commitments. Use this when the user asks about their schedule, what\'s coming up, what they have planned, or "what\'s on my calendar?" Returns events for the specified number of days ahead.';
+  'Get the user\'s upcoming scheduled items (commitments, tasks with due dates, and calendar events if synced). Use when user asks "what\'s coming up?", "what do I have planned?", or "what\'s on my schedule?" Returns scheduled items for the next N days.';
 
 export const getUpcomingEventsToolParameters = {
   type: 'object',
@@ -197,7 +207,7 @@ async function handleGetTodaysEvents(args: GetTodaysEventsArgs | null): Promise<
 export const getTodaysEventsToolName = 'get_todays_events';
 
 export const getTodaysEventsToolDescription =
-  'Get the user\'s events for today, including any overdue items. Use this when the user asks "what do I have today?", "what\'s on my schedule today?", or wants a daily overview.';
+  'Get the user\'s scheduled items for TODAY plus any overdue items. Use when user asks "what do I have today?", "what\'s on my schedule today?", or "anything due today?"';
 
 export const getTodaysEventsToolParameters = {
   type: 'object',
