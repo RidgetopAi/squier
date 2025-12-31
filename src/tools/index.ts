@@ -1,9 +1,8 @@
 /**
  * Tool Registry and Executor
  *
- * Central registry for LLM tools. Tools register themselves on import,
- * and the chat service uses this to pass tool definitions to the LLM
- * and execute tool calls.
+ * Central registry for LLM tools. Tools export their definitions,
+ * and are registered here after the registry is initialized.
  */
 
 import type {
@@ -149,8 +148,16 @@ export async function executeTools(calls: ToolCall[]): Promise<ToolResult[]> {
   return Promise.all(calls.map(executeTool));
 }
 
-// === TOOL IMPORTS ===
-// Import tools here to trigger their registration
-// Each tool file calls registerTool() on import
+// === TOOL REGISTRATION ===
+// Import tool definitions and register them
+// This happens after the registry Map is initialized
 
-import './time.js';
+import {
+  timeToolName,
+  timeToolDescription,
+  timeToolParameters,
+  timeToolHandler,
+} from './time.js';
+
+// Register time tool
+registerTool(timeToolName, timeToolDescription, timeToolParameters, timeToolHandler);

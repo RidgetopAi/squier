@@ -5,8 +5,8 @@
  * Uses system-detected timezone from config.
  */
 
-import { registerTool } from './index.js';
 import { config } from '../config/index.js';
+import type { ToolHandler } from './types.js';
 
 // === TYPES ===
 
@@ -65,22 +65,24 @@ function getCurrentTime(args: GetCurrentTimeArgs): string {
   return now.toLocaleString('en-US', options);
 }
 
-// === REGISTRATION ===
+// === TOOL DEFINITION ===
 
-registerTool<GetCurrentTimeArgs>(
-  'get_current_time',
-  'Get the current date and time. Use this when the user asks about the current time, date, day of the week, or when you need to calculate relative times like "in 30 minutes" or "tomorrow".',
-  {
-    type: 'object',
-    properties: {
-      format: {
-        type: 'string',
-        enum: ['full', 'date', 'time'],
-        description:
-          'Output format: "full" for date and time (default), "date" for date only, "time" for time only',
-      },
+export const timeToolName = 'get_current_time';
+
+export const timeToolDescription =
+  'Get the current date and time. Use this when the user asks about the current time, date, day of the week, or when you need to calculate relative times like "in 30 minutes" or "tomorrow".';
+
+export const timeToolParameters = {
+  type: 'object',
+  properties: {
+    format: {
+      type: 'string',
+      enum: ['full', 'date', 'time'],
+      description:
+        'Output format: "full" for date and time (default), "date" for date only, "time" for time only',
     },
-    required: [],
   },
-  getCurrentTime
-);
+  required: [],
+};
+
+export const timeToolHandler: ToolHandler<GetCurrentTimeArgs> = getCurrentTime;
