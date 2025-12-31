@@ -55,7 +55,11 @@ export function buildVillageLayout(
   graphData: ForceGraphData,
   options: VillageLayoutOptions = {}
 ): VillageLayout {
-  const opts = { ...DEFAULT_OPTIONS, ...options };
+  // Filter out undefined values so they don't override defaults
+  const cleanOptions = Object.fromEntries(
+    Object.entries(options).filter(([_, v]) => v !== undefined)
+  );
+  const opts = { ...DEFAULT_OPTIONS, ...cleanOptions } as Required<VillageLayoutOptions>;
 
   // Filter to memory nodes only (entities become decorations in Phase 3)
   const memoryNodes = graphData.nodes.filter(node => node.type === 'memory');

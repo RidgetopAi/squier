@@ -59,9 +59,9 @@ export function useVillageLayout(
   const {
     enabled = true,
     maxBuildings = 120,
-    hexSize,
+    hexSize = 2,
     minSalience = 0,
-    districtSpacing,
+    districtSpacing = 1.5,
   } = options;
 
   // Fetch graph visualization data
