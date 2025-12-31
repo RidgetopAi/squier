@@ -15,6 +15,9 @@ function optional(name: string, defaultValue: string): string {
 }
 
 export const config = {
+  // Auto-detect timezone from system
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+
   database: {
     url: required('DATABASE_URL'),
   },

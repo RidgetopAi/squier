@@ -83,8 +83,8 @@ function formatReminderAcknowledgment(title: string, remindAt: string): string {
   const diffMs = date.getTime() - now.getTime();
   const diffMins = Math.round(diffMs / 60000);
 
-  // Always use America/New_York timezone for user-facing display
-  const userTimezone = 'America/New_York';
+  // Use system-detected timezone for user-facing display
+  const userTimezone = config.timezone;
 
   let timeStr: string;
   if (diffMins < 60) {
@@ -146,7 +146,7 @@ function getCurrentTimeContext(): string {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-    timeZone: 'America/New_York',
+    timeZone: config.timezone,
     timeZoneName: 'short',
   };
   const formatted = now.toLocaleString('en-US', options);

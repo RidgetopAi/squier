@@ -2,6 +2,7 @@ import { google, calendar_v3 } from 'googleapis';
 import { pool } from '../../db/pool.js';
 import { getAuthenticatedClient } from './auth.js';
 import { GoogleCalendar, updateEventsSyncToken } from './calendars.js';
+import { config } from '../../config/index.js';
 
 export interface GoogleEvent {
   id: string;
@@ -268,21 +269,21 @@ export async function pushEventToGoogle(
     // All-day event uses date format
     eventResource.start = {
       date: commitment.due_at.toISOString().split('T')[0],
-      timeZone: commitment.timezone || 'America/New_York',
+      timeZone: commitment.timezone || config.timezone,
     };
     eventResource.end = {
       date: endTime.toISOString().split('T')[0],
-      timeZone: commitment.timezone || 'America/New_York',
+      timeZone: commitment.timezone || config.timezone,
     };
   } else {
     // Timed event uses dateTime
     eventResource.start = {
       dateTime: commitment.due_at.toISOString(),
-      timeZone: commitment.timezone || 'America/New_York',
+      timeZone: commitment.timezone || config.timezone,
     };
     eventResource.end = {
       dateTime: endTime.toISOString(),
-      timeZone: commitment.timezone || 'America/New_York',
+      timeZone: commitment.timezone || config.timezone,
     };
   }
 
@@ -320,7 +321,7 @@ export async function pushEventToGoogle(
     commitment.due_at,
     endTime,
     commitment.all_day || false,
-    commitment.timezone || 'America/New_York',
+    commitment.timezone || config.timezone,
     'confirmed',
     response.data.etag,
     commitment.id,
@@ -373,20 +374,20 @@ export async function updateEventInGoogle(
     if (updates.all_day) {
       eventResource.start = {
         date: updates.due_at.toISOString().split('T')[0],
-        timeZone: updates.timezone || 'America/New_York',
+        timeZone: updates.timezone || config.timezone,
       };
       eventResource.end = {
         date: endTime.toISOString().split('T')[0],
-        timeZone: updates.timezone || 'America/New_York',
+        timeZone: updates.timezone || config.timezone,
       };
     } else {
       eventResource.start = {
         dateTime: updates.due_at.toISOString(),
-        timeZone: updates.timezone || 'America/New_York',
+        timeZone: updates.timezone || config.timezone,
       };
       eventResource.end = {
         dateTime: endTime.toISOString(),
-        timeZone: updates.timezone || 'America/New_York',
+        timeZone: updates.timezone || config.timezone,
       };
     }
   }

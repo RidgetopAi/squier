@@ -1,6 +1,7 @@
 import { pool } from '../db/pool.js';
 import { generateEmbedding } from '../providers/embeddings.js';
 import { expandRecurrence, getNextOccurrence } from './recurrence.js';
+import { config } from '../config/index.js';
 
 // Commitment status values (from IMPLEMENTATION-TRACKER.md locked naming)
 export type CommitmentStatus = 'open' | 'in_progress' | 'completed' | 'canceled' | 'snoozed';
@@ -98,7 +99,7 @@ export async function createCommitment(input: CreateCommitmentInput): Promise<Co
     memory_id,
     source_type = 'manual',
     due_at,
-    timezone = 'America/New_York',
+    timezone = config.timezone,
     all_day = false,
     duration_minutes,
     rrule,

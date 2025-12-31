@@ -3,10 +3,13 @@
  *
  * Handles chat interactions with LLM integration.
  * Combines context retrieval with conversation management.
+ * Includes tool calling support.
  */
 
 import { complete, type LLMMessage, type LLMCompletionResult } from '../providers/llm.js';
 import { generateContext, type ContextPackage } from './context.js';
+import { config } from '../config/index.js';
+import { getToolDefinitions, executeTools, hasTools } from '../tools/index.js';
 
 // === TYPES ===
 
@@ -61,7 +64,7 @@ function getCurrentDateTimeString(): string {
     hour: 'numeric',
     minute: '2-digit',
     timeZoneName: 'short',
-    timeZone: 'America/New_York', // User's timezone - could be configurable
+    timeZone: config.timezone, // Auto-detected from system
   };
 
   return now.toLocaleString('en-US', options);
@@ -153,8 +156,47 @@ export async function chat(request: ChatRequest): Promise<ChatResponse> {
   // Build messages for LLM
   const messages = buildMessages(message, conversationHistory, contextMarkdown);
 
-  // Call LLM
-  const result: LLMCompletionResult = await complete(messages);
+  // Get available tools
+  const tools = hasTools() ? getToolDefinitions() : undefined;
+
+  // Call LLM with tools
+  let result: LLMCompletionResult = await complete(messages, { tools });
+
+  // Tool calling loop - handle tool calls until we get a final response
+  const maxToolIterations = 5; // Prevent infinite loops
+  let iterations = 0;
+
+  while (result.finishReason === 'tool_calls' && result.toolCalls?.length && iterations < maxToolIterations) {
+    iterations++;
+    console.log(`Tool call iteration ${iterations}: ${result.toolCalls.map((t) => t.function.name).join(', ')}`);
+
+    // Execute all tool calls in parallel
+    const toolResults = await executeTools(result.toolCalls);
+
+    // Add assistant message with tool calls to conversation
+    messages.push({
+      role: 'assistant',
+      content: result.content,
+      tool_calls: result.toolCalls,
+    });
+
+    // Add tool results to conversation
+    for (const tr of toolResults) {
+      messages.push({
+        role: 'tool',
+        tool_call_id: tr.toolCallId,
+        content: tr.result,
+      });
+      console.log(`Tool ${tr.name} result: ${tr.success ? 'success' : 'failed'}`);
+    }
+
+    // Re-prompt LLM with tool results
+    result = await complete(messages, { tools });
+  }
+
+  if (iterations >= maxToolIterations) {
+    console.warn(`Tool calling reached max iterations (${maxToolIterations})`);
+  }
 
   // Build response
   const response: ChatResponse = {

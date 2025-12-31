@@ -1,4 +1,5 @@
 import { pool } from '../db/pool.js';
+import { config } from '../config/index.js';
 
 // Reminder status values (from schema constraints)
 export type ReminderStatus = 'pending' | 'sent' | 'acknowledged' | 'snoozed' | 'canceled' | 'failed';
@@ -83,7 +84,7 @@ export async function createReminder(input: CreateReminderInput): Promise<Remind
     title,
     body,
     scheduled_for,
-    timezone = 'America/New_York',
+    timezone = config.timezone,
     offset_type,
     offset_minutes,
     channel = 'push',
@@ -158,7 +159,7 @@ export async function createCommitmentReminders(
 ): Promise<Reminder[]> {
   const {
     offsets = [DEFAULT_REMINDER_OFFSETS.ONE_WEEK, DEFAULT_REMINDER_OFFSETS.ONE_DAY, DEFAULT_REMINDER_OFFSETS.ONE_HOUR],
-    timezone = 'America/New_York',
+    timezone = config.timezone,
   } = options;
 
   const reminders: Reminder[] = [];
@@ -192,7 +193,7 @@ export async function createStandaloneReminder(
   delayMinutes: number,
   options: { body?: string; timezone?: string } = {}
 ): Promise<Reminder> {
-  const { body, timezone = 'America/New_York' } = options;
+  const { body, timezone = config.timezone } = options;
 
   const scheduledFor = new Date(Date.now() + delayMinutes * 60000);
 
@@ -214,7 +215,7 @@ export async function createScheduledReminder(
   scheduledAt: Date,
   options: { body?: string; timezone?: string } = {}
 ): Promise<Reminder> {
-  const { body, timezone = 'America/New_York' } = options;
+  const { body, timezone = config.timezone } = options;
 
   // Validate the scheduled date is in the future
   if (scheduledAt <= new Date()) {

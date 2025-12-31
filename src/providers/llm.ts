@@ -3,21 +3,36 @@
  *
  * Abstraction layer for language model calls.
  * Supports Groq (primary) and Ollama (local fallback).
+ * Includes tool calling support for Groq.
  */
 
 import { config } from '../config/index.js';
+import type { ToolDefinition, ToolCall } from '../tools/types.js';
+
+// Re-export tool types for convenience
+export type { ToolDefinition, ToolCall } from '../tools/types.js';
 
 // === TYPES ===
 
+/**
+ * LLM message - extended to support tool calls and tool results
+ */
 export interface LLMMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string | null;
+  // For assistant messages with tool calls
+  tool_calls?: ToolCall[];
+  // For tool result messages
+  tool_call_id?: string;
 }
 
 export interface LLMCompletionOptions {
   maxTokens?: number;
   temperature?: number;
   stopSequences?: string[];
+  // Tool calling options
+  tools?: ToolDefinition[];
+  toolChoice?: 'auto' | 'none' | 'required';
 }
 
 export interface LLMCompletionResult {
@@ -29,6 +44,9 @@ export interface LLMCompletionResult {
   };
   model: string;
   provider: string;
+  // Tool calling results
+  toolCalls?: ToolCall[];
+  finishReason: 'stop' | 'tool_calls' | 'length';
 }
 
 export interface LLMProvider {
@@ -60,19 +78,28 @@ class GroqLLMProvider implements LLMProvider {
       throw new Error('GROQ_API_KEY not configured');
     }
 
+    // Build request body
+    const requestBody: Record<string, unknown> = {
+      model: this.model,
+      messages,
+      max_tokens: options.maxTokens ?? config.llm.maxTokens,
+      temperature: options.temperature ?? config.llm.temperature,
+      stop: options.stopSequences,
+    };
+
+    // Add tools if provided
+    if (options.tools && options.tools.length > 0) {
+      requestBody.tools = options.tools;
+      requestBody.tool_choice = options.toolChoice ?? 'auto';
+    }
+
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.apiKey}`,
       },
-      body: JSON.stringify({
-        model: this.model,
-        messages,
-        max_tokens: options.maxTokens ?? config.llm.maxTokens,
-        temperature: options.temperature ?? config.llm.temperature,
-        stop: options.stopSequences,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -81,7 +108,13 @@ class GroqLLMProvider implements LLMProvider {
     }
 
     const data = (await response.json()) as {
-      choices: Array<{ message: { content: string } }>;
+      choices: Array<{
+        message: {
+          content: string | null;
+          tool_calls?: ToolCall[];
+        };
+        finish_reason: string;
+      }>;
       usage: {
         prompt_tokens: number;
         completion_tokens: number;
@@ -90,8 +123,12 @@ class GroqLLMProvider implements LLMProvider {
       model: string;
     };
 
+    const choice = data.choices[0];
+    const finishReason = choice?.finish_reason === 'tool_calls' ? 'tool_calls' :
+                         choice?.finish_reason === 'length' ? 'length' : 'stop';
+
     return {
-      content: data.choices[0]?.message?.content ?? '',
+      content: choice?.message?.content ?? '',
       usage: {
         promptTokens: data.usage.prompt_tokens,
         completionTokens: data.usage.completion_tokens,
@@ -99,6 +136,8 @@ class GroqLLMProvider implements LLMProvider {
       },
       model: data.model,
       provider: 'groq',
+      toolCalls: choice?.message?.tool_calls,
+      finishReason,
     };
   }
 
@@ -177,6 +216,7 @@ class OllamaLLMProvider implements LLMProvider {
       },
       model: data.model,
       provider: 'ollama',
+      finishReason: 'stop', // Ollama doesn't support tool calling yet
     };
   }
 

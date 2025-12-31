@@ -8,6 +8,7 @@
 
 import { pool } from '../db/pool.js';
 import { complete, type LLMMessage } from '../providers/llm.js';
+import { config } from '../config/index.js';
 import { createMemory } from './memories.js';
 import { processMemoryForBeliefs } from './beliefs.js';
 import { classifyMemoryCategories, linkMemoryToCategories } from './summaries.js';
@@ -157,7 +158,7 @@ function getDateTimeContext(): {
   weekdayDates: Record<string, string>;
 } {
   const now = new Date();
-  const timezone = 'America/New_York';
+  const timezone = config.timezone;
 
   const options: Intl.DateTimeFormatOptions = {
     weekday: 'long',
