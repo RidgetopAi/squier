@@ -461,7 +461,13 @@ async function streamGroqResponse(
           break;
         }
 
-        buffer += decoder.decode(value, { stream: true });
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+
+        // Debug: log first chunk to see raw response
+        if (totalTokens === 0 && fullContent === '') {
+          console.log(`[Socket] First stream chunk (${chunk.length} chars): ${chunk.substring(0, 500)}`);
+        }
 
         // Process complete SSE messages
         const lines = buffer.split('\n');
@@ -472,6 +478,7 @@ async function streamGroqResponse(
             const data = line.slice(6);
 
             if (data === '[DONE]') {
+              console.log(`[Socket] Stream [DONE] received. Tool calls accumulated: ${accumulatedToolCalls.size}`);
               // Check if we have tool calls to execute
               if (accumulatedToolCalls.size > 0) {
                 return await handleToolCallsAndContinue(
@@ -575,6 +582,7 @@ async function streamGroqResponse(
       }
 
       // If we exit the loop without explicit return, return what we have
+      console.log(`[Socket] Stream loop ended. Content: ${fullContent.length} chars, tokens: ${totalTokens}, tool calls: ${accumulatedToolCalls.size}, buffer remaining: ${buffer.length}`);
       return { content: fullContent, usage: { promptTokens: 0, completionTokens: totalTokens } };
     } finally {
       reader.releaseLock();
