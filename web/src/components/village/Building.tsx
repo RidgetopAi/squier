@@ -4,12 +4,35 @@
 // SQUIRE WEB - VILLAGE BUILDING COMPONENT
 // ============================================
 // Renders a memory as a 3D building using GLTF models
+// P3-T7: Performance optimizations with memoization and LOD
 
-import { useRef } from 'react';
+import { memo, useRef, useMemo, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
-import type { Group } from 'three';
+import { Detailed } from '@react-three/drei';
+import type { Group, Mesh } from 'three';
 import type { VillageBuilding } from '@/lib/types/village';
 import { BuildingModel } from './BuildingModel';
+
+// ============================================
+// LOD FALLBACK (simple box for distant views)
+// ============================================
+
+interface SimpleBuildingProps {
+  scale: number;
+  color: string;
+}
+
+/**
+ * Simple box geometry for LOD - shown at distance for performance
+ */
+function SimpleBuilding({ scale, color }: SimpleBuildingProps) {
+  return (
+    <mesh castShadow receiveShadow>
+      <boxGeometry args={[0.8 * scale, 1.2 * scale, 0.8 * scale]} />
+      <meshStandardMaterial color={color} roughness={0.8} />
+    </mesh>
+  );
+}
 
 // ============================================
 // BUILDING COMPONENT
@@ -31,8 +54,13 @@ interface BuildingProps {
 /**
  * Building component - renders a memory as a 3D building using GLTF models
  * Scale varies based on salience (0.7 to 1.3x)
+ *
+ * Performance optimizations (P3-T7):
+ * - Memoized with React.memo to prevent unnecessary re-renders
+ * - LOD (Level of Detail): shows simple box at distance > 40 units
+ * - Memoized computed values
  */
-export function Building({
+export const Building = memo(function Building({
   building,
   selected = false,
   hovered = false,
@@ -48,9 +76,14 @@ export function Building({
     return null;
   }
 
-  // Calculate scale based on salience (ensure valid number)
-  const salience = Number.isFinite(building.salience) ? building.salience : 0.5;
-  const baseScale = 0.7 + salience * 0.6; // 0.7 to 1.3
+  // Memoize computed values
+  const { baseScale, emissiveIntensity } = useMemo(() => {
+    const salience = Number.isFinite(building.salience) ? building.salience : 0.5;
+    return {
+      baseScale: 0.7 + salience * 0.6, // 0.7 to 1.3
+      emissiveIntensity: selected ? 0.4 : hovered ? 0.2 : 0,
+    };
+  }, [building.salience, selected, hovered]);
 
   // Base Y position for hover animation
   const baseY = 0;
@@ -63,41 +96,51 @@ export function Building({
     }
   });
 
-  // Emissive intensity for glow effect
-  const emissiveIntensity = selected ? 0.4 : hovered ? 0.2 : 0;
+  // Memoize event handlers
+  const handlePointerOver = useCallback((e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+    document.body.style.cursor = 'pointer';
+    onPointerOver?.(building);
+  }, [building, onPointerOver]);
+
+  const handlePointerOut = useCallback((e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+    document.body.style.cursor = 'auto';
+    onPointerOut?.();
+  }, [onPointerOut]);
+
+  const handleClick = useCallback((e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+    onClick?.(building);
+  }, [building, onClick]);
 
   return (
     <group
       position={[building.position.x, 0, building.position.z]}
-      onPointerOver={(e) => {
-        e.stopPropagation();
-        document.body.style.cursor = 'pointer';
-        onPointerOver?.(building);
-      }}
-      onPointerOut={(e) => {
-        e.stopPropagation();
-        document.body.style.cursor = 'auto';
-        onPointerOut?.();
-      }}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick?.(building);
-      }}
+      onPointerOver={handlePointerOver}
+      onPointerOut={handlePointerOut}
+      onClick={handleClick}
     >
       {/* Animated wrapper for hover lift */}
       <group ref={groupRef} position={[0, baseY, 0]}>
-        <BuildingModel
-          buildingType={building.buildingType}
-          scale={baseScale}
-          emissiveIntensity={emissiveIntensity}
-          emissiveColor={building.color}
-          castShadow
-          receiveShadow
-        />
+        {/* LOD: GLTF model near (0-40), simple box far (40+) */}
+        <Detailed distances={[0, 40]}>
+          {/* Near: Full GLTF model */}
+          <BuildingModel
+            buildingType={building.buildingType}
+            scale={baseScale}
+            emissiveIntensity={emissiveIntensity}
+            emissiveColor={building.color}
+            castShadow
+            receiveShadow
+          />
+          {/* Far: Simple box geometry */}
+          <SimpleBuilding scale={baseScale} color={building.color} />
+        </Detailed>
       </group>
     </group>
   );
-}
+});
 
 // ============================================
 // BUILDINGS LAYER COMPONENT
@@ -117,14 +160,24 @@ interface BuildingsLayerProps {
 
 /**
  * Renders all buildings in the village
+ * Memoized to prevent re-renders when parent updates
  */
-export function BuildingsLayer({
+export const BuildingsLayer = memo(function BuildingsLayer({
   buildings,
   selectedBuildingId,
   hoveredBuildingId,
   onBuildingClick,
   onBuildingHover,
 }: BuildingsLayerProps) {
+  // Memoize hover callbacks to prevent Building re-renders
+  const handlePointerOver = useCallback((b: VillageBuilding) => {
+    onBuildingHover?.(b);
+  }, [onBuildingHover]);
+
+  const handlePointerOut = useCallback(() => {
+    onBuildingHover?.(null);
+  }, [onBuildingHover]);
+
   return (
     <group name="buildings">
       {buildings.map(building => (
@@ -134,12 +187,12 @@ export function BuildingsLayer({
           selected={building.id === selectedBuildingId}
           hovered={building.id === hoveredBuildingId}
           onClick={onBuildingClick}
-          onPointerOver={(b) => onBuildingHover?.(b)}
-          onPointerOut={() => onBuildingHover?.(null)}
+          onPointerOver={handlePointerOver}
+          onPointerOut={handlePointerOut}
         />
       ))}
     </group>
   );
-}
+});
 
 export default Building;
