@@ -35,10 +35,6 @@ function clearOverlayCards() {
   useOverlayStore.getState().clearCards();
 }
 
-function pushOverlayCards(memories: ScoredMemory[], entitiesMap: Map<string, EntitySummary[]>) {
-  const { useOverlayStore } = require('./overlayStore');
-  useOverlayStore.getState().pushCards(memories, entitiesMap);
-}
 
 // Generate unique message IDs
 function generateMessageId(): string {
@@ -342,15 +338,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
           // Store context package
           set({ lastContextPackage: contextPackage });
-
-          // Push memories to overlay
-          if (contextPackage.memories.length > 0) {
-            const entitiesMap = new Map<string, EntitySummary[]>();
-            contextPackage.memories.forEach((m) => {
-              entitiesMap.set(m.id, contextPackage!.entities);
-            });
-            pushOverlayCards(contextPackage.memories, entitiesMap);
-          }
         } catch (contextError) {
           console.error('Failed to fetch context:', contextError);
           // Continue without context rather than failing
@@ -559,13 +546,8 @@ export function initWebSocketListeners(): () => void {
       mention_count: 1,
     }));
 
-    if (memories.length > 0) {
-      const entitiesMap = new Map<string, EntitySummary[]>();
-      memories.forEach((m) => {
-        entitiesMap.set(m.id, entities);
-      });
-      pushOverlayCards(memories, entitiesMap);
-    }
+    // Memories and entities still parsed for potential future use
+    // but no longer pushed to overlay (removed: pushOverlayCards)
   }
 
   // Handle stream completion

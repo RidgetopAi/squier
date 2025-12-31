@@ -3,7 +3,30 @@
 // ============================================
 
 import { apiGet } from './client';
-import type { Memory } from '@/lib/types';
+import type { Memory, ScoredMemory } from '@/lib/types';
+
+// ============================================
+// MEMORY CACHE
+// ============================================
+
+const memoryCache = new Map<string, Memory>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const cacheTimestamps = new Map<string, number>();
+
+function getCachedMemory(id: string): Memory | null {
+  const timestamp = cacheTimestamps.get(id);
+  if (!timestamp || Date.now() - timestamp > CACHE_TTL) {
+    memoryCache.delete(id);
+    cacheTimestamps.delete(id);
+    return null;
+  }
+  return memoryCache.get(id) ?? null;
+}
+
+function setCachedMemory(memory: Memory): void {
+  memoryCache.set(memory.id, memory);
+  cacheTimestamps.set(memory.id, Date.now());
+}
 
 // Raw API response type (matches backend schema)
 interface ApiMemory {
@@ -145,4 +168,71 @@ export async function searchMemories(
     params: { query, limit, min_similarity: minSimilarity },
   });
   return response.results.map(transformMemory);
+}
+
+// ============================================
+// BATCH FETCH WITH CACHING
+// ============================================
+
+/**
+ * Fetch multiple memories by IDs with smart caching.
+ * Returns memories in the same order as requested IDs.
+ */
+export async function fetchMemoriesByIds(ids: string[]): Promise<Memory[]> {
+  if (ids.length === 0) return [];
+
+  const results: Map<string, Memory> = new Map();
+  const idsToFetch: string[] = [];
+
+  // Check cache first
+  for (const id of ids) {
+    const cached = getCachedMemory(id);
+    if (cached) {
+      results.set(id, cached);
+    } else {
+      idsToFetch.push(id);
+    }
+  }
+
+  // Fetch missing ones in parallel
+  if (idsToFetch.length > 0) {
+    const fetchPromises = idsToFetch.map(async (id) => {
+      try {
+        const memory = await fetchMemory(id);
+        setCachedMemory(memory);
+        return memory;
+      } catch (error) {
+        console.warn(`Failed to fetch memory ${id}:`, error);
+        return null;
+      }
+    });
+
+    const fetched = await Promise.all(fetchPromises);
+    fetched.forEach((memory) => {
+      if (memory) {
+        results.set(memory.id, memory);
+      }
+    });
+  }
+
+  // Return in original order, filtering out any that failed
+  return ids.map((id) => results.get(id)).filter((m): m is Memory => m != null);
+}
+
+/**
+ * Convert a Memory to ScoredMemory format for overlay display.
+ * Uses sensible defaults for scoring fields.
+ */
+export function memoryToScoredMemory(memory: Memory): ScoredMemory {
+  return {
+    id: memory.id,
+    content: memory.content,
+    created_at: memory.created_at,
+    salience_score: memory.salience,
+    current_strength: 1,
+    recency_score: 1,
+    final_score: memory.salience,
+    token_estimate: Math.ceil(memory.content.length / 4),
+    category: 'relevant' as const,
+  };
 }

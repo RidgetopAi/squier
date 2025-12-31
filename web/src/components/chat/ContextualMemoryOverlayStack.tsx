@@ -6,9 +6,9 @@ import { OverlayPortal } from '@/components/layout/OverlayPortal';
 import {
   useOverlayCards,
   useOverlayVisible,
+  useOverlayLoading,
   useDismissCard,
-  useClearCards,
-  useToggleOverlayVisible,
+  useHideMemories,
 } from '@/lib/stores/overlayStore';
 
 interface ContextualMemoryOverlayStackProps {
@@ -18,7 +18,7 @@ interface ContextualMemoryOverlayStackProps {
 
 /**
  * Floating stack of memory cards displayed alongside chat
- * Shows context memories being used in the conversation
+ * Shows memories used as context for a specific message
  */
 export function ContextualMemoryOverlayStack({
   position = 'right',
@@ -26,11 +26,12 @@ export function ContextualMemoryOverlayStack({
 }: ContextualMemoryOverlayStackProps) {
   const cards = useOverlayCards();
   const isVisible = useOverlayVisible();
+  const isLoading = useOverlayLoading();
   const dismissCard = useDismissCard();
-  const clearCards = useClearCards();
-  const toggleVisible = useToggleOverlayVisible();
+  const hideMemories = useHideMemories();
 
-  if (cards.length === 0) {
+  // Only render when visible (loading or has cards)
+  if (!isVisible && !isLoading) {
     return null;
   }
 
@@ -53,37 +54,40 @@ export function ContextualMemoryOverlayStack({
         >
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-primary">
-              Memory Context
+              🧠 Related Memories
             </span>
-            <span className="text-xs text-foreground-muted bg-background-tertiary px-2 py-0.5 rounded-full">
-              {cards.length}
-            </span>
+            {!isLoading && (
+              <span className="text-xs text-foreground-muted bg-background-tertiary px-2 py-0.5 rounded-full">
+                {cards.length}
+              </span>
+            )}
           </div>
 
-          <div className="flex items-center gap-1">
-            {/* Toggle visibility */}
-            <button
-              onClick={toggleVisible}
-              className="p-1.5 text-foreground-muted hover:text-foreground transition-colors"
-              title={isVisible ? 'Minimize' : 'Expand'}
-            >
-              {isVisible ? '−' : '+'}
-            </button>
-
-            {/* Clear all */}
-            <button
-              onClick={clearCards}
-              className="p-1.5 text-foreground-muted hover:text-error transition-colors"
-              title="Clear all"
-            >
-              ✕
-            </button>
-          </div>
+          {/* Close button */}
+          <button
+            onClick={hideMemories}
+            className="p-1.5 text-foreground-muted hover:text-foreground transition-colors"
+            title="Close"
+          >
+            ✕
+          </button>
         </motion.div>
+
+        {/* Loading state */}
+        {isLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="glass rounded-lg p-6 text-center"
+          >
+            <div className="animate-pulse text-primary text-2xl mb-2">🧠</div>
+            <span className="text-sm text-foreground-muted">Loading memories...</span>
+          </motion.div>
+        )}
 
         {/* Cards stack */}
         <AnimatePresence mode="popLayout">
-          {isVisible && (
+          {isVisible && !isLoading && cards.length > 0 && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
@@ -112,22 +116,6 @@ export function ContextualMemoryOverlayStack({
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Collapsed indicator */}
-        {!isVisible && cards.length > 0 && (
-          <motion.button
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            onClick={toggleVisible}
-            className="
-              glass rounded-lg p-3
-              hover:border-primary/50 transition-colors
-              text-sm text-foreground-muted
-            "
-          >
-            {cards.length} memories used — click to expand
-          </motion.button>
-        )}
       </div>
     </OverlayPortal>
   );

@@ -3,7 +3,11 @@
 import { useState, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ChatMessage } from '@/lib/types';
-import { useToggleOverlayVisible, useOverlayVisible } from '@/lib/stores';
+import {
+  useShowMemoriesForMessage,
+  useOverlayLoading,
+  useActiveMessageId,
+} from '@/lib/stores/overlayStore';
 import { useChatStore } from '@/lib/stores/chatStore';
 
 interface MessageBubbleProps {
@@ -14,17 +18,22 @@ interface MessageBubbleProps {
 export const MessageBubble = memo(function MessageBubble({ message, isLatest = false }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
-  const toggleVisible = useToggleOverlayVisible();
-  const overlayVisible = useOverlayVisible();
+  const showMemoriesForMessage = useShowMemoriesForMessage();
+  const overlayLoading = useOverlayLoading();
+  const activeMessageId = useActiveMessageId();
   const [badgeHovered, setBadgeHovered] = useState(false);
   const streamingMessageId = useChatStore((state) => state.streamingMessageId);
 
   const isStreaming = message.id === streamingMessageId;
   const memoryCount = message.memoryIds?.length ?? 0;
+  const isActive = activeMessageId === message.id;
+  const isLoadingThis = overlayLoading && activeMessageId === message.id;
 
   const handleBadgeClick = useCallback(() => {
-    toggleVisible();
-  }, [toggleVisible]);
+    if (message.memoryIds && message.memoryIds.length > 0) {
+      showMemoriesForMessage(message.id, message.memoryIds);
+    }
+  }, [showMemoriesForMessage, message.id, message.memoryIds]);
 
   if (isSystem) {
     return (
@@ -81,7 +90,8 @@ export const MessageBubble = memo(function MessageBubble({ message, isLatest = f
           {!isUser && memoryCount > 0 && (
             <MemoryBadge
               count={memoryCount}
-              isActive={overlayVisible}
+              isActive={isActive}
+              isLoading={isLoadingThis}
               isHovered={badgeHovered}
               onClick={handleBadgeClick}
               onHover={setBadgeHovered}
@@ -97,6 +107,7 @@ export const MessageBubble = memo(function MessageBubble({ message, isLatest = f
 interface MemoryBadgeProps {
   count: number;
   isActive: boolean;
+  isLoading: boolean;
   isHovered: boolean;
   onClick: () => void;
   onHover: (hovered: boolean) => void;
@@ -105,6 +116,7 @@ interface MemoryBadgeProps {
 function MemoryBadge({
   count,
   isActive,
+  isLoading,
   isHovered,
   onClick,
   onHover,
@@ -114,21 +126,25 @@ function MemoryBadge({
       onClick={onClick}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
+      disabled={isLoading}
       className={`
         inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full
-        text-xs font-medium transition-all duration-200
+        text-xs font-medium transition-all duration-200 cursor-pointer
         ${isActive
           ? 'bg-primary/30 text-primary border border-primary/50 glow-primary'
           : 'bg-primary/10 text-primary/80 border border-primary/20 hover:bg-primary/20'
         }
+        ${isLoading ? 'opacity-70 cursor-wait' : ''}
       `}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
+      whileHover={isLoading ? {} : { scale: 1.05 }}
+      whileTap={isLoading ? {} : { scale: 0.95 }}
     >
-      <span className="text-[10px]">🧠</span>
+      <span className={`text-[10px] ${isLoading ? 'animate-pulse' : ''}`}>
+        {isLoading ? '⏳' : '🧠'}
+      </span>
       <span>{count}</span>
       <AnimatePresence>
-        {isHovered && (
+        {isHovered && !isLoading && (
           <motion.span
             initial={{ opacity: 0, width: 0 }}
             animate={{ opacity: 1, width: 'auto' }}
