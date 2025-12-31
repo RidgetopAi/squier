@@ -268,7 +268,7 @@ function ReminderCard({
 export default function RemindersPage() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'upcoming' | 'past' | 'all'>('upcoming');
+  const [statusFilter, setStatusFilter] = useState<ReminderStatus | null>('pending');
   const [stats, setStats] = useState<Record<ReminderStatus, number>>({
     pending: 0, sent: 0, acknowledged: 0, snoozed: 0, canceled: 0, failed: 0
   });
@@ -279,10 +279,8 @@ export default function RemindersPage() {
   const fetchReminders = async () => {
     try {
       const params = new URLSearchParams();
-      if (filter === 'upcoming') {
-        params.set('status', 'pending');
-      } else if (filter === 'past') {
-        params.set('status', 'acknowledged');
+      if (statusFilter) {
+        params.set('status', statusFilter);
       }
 
       const res = await fetch(`${API_URL}/api/reminders?${params}`);
@@ -308,7 +306,7 @@ export default function RemindersPage() {
   useEffect(() => {
     fetchReminders();
     fetchStats();
-  }, [filter]);
+  }, [statusFilter]);
 
   const handleSnooze = async (id: string, minutes: number) => {
     try {
@@ -380,7 +378,11 @@ export default function RemindersPage() {
     }
   };
 
-  const upcomingCount = (stats.pending || 0) + (stats.snoozed || 0);
+  const handleStatusClick = (status: ReminderStatus) => {
+    setStatusFilter(statusFilter === status ? null : status);
+  };
+
+  const totalCount = stats.pending + stats.snoozed + stats.acknowledged + stats.sent;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
@@ -405,42 +407,65 @@ export default function RemindersPage() {
         {/* Push Notification Permission */}
         <PushPermission className="mb-6" />
 
-        {/* Stats */}
+        {/* Stats - Clickable Filters */}
         <div className="grid grid-cols-4 gap-3 mb-6">
-          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+          <button
+            onClick={() => handleStatusClick('pending')}
+            className={`p-3 rounded-lg border transition-all text-left ${
+              statusFilter === 'pending'
+                ? 'bg-blue-500/30 border-blue-400 ring-2 ring-blue-400/50'
+                : 'bg-blue-500/10 border-blue-500/20 hover:bg-blue-500/20'
+            }`}
+          >
             <div className="text-2xl font-bold text-blue-400">{stats.pending}</div>
             <div className="text-xs text-gray-400">Pending</div>
-          </div>
-          <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+          </button>
+          <button
+            onClick={() => handleStatusClick('snoozed')}
+            className={`p-3 rounded-lg border transition-all text-left ${
+              statusFilter === 'snoozed'
+                ? 'bg-purple-500/30 border-purple-400 ring-2 ring-purple-400/50'
+                : 'bg-purple-500/10 border-purple-500/20 hover:bg-purple-500/20'
+            }`}
+          >
             <div className="text-2xl font-bold text-purple-400">{stats.snoozed}</div>
             <div className="text-xs text-gray-400">Snoozed</div>
-          </div>
-          <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+          </button>
+          <button
+            onClick={() => handleStatusClick('acknowledged')}
+            className={`p-3 rounded-lg border transition-all text-left ${
+              statusFilter === 'acknowledged'
+                ? 'bg-green-500/30 border-green-400 ring-2 ring-green-400/50'
+                : 'bg-green-500/10 border-green-500/20 hover:bg-green-500/20'
+            }`}
+          >
             <div className="text-2xl font-bold text-green-400">{stats.acknowledged}</div>
             <div className="text-xs text-gray-400">Done</div>
-          </div>
-          <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+          </button>
+          <button
+            onClick={() => handleStatusClick('sent')}
+            className={`p-3 rounded-lg border transition-all text-left ${
+              statusFilter === 'sent'
+                ? 'bg-yellow-500/30 border-yellow-400 ring-2 ring-yellow-400/50'
+                : 'bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/20'
+            }`}
+          >
             <div className="text-2xl font-bold text-yellow-400">{stats.sent}</div>
             <div className="text-xs text-gray-400">Sent</div>
-          </div>
+          </button>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex gap-2 mb-6">
-          {(['upcoming', 'past', 'all'] as const).map((f) => (
+        {/* Show All button when filtered */}
+        {statusFilter && (
+          <div className="mb-4">
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filter === f
-                  ? 'bg-white/10 text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
+              onClick={() => setStatusFilter(null)}
+              className="text-sm text-gray-400 hover:text-white transition-colors"
             >
-              {f === 'upcoming' ? `Upcoming (${upcomingCount})` : f.charAt(0).toUpperCase() + f.slice(1)}
+              Show all ({totalCount})
             </button>
-          ))}
-        </div>
+          </div>
+        )}
 
         {/* List */}
         {loading ? (

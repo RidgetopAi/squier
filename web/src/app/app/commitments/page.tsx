@@ -97,16 +97,20 @@ function CommitmentCard({
 export default function CommitmentsPage() {
   const [commitments, setCommitments] = useState<Commitment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'active' | 'completed' | 'all'>('active');
+  const [statusFilter, setStatusFilter] = useState<CommitmentStatus | null>('open');
   const [stats, setStats] = useState<Record<CommitmentStatus, number>>({ open: 0, in_progress: 0, completed: 0, canceled: 0, snoozed: 0 });
 
   const fetchCommitments = async () => {
     try {
-      const includeResolved = filter === 'completed' || filter === 'all';
-      const status = filter === 'completed' ? 'completed' : undefined;
       const params = new URLSearchParams();
-      if (includeResolved) params.set('include_resolved', 'true');
-      if (status) params.set('status', status);
+      if (statusFilter) {
+        params.set('status', statusFilter);
+        if (statusFilter === 'completed' || statusFilter === 'canceled') {
+          params.set('include_resolved', 'true');
+        }
+      } else {
+        params.set('include_resolved', 'true');
+      }
 
       const res = await fetch(`${API_URL}/api/commitments?${params}`);
       const data = await res.json();
@@ -131,7 +135,7 @@ export default function CommitmentsPage() {
   useEffect(() => {
     fetchCommitments();
     fetchStats();
-  }, [filter]);
+  }, [statusFilter]);
 
   const handleResolve = async (id: string, resolutionType: string) => {
     try {
@@ -165,7 +169,11 @@ export default function CommitmentsPage() {
     }
   };
 
-  const activeCount = stats.open + stats.in_progress + stats.snoozed;
+  const handleStatusClick = (status: CommitmentStatus) => {
+    setStatusFilter(statusFilter === status ? null : status);
+  };
+
+  const totalCount = stats.open + stats.in_progress + stats.completed + stats.snoozed;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
@@ -176,42 +184,65 @@ export default function CommitmentsPage() {
           <p className="text-gray-400">Track your goals, tasks, and promises</p>
         </div>
 
-        {/* Stats */}
+        {/* Stats - Clickable Filters */}
         <div className="grid grid-cols-4 gap-3 mb-6">
-          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+          <button
+            onClick={() => handleStatusClick('open')}
+            className={`p-3 rounded-lg border transition-all text-left ${
+              statusFilter === 'open'
+                ? 'bg-blue-500/30 border-blue-400 ring-2 ring-blue-400/50'
+                : 'bg-blue-500/10 border-blue-500/20 hover:bg-blue-500/20'
+            }`}
+          >
             <div className="text-2xl font-bold text-blue-400">{stats.open}</div>
             <div className="text-xs text-gray-400">Open</div>
-          </div>
-          <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+          </button>
+          <button
+            onClick={() => handleStatusClick('in_progress')}
+            className={`p-3 rounded-lg border transition-all text-left ${
+              statusFilter === 'in_progress'
+                ? 'bg-yellow-500/30 border-yellow-400 ring-2 ring-yellow-400/50'
+                : 'bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/20'
+            }`}
+          >
             <div className="text-2xl font-bold text-yellow-400">{stats.in_progress}</div>
             <div className="text-xs text-gray-400">In Progress</div>
-          </div>
-          <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+          </button>
+          <button
+            onClick={() => handleStatusClick('completed')}
+            className={`p-3 rounded-lg border transition-all text-left ${
+              statusFilter === 'completed'
+                ? 'bg-green-500/30 border-green-400 ring-2 ring-green-400/50'
+                : 'bg-green-500/10 border-green-500/20 hover:bg-green-500/20'
+            }`}
+          >
             <div className="text-2xl font-bold text-green-400">{stats.completed}</div>
             <div className="text-xs text-gray-400">Completed</div>
-          </div>
-          <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+          </button>
+          <button
+            onClick={() => handleStatusClick('snoozed')}
+            className={`p-3 rounded-lg border transition-all text-left ${
+              statusFilter === 'snoozed'
+                ? 'bg-purple-500/30 border-purple-400 ring-2 ring-purple-400/50'
+                : 'bg-purple-500/10 border-purple-500/20 hover:bg-purple-500/20'
+            }`}
+          >
             <div className="text-2xl font-bold text-purple-400">{stats.snoozed}</div>
             <div className="text-xs text-gray-400">Snoozed</div>
-          </div>
+          </button>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex gap-2 mb-6">
-          {(['active', 'completed', 'all'] as const).map((f) => (
+        {/* Show All button when filtered */}
+        {statusFilter && (
+          <div className="mb-4">
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filter === f
-                  ? 'bg-white/10 text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
+              onClick={() => setStatusFilter(null)}
+              className="text-sm text-gray-400 hover:text-white transition-colors"
             >
-              {f === 'active' ? `Active (${activeCount})` : f.charAt(0).toUpperCase() + f.slice(1)}
+              Show all ({totalCount})
             </button>
-          ))}
-        </div>
+          </div>
+        )}
 
         {/* List */}
         {loading ? (
