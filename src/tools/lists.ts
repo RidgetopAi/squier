@@ -194,8 +194,8 @@ interface ListAllListsArgs {
   category?: string;
 }
 
-async function handleListAllLists(args: ListAllListsArgs): Promise<string> {
-  const { limit = 20, list_type, category } = args;
+async function handleListAllLists(args: ListAllListsArgs | null): Promise<string> {
+  const { limit = 20, list_type, category } = args ?? {};
 
   try {
     const lists = await listLists({ limit, list_type, category });

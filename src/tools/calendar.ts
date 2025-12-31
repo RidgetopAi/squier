@@ -22,8 +22,8 @@ interface GetUpcomingEventsArgs {
   include_completed?: boolean;
 }
 
-async function handleGetUpcomingEvents(args: GetUpcomingEventsArgs): Promise<string> {
-  const { days = 7, limit = 50, include_completed = false } = args;
+async function handleGetUpcomingEvents(args: GetUpcomingEventsArgs | null): Promise<string> {
+  const { days = 7, limit = 50, include_completed = false } = args ?? {};
 
   try {
     // Calculate date range
@@ -107,8 +107,8 @@ interface GetTodaysEventsArgs {
   include_overdue?: boolean;
 }
 
-async function handleGetTodaysEvents(args: GetTodaysEventsArgs): Promise<string> {
-  const { include_overdue = true } = args;
+async function handleGetTodaysEvents(args: GetTodaysEventsArgs | null): Promise<string> {
+  const { include_overdue = true } = args ?? {};
 
   try {
     // Today's range
@@ -220,8 +220,8 @@ interface GetEventsDueSoonArgs {
   within_hours?: number;
 }
 
-async function handleGetEventsDueSoon(args: GetEventsDueSoonArgs): Promise<string> {
-  const { within_hours = 24 } = args;
+async function handleGetEventsDueSoon(args: GetEventsDueSoonArgs | null): Promise<string> {
+  const { within_hours = 24 } = args ?? {};
 
   try {
     const withinMinutes = within_hours * 60;

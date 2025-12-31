@@ -90,7 +90,7 @@ interface GetPinnedNotesArgs {
   // No arguments needed
 }
 
-async function handleGetPinnedNotes(_args: GetPinnedNotesArgs): Promise<string> {
+async function handleGetPinnedNotes(_args: GetPinnedNotesArgs | null): Promise<string> {
   try {
     const notes = await getPinnedNotes();
 
@@ -143,8 +143,8 @@ interface ListRecentNotesArgs {
   category?: string;
 }
 
-async function handleListRecentNotes(args: ListRecentNotesArgs): Promise<string> {
-  const { limit = 10, category } = args;
+async function handleListRecentNotes(args: ListRecentNotesArgs | null): Promise<string> {
+  const { limit = 10, category } = args ?? {};
 
   try {
     const notes = await listNotes({ limit, category });
