@@ -320,86 +320,47 @@ async function getEntitiesForMemories(memoryIds: string[]): Promise<EntitySummar
 
 /**
  * Format memories as markdown
+ *
+ * Design philosophy: Present context as genuine knowledge, not database output.
+ * - No scores, similarity percentages, or technical metadata
+ * - Clean, readable format that feels like natural recall
+ * - Summaries first (who they are), then relevant specifics
  */
 function formatMarkdown(
   memories: ScoredMemory[],
   entities: EntitySummary[],
   summaries: SummarySnapshot[],
-  profile: ContextProfile,
-  query?: string
+  _profile: ContextProfile,
+  _query?: string
 ): string {
   const lines: string[] = [];
 
-  lines.push('# Memory Context');
-  lines.push('');
-  lines.push(`**Profile**: ${profile.name}`);
-  lines.push(`**Generated**: ${new Date().toISOString()}`);
-  if (query) {
-    lines.push(`**Query**: "${query}"`);
-  }
-  lines.push('');
-
-  // Living Summaries section (first, as overview)
+  // Living Summaries - present as knowledge about the person
   if (summaries.length > 0) {
-    lines.push('## Living Summaries');
+    lines.push('# What You Know About Them');
     lines.push('');
     for (const s of summaries) {
-      lines.push(`### ${s.category.charAt(0).toUpperCase() + s.category.slice(1)}`);
-      lines.push(s.content);
+      const title = s.category.charAt(0).toUpperCase() + s.category.slice(1);
+      lines.push(`**${title}**: ${s.content}`);
       lines.push('');
     }
   }
 
-  if (memories.length === 0) {
-    lines.push('No memories match the current criteria.');
-    return lines.join('\n');
-  }
+  // Combine all memories, already sorted by relevance
+  const allMemories = [...memories];
 
-  // Group by category
-  const highSalience = memories.filter((m) => m.category === 'high_salience');
-  const relevant = memories.filter((m) => m.category === 'relevant');
-  const recent = memories.filter((m) => m.category === 'recent');
-
-  if (highSalience.length > 0) {
-    lines.push('## Important Memories');
+  if (allMemories.length > 0) {
+    lines.push('# Relevant Context');
     lines.push('');
-    for (const m of highSalience) {
-      const date = new Date(m.created_at).toLocaleDateString();
-      const score = (m.final_score * 100).toFixed(0);
-      lines.push(`- [${date}] (score: ${score}%) ${m.content}`);
+    for (const m of allMemories) {
+      // Simple bullet, no scores or dates - just the knowledge
+      lines.push(`- ${m.content}`);
     }
     lines.push('');
   }
 
-  if (relevant.length > 0) {
-    lines.push('## Relevant Memories');
-    lines.push('');
-    for (const m of relevant) {
-      const date = new Date(m.created_at).toLocaleDateString();
-      const score = (m.final_score * 100).toFixed(0);
-      const sim = m.similarity ? ` | similarity: ${(m.similarity * 100).toFixed(0)}%` : '';
-      lines.push(`- [${date}] (score: ${score}%${sim}) ${m.content}`);
-    }
-    lines.push('');
-  }
-
-  if (recent.length > 0) {
-    lines.push('## Recent Memories');
-    lines.push('');
-    for (const m of recent) {
-      const date = new Date(m.created_at).toLocaleDateString();
-      const score = (m.final_score * 100).toFixed(0);
-      lines.push(`- [${date}] (score: ${score}%) ${m.content}`);
-    }
-    lines.push('');
-  }
-
-  // Entity summary section
+  // Key people and things they've mentioned
   if (entities.length > 0) {
-    lines.push('## Key Entities');
-    lines.push('');
-
-    // Group by type
     const byType: Record<string, EntitySummary[]> = {};
     for (const e of entities) {
       const arr = byType[e.type] ?? [];
@@ -407,17 +368,20 @@ function formatMarkdown(
       byType[e.type] = arr;
     }
 
-    // Display people first, then projects, then others
+    const parts: string[] = [];
     const typeOrder = ['person', 'project', 'organization', 'place', 'concept'];
     for (const type of typeOrder) {
       const typeEntities = byType[type];
       if (typeEntities && typeEntities.length > 0) {
-        const label = type.charAt(0).toUpperCase() + type.slice(1) + 's';
         const names = typeEntities.map((e) => e.name).join(', ');
-        lines.push(`- **${label}**: ${names}`);
+        parts.push(`${type}s: ${names}`);
       }
     }
-    lines.push('');
+
+    if (parts.length > 0) {
+      lines.push(`**People & things mentioned**: ${parts.join(' | ')}`);
+      lines.push('');
+    }
   }
 
   return lines.join('\n');
