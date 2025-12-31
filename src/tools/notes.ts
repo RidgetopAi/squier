@@ -59,7 +59,7 @@ async function handleSearchNotes(args: SearchNotesArgs): Promise<string> {
 export const searchNotesToolName = 'search_notes';
 
 export const searchNotesToolDescription =
-  'Search the user\'s notes using semantic similarity. Use this when the user asks about their notes, wants to find information they wrote down, or when you need to reference something they noted previously. Returns matching notes with content and metadata.';
+  'Search the user\'s notes using semantic similarity. Use this when the user asks to FIND a specific note or topic (e.g., "find my notes about cooking", "what did I write about the project?"). Do NOT use for listing all notes - use list_recent_notes instead.';
 
 export const searchNotesToolParameters = {
   type: 'object',
@@ -180,7 +180,7 @@ async function handleListRecentNotes(args: ListRecentNotesArgs): Promise<string>
 export const listRecentNotesToolName = 'list_recent_notes';
 
 export const listRecentNotesToolDescription =
-  'Get the user\'s recent notes. Use this when the user asks to see their notes, wants a list of what they\'ve written, or asks "what are my notes?" without a specific search query.';
+  'Get ALL of the user\'s notes (most recent first). Use this when the user asks "what notes do I have?", "show me my notes", "list my notes", or wants to see all their notes. This is the DEFAULT tool for viewing notes - use search_notes only when looking for a specific topic.';
 
 export const listRecentNotesToolParameters = {
   type: 'object',

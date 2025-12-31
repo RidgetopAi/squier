@@ -65,7 +65,7 @@ async function handleSearchLists(args: SearchListsArgs): Promise<string> {
 export const searchListsToolName = 'search_lists';
 
 export const searchListsToolDescription =
-  'Search the user\'s lists by name or description using semantic similarity. Use this when the user asks about a specific list or wants to find lists related to a topic. Returns list metadata (not items - use get_list_items for that).';
+  'Search for a specific list by name or topic. Use when user asks to FIND a particular list (e.g., "find my grocery list", "do I have a list about movies?"). Do NOT use for listing all lists - use list_all_lists instead.';
 
 export const searchListsToolParameters = {
   type: 'object',
@@ -232,7 +232,7 @@ async function handleListAllLists(args: ListAllListsArgs): Promise<string> {
 export const listAllListsToolName = 'list_all_lists';
 
 export const listAllListsToolDescription =
-  'Get all of the user\'s lists. Use this when the user asks "what lists do I have?" or wants to see all their lists. Returns list names and metadata (not items - use get_list_items for that).';
+  'Get ALL of the user\'s lists. Use this when the user asks "what lists do I have?", "show me my lists", or wants to see all their lists. This is the DEFAULT tool for viewing lists. Returns list names only - use get_list_items to see items in a specific list.';
 
 export const listAllListsToolParameters = {
   type: 'object',
