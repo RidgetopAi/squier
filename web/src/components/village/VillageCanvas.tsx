@@ -13,7 +13,12 @@ import { BuildingsLayer } from './Building';
 import { RoadsLayer } from './Road';
 import { VillageGround } from './DistrictGround';
 import { DISTRICT_EDGE_COLORS } from './HexTile';
+import { preloadAllBuildingModels } from '@/lib/village/models';
 import type { VillageBuilding, VillageLayout, VillageDistrict } from '@/lib/types/village';
+
+// Preload all building GLTF models at module load time
+// This starts fetching models before the scene renders
+preloadAllBuildingModels();
 
 // ============================================
 // SIMPLE GROUND (for loading/empty states)

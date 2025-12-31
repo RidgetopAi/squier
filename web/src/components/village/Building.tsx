@@ -3,35 +3,13 @@
 // ============================================
 // SQUIRE WEB - VILLAGE BUILDING COMPONENT
 // ============================================
-// Renders a memory as a 3D building
+// Renders a memory as a 3D building using GLTF models
 
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import type { Mesh } from 'three';
-import type { VillageBuilding, BuildingType } from '@/lib/types/village';
-
-// ============================================
-// BUILDING DIMENSIONS BY TYPE
-// ============================================
-
-interface BuildingDimensions {
-  width: number;
-  height: number;
-  depth: number;
-}
-
-/**
- * Building dimensions by type (placeholder - will be replaced with GLTF in Phase 3)
- */
-const BUILDING_DIMENSIONS: Record<BuildingType, BuildingDimensions> = {
-  tavern: { width: 1.2, height: 0.9, depth: 1.2 },
-  library: { width: 1.0, height: 1.4, depth: 0.8 },
-  blacksmith: { width: 1.3, height: 0.8, depth: 1.0 },
-  church: { width: 0.9, height: 1.6, depth: 1.1 },
-  market: { width: 1.4, height: 0.7, depth: 0.9 },
-  barracks: { width: 1.1, height: 1.0, depth: 1.1 },
-  house: { width: 0.8, height: 0.8, depth: 0.8 },
-};
+import type { Group } from 'three';
+import type { VillageBuilding } from '@/lib/types/village';
+import { BuildingModel } from './BuildingModel';
 
 // ============================================
 // BUILDING COMPONENT
@@ -51,7 +29,7 @@ interface BuildingProps {
 }
 
 /**
- * Building component - renders a memory as a 3D building
+ * Building component - renders a memory as a 3D building using GLTF models
  * Scale varies based on salience (0.7 to 1.3x)
  */
 export function Building({
@@ -62,7 +40,7 @@ export function Building({
   onPointerOver,
   onPointerOut,
 }: BuildingProps) {
-  const meshRef = useRef<Mesh>(null);
+  const groupRef = useRef<Group>(null);
 
   // Validate position - skip rendering if invalid
   if (!Number.isFinite(building.position.x) || !Number.isFinite(building.position.z)) {
@@ -73,16 +51,15 @@ export function Building({
   // Calculate scale based on salience (ensure valid number)
   const salience = Number.isFinite(building.salience) ? building.salience : 0.5;
   const baseScale = 0.7 + salience * 0.6; // 0.7 to 1.3
-  const dimensions = BUILDING_DIMENSIONS[building.buildingType] || BUILDING_DIMENSIONS.house;
 
-  // Y position (half height so building sits on ground)
-  const baseY = (dimensions.height * baseScale) / 2;
+  // Base Y position for hover animation
+  const baseY = 0;
 
-  // Animate hover effect
+  // Animate hover effect (lift building slightly)
   useFrame((_, delta) => {
-    if (meshRef.current) {
+    if (groupRef.current) {
       const targetY = hovered || selected ? baseY + 0.15 : baseY;
-      meshRef.current.position.y += (targetY - meshRef.current.position.y) * delta * 8;
+      groupRef.current.position.y += (targetY - groupRef.current.position.y) * delta * 8;
     }
   });
 
@@ -107,40 +84,17 @@ export function Building({
         onClick?.(building);
       }}
     >
-      <mesh
-        ref={meshRef}
-        position={[0, baseY, 0]}
-        castShadow
-        receiveShadow
-      >
-        <boxGeometry
-          args={[
-            dimensions.width * baseScale,
-            dimensions.height * baseScale,
-            dimensions.depth * baseScale,
-          ]}
-        />
-        <meshStandardMaterial
-          color={building.color}
-          emissive={building.color}
+      {/* Animated wrapper for hover lift */}
+      <group ref={groupRef} position={[0, baseY, 0]}>
+        <BuildingModel
+          buildingType={building.buildingType}
+          scale={baseScale}
           emissiveIntensity={emissiveIntensity}
-          roughness={0.7}
-          metalness={0.2}
+          emissiveColor={building.color}
+          castShadow
+          receiveShadow
         />
-      </mesh>
-
-      {/* Roof (simple pyramid for variety) */}
-      <mesh
-        position={[0, baseY + (dimensions.height * baseScale) / 2 + 0.15 * baseScale, 0]}
-        castShadow
-      >
-        <coneGeometry args={[dimensions.width * baseScale * 0.7, 0.4 * baseScale, 4]} />
-        <meshStandardMaterial
-          color="#1e293b" // slate-800
-          roughness={0.8}
-          metalness={0.1}
-        />
-      </mesh>
+      </group>
     </group>
   );
 }
