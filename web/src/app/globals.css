@@ -144,6 +144,13 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+  /* Prevent native pull-to-refresh on iOS PWA */
+  overscroll-behavior-y: contain;
+}
+
+html {
+  /* Prevent native pull-to-refresh on iOS PWA */
+  overscroll-behavior-y: contain;
 }
 
 /* ============================================

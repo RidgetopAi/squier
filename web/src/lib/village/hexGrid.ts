@@ -1,0 +1,229 @@
+// ============================================
+// SQUIRE WEB - HEX GRID UTILITIES
+// ============================================
+// Hex grid math for village layout using axial coordinates
+
+import type { HexCoord, VillagePosition } from '@/lib/types/village';
+
+// ============================================
+// CONSTANTS
+// ============================================
+
+/**
+ * Default hex size (distance from center to corner)
+ */
+export const DEFAULT_HEX_SIZE = 2;
+
+// ============================================
+// COORDINATE CONVERSIONS
+// ============================================
+
+/**
+ * Convert axial hex coordinates to world position
+ * Uses pointy-top hex orientation
+ *
+ * @param coord - Axial hex coordinates (q, r)
+ * @param hexSize - Size of each hex tile
+ * @returns World position (x, z)
+ */
+export function hexToWorld(coord: HexCoord, hexSize: number = DEFAULT_HEX_SIZE): VillagePosition {
+  const { q, r } = coord;
+
+  // Pointy-top hex layout
+  const x = hexSize * (Math.sqrt(3) * q + (Math.sqrt(3) / 2) * r);
+  const z = hexSize * ((3 / 2) * r);
+
+  return { x, z };
+}
+
+/**
+ * Convert world position to nearest hex coordinates
+ *
+ * @param position - World position (x, z)
+ * @param hexSize - Size of each hex tile
+ * @returns Nearest axial hex coordinates
+ */
+export function worldToHex(position: VillagePosition, hexSize: number = DEFAULT_HEX_SIZE): HexCoord {
+  const { x, z } = position;
+
+  // Convert to fractional hex coordinates
+  const q = ((Math.sqrt(3) / 3) * x - (1 / 3) * z) / hexSize;
+  const r = ((2 / 3) * z) / hexSize;
+
+  // Round to nearest hex
+  return hexRound(q, r);
+}
+
+/**
+ * Round fractional hex coordinates to nearest integer hex
+ * Uses cube coordinate rounding for accuracy
+ */
+function hexRound(q: number, r: number): HexCoord {
+  // Convert to cube coordinates
+  const s = -q - r;
+
+  let rq = Math.round(q);
+  let rr = Math.round(r);
+  let rs = Math.round(s);
+
+  const qDiff = Math.abs(rq - q);
+  const rDiff = Math.abs(rr - r);
+  const sDiff = Math.abs(rs - s);
+
+  // Cube coordinates must sum to 0
+  if (qDiff > rDiff && qDiff > sDiff) {
+    rq = -rr - rs;
+  } else if (rDiff > sDiff) {
+    rr = -rq - rs;
+  }
+
+  return { q: rq, r: rr };
+}
+
+// ============================================
+// SPIRAL PLACEMENT
+// ============================================
+
+/**
+ * Generate hex positions in a spiral pattern from center
+ * Used to place buildings within a district
+ *
+ * @param count - Number of positions to generate
+ * @returns Array of hex coordinates in spiral order
+ */
+export function spiralHexPositions(count: number): HexCoord[] {
+  if (count <= 0) return [];
+
+  const positions: HexCoord[] = [{ q: 0, r: 0 }]; // Start at center
+
+  if (count === 1) return positions;
+
+  // Direction vectors for pointy-top hex (6 directions)
+  const directions: HexCoord[] = [
+    { q: 1, r: 0 },   // East
+    { q: 0, r: 1 },   // Southeast
+    { q: -1, r: 1 },  // Southwest
+    { q: -1, r: 0 },  // West
+    { q: 0, r: -1 },  // Northwest
+    { q: 1, r: -1 },  // Northeast
+  ];
+
+  let current: HexCoord = { q: 0, r: 0 };
+  let ring = 1;
+
+  while (positions.length < count) {
+    // Move to the start of the next ring (East)
+    current = { q: current.q + 1, r: current.r };
+
+    // Walk around the ring
+    for (let side = 0; side < 6 && positions.length < count; side++) {
+      // Number of steps per side equals the ring number
+      for (let step = 0; step < ring && positions.length < count; step++) {
+        // Skip the first step of the first side (we already moved there)
+        if (side === 0 && step === 0) continue;
+
+        // Move in the current direction
+        const dir = directions[(side + 2) % 6]; // Offset by 2 for correct spiral
+        current = { q: current.q + dir.q, r: current.r + dir.r };
+        positions.push({ ...current });
+      }
+    }
+
+    ring++;
+
+    // Safety limit to prevent infinite loops
+    if (ring > 20) break;
+  }
+
+  return positions.slice(0, count);
+}
+
+// ============================================
+// DISTANCE CALCULATIONS
+// ============================================
+
+/**
+ * Calculate hex distance between two coordinates
+ * (Number of hex steps to move from one to another)
+ */
+export function hexDistance(a: HexCoord, b: HexCoord): number {
+  return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
+}
+
+/**
+ * Calculate world distance between two positions
+ */
+export function worldDistance(a: VillagePosition, b: VillagePosition): number {
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  return Math.sqrt(dx * dx + dz * dz);
+}
+
+// ============================================
+// BOUNDS CALCULATIONS
+// ============================================
+
+/**
+ * Calculate bounding box from a list of positions
+ */
+export function calculateBounds(positions: VillagePosition[]): {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+} {
+  if (positions.length === 0) {
+    return { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
+  }
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+
+  for (const pos of positions) {
+    minX = Math.min(minX, pos.x);
+    maxX = Math.max(maxX, pos.x);
+    minZ = Math.min(minZ, pos.z);
+    maxZ = Math.max(maxZ, pos.z);
+  }
+
+  return { minX, maxX, minZ, maxZ };
+}
+
+// ============================================
+// HEX OFFSET UTILITIES
+// ============================================
+
+/**
+ * Add two hex coordinates together
+ */
+export function hexAdd(a: HexCoord, b: HexCoord): HexCoord {
+  return { q: a.q + b.q, r: a.r + b.r };
+}
+
+/**
+ * Scale hex coordinate by a factor
+ */
+export function hexScale(coord: HexCoord, factor: number): HexCoord {
+  return {
+    q: Math.round(coord.q * factor),
+    r: Math.round(coord.r * factor),
+  };
+}
+
+/**
+ * Get neighboring hex coordinates
+ */
+export function hexNeighbors(coord: HexCoord): HexCoord[] {
+  const directions: HexCoord[] = [
+    { q: 1, r: 0 },
+    { q: 0, r: 1 },
+    { q: -1, r: 1 },
+    { q: -1, r: 0 },
+    { q: 0, r: -1 },
+    { q: 1, r: -1 },
+  ];
+
+  return directions.map(dir => hexAdd(coord, dir));
+}

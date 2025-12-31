@@ -129,7 +129,7 @@ export function MessageList({ messages, isLoading = false }: MessageListProps) {
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-y-auto p-4 space-y-4 relative"
+      className="flex-1 overflow-y-auto p-4 space-y-4 relative overscroll-y-contain"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
