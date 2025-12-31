@@ -1298,6 +1298,7 @@ async function extractIdentityRealTime(
 
   // Extended list of common words that could be mistakenly matched as names
   // CRITICAL: "confident" was matched as a name causing identity replacement bug
+  // CRITICAL: "originally" was matched from "I'm originally from Indiana"
   const commonWords = [
     // States/feelings
     'here', 'there', 'ready', 'done', 'back', 'home', 'good', 'fine', 'great',
@@ -1315,6 +1316,11 @@ async function extractIdentityRealTime(
     'planning', 'learning', 'starting', 'finishing', 'waiting', 'running',
     // Time/situation
     'late', 'early', 'still', 'almost', 'nearly', 'finally', 'currently',
+    // Origin/location words (bug fix: "I'm originally from" matched as name)
+    'originally', 'actually', 'basically', 'probably', 'definitely', 'certainly',
+    'usually', 'normally', 'typically', 'generally', 'mostly', 'mainly',
+    // Transition/filler words that start sentences
+    'honestly', 'frankly', 'seriously', 'literally', 'apparently', 'supposedly',
   ];
 
   for (const pattern of namePatterns) {
