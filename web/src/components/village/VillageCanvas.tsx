@@ -12,7 +12,8 @@ import { useVillageLayout, useVillageSelection } from '@/lib/hooks/useVillageLay
 import { BuildingsLayer } from './Building';
 import { RoadsLayer } from './Road';
 import { VillageGround } from './DistrictGround';
-import type { VillageBuilding, VillageLayout } from '@/lib/types/village';
+import { DISTRICT_EDGE_COLORS } from './HexTile';
+import type { VillageBuilding, VillageLayout, VillageDistrict } from '@/lib/types/village';
 
 // ============================================
 // SIMPLE GROUND (for loading/empty states)
@@ -42,30 +43,87 @@ function SimpleGround() {
 function Lighting() {
   return (
     <>
-      <ambientLight intensity={0.4} />
+      {/* Ambient base - slightly warm */}
+      <ambientLight intensity={0.25} color="#ffe4c4" />
+
+      {/* Main sun light - golden hour angle from southwest */}
       <directionalLight
-        position={[15, 20, 15]}
-        intensity={1.2}
+        position={[-20, 25, -15]}
+        intensity={1.4}
+        color="#ffeedd"
         castShadow
         shadow-mapSize={[2048, 2048]}
-        shadow-camera-far={80}
-        shadow-camera-left={-30}
-        shadow-camera-right={30}
-        shadow-camera-top={30}
-        shadow-camera-bottom={-30}
+        shadow-camera-far={100}
+        shadow-camera-left={-40}
+        shadow-camera-right={40}
+        shadow-camera-top={40}
+        shadow-camera-bottom={-40}
+        shadow-bias={-0.0001}
+        shadow-radius={2}
       />
-      {/* Fill light from opposite side */}
+
+      {/* Cool fill light from opposite side (simulates sky bounce) */}
       <directionalLight
-        position={[-10, 8, -10]}
-        intensity={0.3}
+        position={[15, 12, 20]}
+        intensity={0.25}
+        color="#b4d4ff"
       />
-      {/* Slight color tint for atmosphere */}
-      <hemisphereLight
-        color="#7c3aed"
-        groundColor="#1e1b4b"
+
+      {/* Rim light from behind for depth */}
+      <directionalLight
+        position={[0, 8, -25]}
         intensity={0.15}
+        color="#ffd4a8"
+      />
+
+      {/* Hemisphere light - purple sky, warm ground for fantasy feel */}
+      <hemisphereLight
+        color="#8b5cf6"
+        groundColor="#2d1f47"
+        intensity={0.35}
+      />
+
+      {/* Subtle point light at world center for warmth */}
+      <pointLight
+        position={[0, 6, 0]}
+        intensity={0.3}
+        color="#ffa500"
+        distance={30}
+        decay={2}
       />
     </>
+  );
+}
+
+// ============================================
+// DISTRICT ACCENT LIGHTS
+// ============================================
+
+interface DistrictLightsProps {
+  districts: VillageDistrict[];
+}
+
+/**
+ * Colored point lights at each district center
+ * Creates localized atmosphere matching district theme
+ */
+function DistrictLights({ districts }: DistrictLightsProps) {
+  return (
+    <group>
+      {districts.map((district) => {
+        const color = DISTRICT_EDGE_COLORS[district.category];
+        return (
+          <pointLight
+            key={`district-light-${district.category}`}
+            position={[district.center.x, 4, district.center.z]}
+            intensity={0.4}
+            color={color}
+            distance={15}
+            decay={2}
+          />
+        );
+      })}
+    </group>
   );
 }
 
@@ -176,6 +234,9 @@ function VillageContent({
     <>
       <CameraRig bounds={layout.bounds} />
       <Lighting />
+
+      {/* District accent lights */}
+      <DistrictLights districts={layout.districts} />
 
       {/* District hex tile ground */}
       <VillageGround layout={layout} />
