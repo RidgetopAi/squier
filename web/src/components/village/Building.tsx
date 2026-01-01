@@ -6,7 +6,7 @@
 // Renders a memory as a 3D building using GLTF models
 // P3-T7: Performance optimizations with memoization and LOD
 
-import React, { memo, useRef, useMemo, useCallback, Suspense, useState, useLayoutEffect } from 'react';
+import React, { memo, useRef, useMemo, useCallback, Suspense, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
@@ -35,43 +35,32 @@ function SimpleBuilding({ scale, color }: SimpleBuildingProps) {
   );
 }
 
-// Native THREE.LOD component - bypasses drei's Detailed which may have bugs
-interface NativeLODProps {
-  distances: number[];
-  children: React.ReactNode;
+// Simple distance-based LOD using React state instead of THREE.LOD
+// More reliable than THREE.LOD which has ordering/timing issues with React
+interface DistanceLODProps {
+  threshold: number;
+  near: React.ReactNode;
+  far: React.ReactNode;
 }
 
-function NativeLOD({ distances, children }: NativeLODProps) {
-  const lodRef = useRef<THREE.LOD>(null);
+function DistanceLOD({ threshold, near, far }: DistanceLODProps) {
+  const groupRef = useRef<THREE.Group>(null);
   const { camera } = useThree();
+  const [isNear, setIsNear] = useState(true);
   
-  // Convert children to array
-  const childArray = React.Children.toArray(children);
-  
-  useLayoutEffect(() => {
-    const lod = lodRef.current;
-    if (!lod) return;
-    
-    // Clear existing levels
-    lod.levels.length = 0;
-    
-    // Add levels using THREE.LOD.addLevel which handles sorting
-    lod.children.forEach((child, index) => {
-      const distance = distances[index] ?? 0;
-      // addLevel properly sorts by distance
-      lod.addLevel(child, distance);
-    });
-  }, [distances, childArray.length]);
-  
-  // Update LOD each frame
   useFrame(() => {
-    lodRef.current?.update(camera);
+    if (!groupRef.current) return;
+    const distance = camera.position.distanceTo(groupRef.current.getWorldPosition(new THREE.Vector3()));
+    const shouldBeNear = distance < threshold;
+    if (shouldBeNear !== isNear) {
+      setIsNear(shouldBeNear);
+    }
   });
   
   return (
-    <lOD ref={lodRef}>
-      {children}
-    </lOD>
+    <group ref={groupRef}>
+      {isNear ? near : far}
+    </group>
   );
 }
 
@@ -204,23 +193,23 @@ export const Building = memo(function Building({
       
       {/* Animated wrapper for hover lift */}
       <group ref={groupRef} position={[0, baseY, 0]}>
-        {/* Suspense wraps the LOD - NativeLOD bypasses drei's buggy Detailed */}
-        <Suspense fallback={<SimpleBuilding scale={baseScale} color={building.color} />}>
-          {/* LOD: child[0] at distance 0 (near), child[1] at distance 40 (far) */}
-          <NativeLOD distances={[0, 40]}>
-            {/* Near: Full GLTF model (shown when camera < 40 units) */}
-            <BuildingModel
-              buildingType={building.buildingType}
-              scale={baseScale}
-              emissiveIntensity={emissiveIntensity}
-              emissiveColor={building.color}
-              castShadow
-              receiveShadow
-            />
-            {/* Far: Simple box geometry (shown when camera >= 40 units) */}
-            <SimpleBuilding scale={baseScale} color={building.color} />
-          </NativeLOD>
-        </Suspense>
+        {/* Distance-based LOD: GLTF when close, simple box when far */}
+        <DistanceLOD
+          threshold={40}
+          near={
+            <Suspense fallback={<SimpleBuilding scale={baseScale} color={building.color} />}>
+              <BuildingModel
+                buildingType={building.buildingType}
+                scale={baseScale}
+                emissiveIntensity={emissiveIntensity}
+                emissiveColor={building.color}
+                castShadow
+                receiveShadow
+              />
+            </Suspense>
+          }
+          far={<SimpleBuilding scale={baseScale} color={building.color} />}
+        />
       </group>
     </group>
   );
