@@ -5,7 +5,8 @@
 // ============================================
 // Main 3D scene content for Memory Village
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo, useRef, useEffect } from 'react';
+import { useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Html } from '@react-three/drei';
 import { useVillageLayout, useVillageSelection } from '@/lib/hooks/useVillageLayout';
 import { useCameraMode } from '@/lib/stores';
@@ -163,58 +164,92 @@ interface CameraRigProps {
   onBuildingInteract?: (building: VillageBuilding) => void;
 }
 
+// Memoize initial position to prevent object recreation
+const useCameraCenter = (bounds: VillageLayout['bounds']) => {
+  return useMemo(() => {
+    const centerX = (bounds.minX + bounds.maxX) / 2;
+    const centerZ = (bounds.minZ + bounds.maxZ) / 2;
+    const rangeX = bounds.maxX - bounds.minX;
+    const rangeZ = bounds.maxZ - bounds.minZ;
+    const maxRange = Math.max(rangeX, rangeZ, 20);
+    const cameraDistance = maxRange * 0.8;
+    return { centerX, centerZ, cameraDistance };
+  }, [bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ]);
+};
+
 function CameraRig({ bounds, mode, buildings, onBuildingProximity, onBuildingInteract }: CameraRigProps) {
-  // Calculate camera position based on layout bounds
-  const centerX = (bounds.minX + bounds.maxX) / 2;
-  const centerZ = (bounds.minZ + bounds.maxZ) / 2;
-  const rangeX = bounds.maxX - bounds.minX;
-  const rangeZ = bounds.maxZ - bounds.minZ;
-  const maxRange = Math.max(rangeX, rangeZ, 20);
+  const { centerX, centerZ, cameraDistance } = useCameraCenter(bounds);
+  const initialPositionRef = useRef({ x: centerX, z: centerZ });
 
-  // Position camera to see entire village (fly mode)
-  const cameraDistance = maxRange * 0.8;
+  // Update ref when bounds change (but don't trigger re-render)
+  initialPositionRef.current = { x: centerX, z: centerZ };
 
-  if (mode === 'walk') {
-    return (
-      <>
-        <PerspectiveCamera
-          makeDefault
-          fov={70}
-          near={0.1}
-          far={500}
-        />
+  return (
+    <>
+      {/* Single camera - no position prop, controls manage position */}
+      <PerspectiveCamera
+        makeDefault
+        fov={mode === 'walk' ? 70 : 50}
+        near={0.1}
+        far={500}
+      />
+      {mode === 'walk' ? (
         <FirstPersonControls
           bounds={bounds}
           buildings={buildings}
           onBuildingProximity={onBuildingProximity}
           onBuildingInteract={onBuildingInteract}
-          initialPosition={{ x: centerX, z: centerZ }}
+          initialPosition={initialPositionRef.current}
+          flyModePosition={{
+            x: centerX + cameraDistance,
+            y: cameraDistance * 0.7,
+            z: centerZ + cameraDistance
+          }}
         />
-      </>
-    );
-  }
-
-  // Fly mode (default OrbitControls)
-  return (
-    <>
-      <PerspectiveCamera
-        makeDefault
-        position={[centerX + cameraDistance, cameraDistance * 0.7, centerZ + cameraDistance]}
-        fov={50}
-        near={0.1}
-        far={500}
-      />
-      <OrbitControls
-        target={[centerX, 0, centerZ]}
-        enableDamping
-        dampingFactor={0.05}
-        minDistance={5}
-        maxDistance={100}
-        maxPolarAngle={Math.PI / 2.1}
-        minPolarAngle={0.2}
-        zoomSpeed={0.3}
-      />
+      ) : (
+        <FlyModeControls
+          centerX={centerX}
+          centerZ={centerZ}
+          cameraDistance={cameraDistance}
+        />
+      )}
     </>
+  );
+}
+
+// Separate component for fly mode to handle initial positioning
+function FlyModeControls({ centerX, centerZ, cameraDistance }: {
+  centerX: number;
+  centerZ: number;
+  cameraDistance: number;
+}) {
+  const { camera } = useThree();
+  const initializedRef = useRef(false);
+
+  // Set initial fly position only once per mount
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    camera.position.set(
+      centerX + cameraDistance,
+      cameraDistance * 0.7,
+      centerZ + cameraDistance
+    );
+    camera.lookAt(centerX, 0, centerZ);
+  }, [camera, centerX, centerZ, cameraDistance]);
+
+  return (
+    <OrbitControls
+      target={[centerX, 0, centerZ]}
+      enableDamping
+      dampingFactor={0.05}
+      minDistance={5}
+      maxDistance={100}
+      maxPolarAngle={Math.PI / 2.1}
+      minPolarAngle={0.2}
+      zoomSpeed={0.3}
+    />
   );
 }
 

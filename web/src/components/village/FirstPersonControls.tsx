@@ -242,6 +242,7 @@ export interface FirstPersonControlsProps {
   onBuildingProximity?: (building: VillageBuilding | null) => void;
   onBuildingInteract?: (building: VillageBuilding) => void;
   initialPosition?: { x: number; z: number };
+  flyModePosition?: { x: number; y: number; z: number };
 }
 
 export function FirstPersonControls({
@@ -250,6 +251,7 @@ export function FirstPersonControls({
   onBuildingProximity,
   onBuildingInteract,
   initialPosition,
+  flyModePosition,
 }: FirstPersonControlsProps) {
   const controlsRef = useRef<ElementRef<typeof PointerLockControls>>(null);
   const { camera } = useThree();
@@ -257,15 +259,19 @@ export function FirstPersonControls({
   const keyboard = useKeyboardState();
 
   // Set initial camera position (only once on mount)
-  // Uses saved position if returning from fly mode, otherwise center of village
   useEffect(() => {
+    const centerX = initialPosition?.x ?? (bounds.minX + bounds.maxX) / 2;
+    const centerZ = initialPosition?.z ?? (bounds.minZ + bounds.maxZ) / 2;
+
     if (lastWalkPosition) {
-      // Returning from fly mode - restore saved position
+      // Returning from fly mode - restore saved walk position
       camera.position.set(lastWalkPosition.x, EYE_HEIGHT, lastWalkPosition.z);
+    } else if (flyModePosition && camera.position.y > EYE_HEIGHT + 1) {
+      // Coming from fly mode (camera is high up) - move to center at ground level
+      camera.position.set(centerX, EYE_HEIGHT, centerZ);
+      camera.lookAt(centerX, EYE_HEIGHT, centerZ - 10);
     } else {
-      // First time entering walk mode - start at center
-      const centerX = initialPosition?.x ?? (bounds.minX + bounds.maxX) / 2;
-      const centerZ = initialPosition?.z ?? (bounds.minZ + bounds.maxZ) / 2;
+      // First load or already at ground level - use center
       camera.position.set(centerX, EYE_HEIGHT, centerZ);
       camera.lookAt(centerX, EYE_HEIGHT, centerZ - 10);
     }
