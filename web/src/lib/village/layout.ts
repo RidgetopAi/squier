@@ -29,6 +29,7 @@ import {
 } from '@/lib/types/village';
 import {
   hexToWorld,
+  worldToHex,
   hexAdd,
   spiralHexPositions,
   calculateBounds,
@@ -454,6 +455,45 @@ const DISTRICT_PROPS: Record<MemoryCategory, PropType[]> = {
 };
 
 /**
+ * Generate valid hex tile set from layout (same logic as VillageGround)
+ */
+function generateValidHexTiles(layout: VillageLayout, hexSize: number = DEFAULT_HEX_SIZE): Set<string> {
+  const validTiles = new Set<string>();
+  const padding = 1; // Same as VillageGround
+  
+  // Add tiles for each district
+  for (const district of layout.districts) {
+    const { minX, maxX, minZ, maxZ } = district.bounds;
+    const minHex = worldToHex({ x: minX, z: minZ }, hexSize);
+    const maxHex = worldToHex({ x: maxX, z: maxZ }, hexSize);
+    
+    for (let q = minHex.q - padding; q <= maxHex.q + padding; q++) {
+      for (let r = minHex.r - padding; r <= maxHex.r + padding; r++) {
+        const worldPos = hexToWorld({ q, r }, hexSize);
+        const inBounds =
+          worldPos.x >= minX - hexSize * 2 &&
+          worldPos.x <= maxX + hexSize * 2 &&
+          worldPos.z >= minZ - hexSize * 2 &&
+          worldPos.z <= maxZ + hexSize * 2;
+        if (inBounds) {
+          validTiles.add(`${q},${r}`);
+        }
+      }
+    }
+  }
+  
+  // Add center connector tiles
+  const centerRange = 3;
+  for (let q = -centerRange; q <= centerRange; q++) {
+    for (let r = -centerRange; r <= centerRange; r++) {
+      validTiles.add(`${q},${r}`);
+    }
+  }
+  
+  return validTiles;
+}
+
+/**
  * Generate props around buildings and at district edges
  */
 export function generateProps(
@@ -463,6 +503,10 @@ export function generateProps(
   const { propsPerBuilding = 2, treeDensity = 0.3 } = options;
   const props: VillageProp[] = [];
   const occupiedPositions = new Set<string>();
+  const hexSize = DEFAULT_HEX_SIZE;
+  
+  // Generate valid hex tiles to constrain prop placement
+  const validHexTiles = generateValidHexTiles(layout, hexSize);
 
   // Track building positions to avoid overlap
   layout.buildings.forEach((b) => {
@@ -477,6 +521,12 @@ export function generateProps(
   const addOccupied = (x: number, z: number): void => {
     occupiedPositions.add(`${Math.round(x)},${Math.round(z)}`);
   };
+  
+  // Check if position is on valid hex tile
+  const isOnValidTile = (x: number, z: number): boolean => {
+    const hex = worldToHex({ x, z }, hexSize);
+    return validHexTiles.has(`${hex.q},${hex.r}`);
+  };
 
   // 1. Add decoration props near each building (district-specific)
   layout.buildings.forEach((building, buildingIdx) => {
@@ -486,7 +536,7 @@ export function generateProps(
       const x = building.position.x + Math.cos(angle) * distance;
       const z = building.position.z + Math.sin(angle) * distance;
 
-      if (isOccupied(x, z)) continue;
+      if (isOccupied(x, z) || !isOnValidTile(x, z)) continue;
 
       // Use district-specific props for variety
       const districtProps = DISTRICT_PROPS[building.category] ?? DECOR_TYPES;
@@ -531,7 +581,7 @@ export function generateProps(
           z = minZ - padding + Math.random() * (maxZ - minZ + padding * 2);
       }
 
-      if (isOccupied(x, z)) continue;
+      if (isOccupied(x, z) || !isOnValidTile(x, z)) continue;
 
       props.push({
         id: `tree-${district.category}-${i}`,
@@ -550,7 +600,7 @@ export function generateProps(
     const x = layout.bounds.minX + Math.random() * (layout.bounds.maxX - layout.bounds.minX);
     const z = layout.bounds.minZ + Math.random() * (layout.bounds.maxZ - layout.bounds.minZ);
 
-    if (isOccupied(x, z)) continue;
+    if (isOccupied(x, z) || !isOnValidTile(x, z)) continue;
 
     props.push({
       id: `rock-${i}`,

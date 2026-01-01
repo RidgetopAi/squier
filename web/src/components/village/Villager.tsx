@@ -44,11 +44,14 @@ const VillagerFigure = memo(function VillagerFigure({
   const groupRef = useRef<THREE.Group>(null);
   const colors = VILLAGER_COLORS[villager.villagerType];
 
-  // Gentle idle animation - subtle bobbing
+  // Idle animation - visible sine bobbing
   useFrame((state) => {
     if (!groupRef.current) return;
     const t = state.clock.elapsedTime;
-    groupRef.current.position.y = Math.sin(t * 2 + villager.position.x) * 0.02;
+    // Phase offset based on position for variety
+    const phase = villager.position.x * 0.5 + villager.position.z * 0.3;
+    // Bob up and down with visible amplitude
+    groupRef.current.position.y = Math.sin(t * 1.5 + phase) * 0.08;
   });
 
   const handleClick = () => onClick?.(villager);
