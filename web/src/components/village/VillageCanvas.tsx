@@ -14,8 +14,9 @@ import { RoadsLayer } from './Road';
 import { VillageGround } from './DistrictGround';
 import { DISTRICT_EDGE_COLORS } from './HexTile';
 import { PropsLayer } from './InstancedProps';
+import { VillagersLayer } from './Villager';
 import { preloadAllBuildingModels, preloadAllPropModels } from '@/lib/village/models';
-import type { VillageBuilding, VillageLayout, VillageDistrict, VillageProp } from '@/lib/types/village';
+import type { VillageBuilding, VillageLayout, VillageDistrict, VillageProp, VillageVillager } from '@/lib/types/village';
 
 // Preload all GLTF models at module load time
 // This starts fetching models before the scene renders
@@ -239,6 +240,7 @@ function LoadingState() {
 interface VillageContentProps {
   layout: VillageLayout;
   props: VillageProp[];
+  villagers: VillageVillager[];
   selectedBuildingId: string | null;
   hoveredBuildingId: string | null;
   onBuildingClick: (building: VillageBuilding) => void;
@@ -248,6 +250,7 @@ interface VillageContentProps {
 function VillageContent({
   layout,
   props,
+  villagers,
   selectedBuildingId,
   hoveredBuildingId,
   onBuildingClick,
@@ -273,6 +276,9 @@ function VillageContent({
 
       {/* Props (barrels, trees, rocks - between roads and buildings) */}
       <PropsLayer props={props} />
+
+      {/* Villagers (entities as characters) */}
+      <VillagersLayer villagers={villagers} />
 
       {/* Buildings */}
       <BuildingsLayer
@@ -303,7 +309,7 @@ export interface VillageCanvasProps {
  */
 export function VillageCanvas({ onBuildingSelect, onBuildingHover }: VillageCanvasProps) {
   // Fetch layout data
-  const { layout, props, isLoading, isError, isEmpty } = useVillageLayout({
+  const { layout, props, villagers, isLoading, isError, isEmpty } = useVillageLayout({
     maxBuildings: 120,
     minSalience: 0,
   });
@@ -376,6 +382,7 @@ export function VillageCanvas({ onBuildingSelect, onBuildingHover }: VillageCanv
     <VillageContent
       layout={layout}
       props={props}
+      villagers={villagers}
       selectedBuildingId={selection.buildingId}
       hoveredBuildingId={selection.hoveredBuildingId}
       onBuildingClick={handleBuildingClick}

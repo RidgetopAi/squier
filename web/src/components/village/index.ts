@@ -8,3 +8,4 @@ export { HexTile, HexTilesLayer, DISTRICT_GROUND_COLORS, DISTRICT_EDGE_COLORS } 
 export { DistrictGround, VillageGround } from './DistrictGround';
 export { PropsLayer, OptimizedPropsLayer, InstancedPropGroup } from './InstancedProps';
 export type { PropPlacement } from './InstancedProps';
+export { VillagersLayer, VillagerFigure } from './Villager';

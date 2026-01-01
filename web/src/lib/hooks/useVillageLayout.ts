@@ -7,8 +7,8 @@
 
 import { useMemo } from 'react';
 import { useGraphVisualization } from './useGraphData';
-import { buildVillageLayout, createEmptyLayout, generateProps } from '@/lib/village';
-import type { VillageLayout, VillageLayoutOptions, VillageProp } from '@/lib/types/village';
+import { buildVillageLayout, createEmptyLayout, generateProps, generateVillagers } from '@/lib/village';
+import type { VillageLayout, VillageLayoutOptions, VillageProp, VillageVillager } from '@/lib/types/village';
 
 // ============================================
 // HOOK OPTIONS
@@ -30,6 +30,8 @@ export interface UseVillageLayoutResult {
   layout: VillageLayout;
   /** Generated props for decoration */
   props: VillageProp[];
+  /** Generated villagers from entities */
+  villagers: VillageVillager[];
   /** Whether the layout is currently loading */
   isLoading: boolean;
   /** Whether there's an error */
@@ -117,12 +119,19 @@ export function useVillageLayout(
     return generateProps(layout);
   }, [layout]);
 
+  // Generate villagers from entities (memoized)
+  const villagers = useMemo(() => {
+    if (!graphData || layout.buildings.length === 0) return [];
+    return generateVillagers(graphData, layout);
+  }, [graphData, layout]);
+
   // Determine if empty (after loading)
   const isEmpty = !isLoading && !isError && layout.buildings.length === 0;
 
   return {
     layout,
     props,
+    villagers,
     isLoading,
     isError,
     error: error as Error | null,

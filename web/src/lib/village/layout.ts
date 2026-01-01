@@ -16,6 +16,9 @@ import type {
   VillagePosition,
   VillageProp,
   VillageLayoutWithProps,
+  VillageVillager,
+  VillagerType,
+  VillageLayoutFull,
 } from '@/lib/types/village';
 import type { PropType } from '@/lib/village/models';
 import {
@@ -559,4 +562,124 @@ export function buildVillageLayoutWithProps(
   const layout = buildVillageLayout(graphData, options);
   const props = generateProps(layout);
   return { ...layout, props };
+}
+
+// ============================================
+// VILLAGER GENERATION (Phase 5)
+// ============================================
+
+const ENTITY_TYPE_TO_VILLAGER: Record<string, VillagerType> = {
+  person: 'peasant',
+  organization: 'merchant',
+  concept: 'scholar',
+  location: 'guard',
+  event: 'peasant',
+  object: 'merchant',
+};
+
+/**
+ * Generate villagers from entity nodes
+ * Places villagers near buildings they're connected to
+ */
+export function generateVillagers(
+  graphData: ForceGraphData,
+  layout: VillageLayout
+): VillageVillager[] {
+  const villagers: VillageVillager[] = [];
+  
+  // Get entity nodes
+  const entityNodes = graphData.nodes.filter(node => node.type === 'entity');
+  
+  // Build lookup for memory -> building
+  const buildingByMemoryId = new Map(layout.buildings.map(b => [b.memoryId, b]));
+  
+  // Build lookup for entity -> connected memories (from edges)
+  const entityToMemories = new Map<string, string[]>();
+  
+  graphData.links.forEach(link => {
+    const sourceId = typeof link.source === 'string' ? link.source : (link.source as { id: string }).id;
+    const targetId = typeof link.target === 'string' ? link.target : (link.target as { id: string }).id;
+    
+    // Find edges connecting entities to memories
+    const sourceNode = graphData.nodes.find(n => n.id === sourceId);
+    const targetNode = graphData.nodes.find(n => n.id === targetId);
+    
+    if (sourceNode?.type === 'entity' && targetNode?.type === 'memory') {
+      const list = entityToMemories.get(sourceId) ?? [];
+      list.push(targetId);
+      entityToMemories.set(sourceId, list);
+    } else if (targetNode?.type === 'entity' && sourceNode?.type === 'memory') {
+      const list = entityToMemories.get(targetId) ?? [];
+      list.push(sourceId);
+      entityToMemories.set(targetId, list);
+    }
+  });
+  
+  // Place villagers near their most connected building
+  entityNodes.forEach((entity, idx) => {
+    const connectedMemoryIds = entityToMemories.get(entity.id) ?? [];
+    
+    // Find the building with the most connections to this entity
+    let bestBuilding: VillageBuilding | null = null;
+    let maxConnections = 0;
+    
+    const buildingConnections = new Map<string, number>();
+    connectedMemoryIds.forEach(memId => {
+      const building = buildingByMemoryId.get(memId);
+      if (building) {
+        const count = (buildingConnections.get(building.id) ?? 0) + 1;
+        buildingConnections.set(building.id, count);
+        if (count > maxConnections) {
+          maxConnections = count;
+          bestBuilding = building;
+        }
+      }
+    });
+    
+    // If no connected building, place near a random building
+    if (!bestBuilding && layout.buildings.length > 0) {
+      bestBuilding = layout.buildings[idx % layout.buildings.length];
+    }
+    
+    if (!bestBuilding) return;
+    
+    // Position villager offset from building
+    const angle = (idx * 137.5 * Math.PI / 180); // Golden angle for distribution
+    const distance = 2 + (idx % 3) * 0.5;
+    const position: VillagePosition = {
+      x: bestBuilding.position.x + Math.cos(angle) * distance,
+      z: bestBuilding.position.z + Math.sin(angle) * distance,
+    };
+    
+    // Determine villager type from entity type
+    const entityType = (entity.attributes?.entity_type as string) ?? 'person';
+    const villagerType = ENTITY_TYPE_TO_VILLAGER[entityType] ?? 'peasant';
+    
+    villagers.push({
+      id: `villager-${entity.id}`,
+      entityId: entity.id,
+      name: entity.label,
+      entityType,
+      villagerType,
+      position,
+      rotation: Math.random() * Math.PI * 2,
+      nearBuildingId: bestBuilding.id,
+    });
+  });
+  
+  // Cap villagers for performance (max 30)
+  return villagers.slice(0, 30);
+}
+
+/**
+ * Build complete village layout with props and villagers
+ */
+export function buildVillageLayoutFull(
+  graphData: ForceGraphData,
+  options: VillageLayoutOptions = {}
+): VillageLayoutFull {
+  const layout = buildVillageLayout(graphData, options);
+  const props = generateProps(layout);
+  const villagers = generateVillagers(graphData, layout);
+  return { ...layout, props, villagers };
 }

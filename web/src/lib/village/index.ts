@@ -25,6 +25,8 @@ export {
   getConnectedRoads,
   generateProps,
   buildVillageLayoutWithProps,
+  generateVillagers,
+  buildVillageLayoutFull,
 } from './layout';
 
 // GLTF model utilities (Phase 3)

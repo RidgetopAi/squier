@@ -248,6 +248,36 @@ export interface VillageLayoutWithProps extends VillageLayout {
   props: VillageProp[];
 }
 
+// ============================================
+// VILLAGER TYPES (Phase 5)
+// ============================================
+
+/**
+ * Villager types for entity representation
+ */
+export type VillagerType = 'peasant' | 'merchant' | 'scholar' | 'guard';
+
+/**
+ * A villager in the village (represents an entity)
+ */
+export interface VillageVillager {
+  id: string;
+  entityId: string;
+  name: string;
+  entityType: string;
+  villagerType: VillagerType;
+  position: VillagePosition;
+  rotation: number;
+  nearBuildingId: string | null;
+}
+
+/**
+ * Extended village layout with props and villagers
+ */
+export interface VillageLayoutFull extends VillageLayoutWithProps {
+  villagers: VillageVillager[];
+}
+
 export const CATEGORY_KEYWORDS: Record<MemoryCategory, string[]> = {
   social: [
     'friend', 'family', 'people', 'relationship', 'conversation',
