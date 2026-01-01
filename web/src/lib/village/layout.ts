@@ -562,16 +562,16 @@ export function generateProps(
   // Shuffle for random distribution (seeded by layout size for consistency)
   const shuffled = [...validTileArray].sort(() => Math.random() - 0.5);
   
-  // Place trees on outer tiles (those not occupied by buildings)
+  // Place trees on valid tiles (no offset - place at hex centers only)
   const numTrees = Math.floor(layout.buildings.length * treeDensity * 1.5);
   let treeCount = 0;
   for (let i = 0; i < shuffled.length && treeCount < numTrees; i++) {
     const pos = shuffled[i];
-    // Add small random offset within the hex
-    const x = pos.x + (Math.random() - 0.5) * hexSize * 0.8;
-    const z = pos.z + (Math.random() - 0.5) * hexSize * 0.8;
+    // Use hex center position directly - no offset that could push off tile
+    const x = pos.x;
+    const z = pos.z;
     
-    if (isOccupied(x, z)) continue;
+    if (isOccupied(x, z) || !isOnValidTile(x, z)) continue;
     
     props.push({
       id: `tree-${treeCount}`,
@@ -584,15 +584,15 @@ export function generateProps(
     treeCount++;
   }
 
-  // 3. Add scattered rocks on valid tiles
+  // 3. Add scattered rocks on valid tiles (hex centers only)
   const numRocks = Math.floor(layout.buildings.length * 0.15);
   let rockCount = 0;
   for (let i = shuffled.length - 1; i >= 0 && rockCount < numRocks; i--) {
     const pos = shuffled[i];
-    const x = pos.x + (Math.random() - 0.5) * hexSize * 0.6;
-    const z = pos.z + (Math.random() - 0.5) * hexSize * 0.6;
+    const x = pos.x;
+    const z = pos.z;
 
-    if (isOccupied(x, z)) continue;
+    if (isOccupied(x, z) || !isOnValidTile(x, z)) continue;
 
     props.push({
       id: `rock-${rockCount}`,
