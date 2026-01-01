@@ -311,7 +311,7 @@ export async function deleteList(id: string): Promise<void> {
 /**
  * List lists with filtering options
  */
-export async function listLists(options: ListListsOptions = {}): Promise<List[]> {
+export async function listLists(options: ListListsOptions = {}): Promise<(List & { item_count: number; completed_count: number })[]> {
   const {
     limit = 50,
     offset = 0,
@@ -327,44 +327,59 @@ export async function listLists(options: ListListsOptions = {}): Promise<List[]>
   let paramIndex = 1;
 
   if (!include_archived) {
-    conditions.push('archived_at IS NULL');
+    conditions.push('l.archived_at IS NULL');
   }
 
   if (list_type) {
-    conditions.push(`list_type = $${paramIndex}`);
+    conditions.push(`l.list_type = $${paramIndex}`);
     params.push(list_type);
     paramIndex++;
   }
 
   if (category) {
-    conditions.push(`category = $${paramIndex}`);
+    conditions.push(`l.category = $${paramIndex}`);
     params.push(category);
     paramIndex++;
   }
 
   if (entity_id) {
-    conditions.push(`primary_entity_id = $${paramIndex}`);
+    conditions.push(`l.primary_entity_id = $${paramIndex}`);
     params.push(entity_id);
     paramIndex++;
   }
 
   if (is_pinned !== undefined) {
-    conditions.push(`is_pinned = $${paramIndex}`);
+    conditions.push(`l.is_pinned = $${paramIndex}`);
     params.push(is_pinned);
     paramIndex++;
   }
 
-  let query = 'SELECT * FROM lists';
+  let query = `
+    SELECT l.*,
+      COALESCE(counts.item_count, 0)::int AS item_count,
+      COALESCE(counts.completed_count, 0)::int AS completed_count
+    FROM lists l
+    LEFT JOIN (
+      SELECT
+        list_id,
+        COUNT(*) AS item_count,
+        COUNT(*) FILTER (WHERE is_completed = TRUE) AS completed_count
+      FROM list_items
+      WHERE archived_at IS NULL
+      GROUP BY list_id
+    ) counts ON counts.list_id = l.id
+  `;
+
   if (conditions.length > 0) {
     query += ' WHERE ' + conditions.join(' AND ');
   }
 
-  query += ' ORDER BY is_pinned DESC, updated_at DESC';
+  query += ' ORDER BY l.is_pinned DESC, l.updated_at DESC';
   query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
   params.push(limit, offset);
 
   const result = await pool.query(query, params);
-  return result.rows as List[];
+  return result.rows as (List & { item_count: number; completed_count: number })[];
 }
 
 /**

@@ -49,7 +49,8 @@ export async function searchNotes(query: string, limit = 20): Promise<Note[]> {
  * Get pinned notes
  */
 export async function fetchPinnedNotes(): Promise<Note[]> {
-  return apiGet<Note[]>('/api/notes/pinned');
+  const response = await apiGet<{ notes: Note[] }>('/api/notes/pinned');
+  return response.notes;
 }
 
 /**
