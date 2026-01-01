@@ -242,7 +242,6 @@ export interface FirstPersonControlsProps {
   onBuildingProximity?: (building: VillageBuilding | null) => void;
   onBuildingInteract?: (building: VillageBuilding) => void;
   initialPosition?: { x: number; z: number };
-  flyModePosition?: { x: number; y: number; z: number };
 }
 
 export function FirstPersonControls({
@@ -251,7 +250,6 @@ export function FirstPersonControls({
   onBuildingProximity,
   onBuildingInteract,
   initialPosition,
-  flyModePosition,
 }: FirstPersonControlsProps) {
   const controlsRef = useRef<ElementRef<typeof PointerLockControls>>(null);
   const { camera } = useThree();
@@ -266,12 +264,8 @@ export function FirstPersonControls({
     if (lastWalkPosition) {
       // Returning from fly mode - restore saved walk position
       camera.position.set(lastWalkPosition.x, EYE_HEIGHT, lastWalkPosition.z);
-    } else if (flyModePosition && camera.position.y > EYE_HEIGHT + 1) {
-      // Coming from fly mode (camera is high up) - move to center at ground level
-      camera.position.set(centerX, EYE_HEIGHT, centerZ);
-      camera.lookAt(centerX, EYE_HEIGHT, centerZ - 10);
     } else {
-      // First load or already at ground level - use center
+      // First load - start at center
       camera.position.set(centerX, EYE_HEIGHT, centerZ);
       camera.lookAt(centerX, EYE_HEIGHT, centerZ - 10);
     }

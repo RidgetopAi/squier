@@ -6,7 +6,7 @@
 // Main 3D scene content for Memory Village
 
 import { useCallback, useState, useMemo, useRef, useEffect } from 'react';
-import { useThree } from '@react-three/fiber';
+import * as THREE from 'three';
 import { OrbitControls, PerspectiveCamera, Html } from '@react-three/drei';
 import { useVillageLayout, useVillageSelection } from '@/lib/hooks/useVillageLayout';
 import { useCameraMode } from '@/lib/stores';
@@ -179,76 +179,77 @@ const useCameraCenter = (bounds: VillageLayout['bounds']) => {
 
 function CameraRig({ bounds, mode, buildings, onBuildingProximity, onBuildingInteract }: CameraRigProps) {
   const { centerX, centerZ, cameraDistance } = useCameraCenter(bounds);
-  const initialPositionRef = useRef({ x: centerX, z: centerZ });
 
-  // Update ref when bounds change (but don't trigger re-render)
-  initialPositionRef.current = { x: centerX, z: centerZ };
-
-  return (
-    <>
-      {/* Single camera - no position prop, controls manage position */}
-      <PerspectiveCamera
-        makeDefault
-        fov={mode === 'walk' ? 70 : 50}
-        near={0.1}
-        far={500}
-      />
-      {mode === 'walk' ? (
+  if (mode === 'walk') {
+    return (
+      <>
+        <PerspectiveCamera
+          makeDefault
+          fov={70}
+          near={0.1}
+          far={500}
+        />
         <FirstPersonControls
           bounds={bounds}
           buildings={buildings}
           onBuildingProximity={onBuildingProximity}
           onBuildingInteract={onBuildingInteract}
-          initialPosition={initialPositionRef.current}
-          flyModePosition={{
-            x: centerX + cameraDistance,
-            y: cameraDistance * 0.7,
-            z: centerZ + cameraDistance
-          }}
+          initialPosition={{ x: centerX, z: centerZ }}
         />
-      ) : (
-        <FlyModeControls
-          centerX={centerX}
-          centerZ={centerZ}
-          cameraDistance={cameraDistance}
-        />
-      )}
+      </>
+    );
+  }
+
+  // Fly mode - separate camera and controls
+  return (
+    <>
+      <FlyModeCamera
+        centerX={centerX}
+        centerZ={centerZ}
+        cameraDistance={cameraDistance}
+      />
+      <OrbitControls
+        target={[centerX, 0, centerZ]}
+        enableDamping
+        dampingFactor={0.05}
+        minDistance={5}
+        maxDistance={100}
+        maxPolarAngle={Math.PI / 2.1}
+        minPolarAngle={0.2}
+        zoomSpeed={0.3}
+      />
     </>
   );
 }
 
-// Separate component for fly mode to handle initial positioning
-function FlyModeControls({ centerX, centerZ, cameraDistance }: {
+// Fly mode camera - sets position imperatively to avoid prop-based resets
+function FlyModeCamera({ centerX, centerZ, cameraDistance }: {
   centerX: number;
   centerZ: number;
   cameraDistance: number;
 }) {
-  const { camera } = useThree();
-  const initializedRef = useRef(false);
+  const cameraRef = useRef<THREE.PerspectiveCamera>(null);
 
-  // Set initial fly position only once per mount
+  // Set camera position after mount
   useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-
-    camera.position.set(
-      centerX + cameraDistance,
-      cameraDistance * 0.7,
-      centerZ + cameraDistance
-    );
-    camera.lookAt(centerX, 0, centerZ);
-  }, [camera, centerX, centerZ, cameraDistance]);
+    if (cameraRef.current) {
+      cameraRef.current.position.set(
+        centerX + cameraDistance,
+        cameraDistance * 0.7,
+        centerZ + cameraDistance
+      );
+      cameraRef.current.lookAt(centerX, 0, centerZ);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only on mount
 
   return (
-    <OrbitControls
-      target={[centerX, 0, centerZ]}
-      enableDamping
-      dampingFactor={0.05}
-      minDistance={5}
-      maxDistance={100}
-      maxPolarAngle={Math.PI / 2.1}
-      minPolarAngle={0.2}
-      zoomSpeed={0.3}
+    <PerspectiveCamera
+      ref={cameraRef}
+      makeDefault
+      fov={50}
+      near={0.1}
+      far={500}
     />
   );
 }
