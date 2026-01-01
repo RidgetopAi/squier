@@ -51,3 +51,14 @@ export {
   clearPropCache,
 } from './models';
 export type { BuildingModelConfig, PropType, PropModelConfig } from './models';
+
+// Light beam shader utilities (Phase 6: Visual polish)
+export {
+  beamVertexShader,
+  beamFragmentShader,
+  createBeamMaterial,
+  updateBeamTime,
+  updateBeamColor,
+  createOuterGlowMaterial,
+} from './beamShader';
+export type { BeamMaterialOptions } from './beamShader';

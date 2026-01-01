@@ -10,7 +10,7 @@ import { useCallback } from 'react';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { useVillageLayout, useVillageSelection } from '@/lib/hooks/useVillageLayout';
 import { BuildingsLayer } from './Building';
-import { RoadsLayer } from './Road';
+import { LightBeamsLayer } from './LightBeamRoad';
 import { VillageGround } from './DistrictGround';
 import { DISTRICT_EDGE_COLORS } from './HexTile';
 import { PropsLayer } from './InstancedProps';
@@ -265,8 +265,8 @@ function VillageContent({
       {/* District hex tile ground */}
       <VillageGround layout={layout} />
 
-      {/* Roads (render first so buildings appear on top) */}
-      <RoadsLayer
+      {/* Light beam roads (curved, animated, only show for selected building) */}
+      <LightBeamsLayer
         roads={layout.roads}
         selectedBuildingId={selectedBuildingId}
       />
