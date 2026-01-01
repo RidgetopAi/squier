@@ -6,7 +6,7 @@
 // Main 3D scene content for Memory Village
 
 import { useCallback } from 'react';
-import { useThree } from '@react-three/fiber';
+// useThree removed - using frameloop="always" now
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { useVillageLayout, useVillageSelection } from '@/lib/hooks/useVillageLayout';
 import { BuildingsLayer } from './Building';
@@ -158,8 +158,6 @@ interface CameraRigProps {
 }
 
 function CameraRig({ bounds }: CameraRigProps) {
-  const { invalidate } = useThree();
-
   // Calculate camera position based on layout bounds
   const centerX = (bounds.minX + bounds.maxX) / 2;
   const centerZ = (bounds.minZ + bounds.maxZ) / 2;
@@ -187,7 +185,6 @@ function CameraRig({ bounds }: CameraRigProps) {
         maxDistance={100}
         maxPolarAngle={Math.PI / 2.1}
         minPolarAngle={0.2}
-        onChange={() => invalidate()}
       />
     </>
   );

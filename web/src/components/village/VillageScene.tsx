@@ -37,7 +37,7 @@ export default function VillageScene() {
     <div className="relative h-full w-full bg-background" onMouseMove={handleMouseMove}>
       <Canvas
         shadows
-        frameloop="demand"
+        frameloop="always"
         gl={{
           antialias: true,
           alpha: false,

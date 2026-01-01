@@ -442,6 +442,17 @@ const TREE_TYPES: PropType[] = ['tree_a', 'tree_b'];
 const DECOR_TYPES: PropType[] = ['barrel', 'crate_a', 'crate_b', 'sack'];
 const ROCK_TYPES: PropType[] = ['rock_a', 'rock_b'];
 
+// District-specific prop preferences (Phase 5 T7)
+const DISTRICT_PROPS: Record<MemoryCategory, PropType[]> = {
+  social: ['barrel', 'bucket', 'sack'],           // Tavern props
+  learning: ['crate_a', 'crate_b', 'barrel'],     // Books/storage
+  work: ['barrel', 'wheelbarrow', 'crate_a'],     // Workshop props
+  reflection: ['rock_a', 'rock_b', 'bucket'],     // Peaceful props
+  travel: ['crate_a', 'crate_b', 'sack'],         // Market goods
+  health: ['barrel', 'bucket', 'sack'],           // Supplies
+  misc: ['barrel', 'crate_a', 'sack'],            // General
+};
+
 /**
  * Generate props around buildings and at district edges
  */
@@ -467,7 +478,7 @@ export function generateProps(
     occupiedPositions.add(`${Math.round(x)},${Math.round(z)}`);
   };
 
-  // 1. Add decoration props near each building
+  // 1. Add decoration props near each building (district-specific)
   layout.buildings.forEach((building, buildingIdx) => {
     for (let i = 0; i < propsPerBuilding; i++) {
       const angle = (Math.PI * 2 * i) / propsPerBuilding + buildingIdx * 0.5;
@@ -477,7 +488,9 @@ export function generateProps(
 
       if (isOccupied(x, z)) continue;
 
-      const propType = DECOR_TYPES[buildingIdx % DECOR_TYPES.length];
+      // Use district-specific props for variety
+      const districtProps = DISTRICT_PROPS[building.category] ?? DECOR_TYPES;
+      const propType = districtProps[(buildingIdx + i) % districtProps.length];
       props.push({
         id: `prop-${building.id}-${i}`,
         propType,

@@ -42,6 +42,9 @@ interface DistanceLODProps {
   far: React.ReactNode;
 }
 
+// Reusable Vector3 for LOD distance calculations (avoids GC pressure)
+const _worldPos = new THREE.Vector3();
+
 function DistanceLOD({ threshold, near, far }: DistanceLODProps) {
   const groupRef = useRef<THREE.Group>(null);
   const { camera } = useThree();
@@ -49,7 +52,8 @@ function DistanceLOD({ threshold, near, far }: DistanceLODProps) {
   
   useFrame(() => {
     if (!groupRef.current) return;
-    const distance = camera.position.distanceTo(groupRef.current.getWorldPosition(new THREE.Vector3()));
+    groupRef.current.getWorldPosition(_worldPos);
+    const distance = camera.position.distanceTo(_worldPos);
     const shouldBeNear = distance < threshold;
     if (shouldBeNear !== isNear) {
       setIsNear(shouldBeNear);
