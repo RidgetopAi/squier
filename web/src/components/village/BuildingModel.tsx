@@ -6,7 +6,7 @@
 // Loads and renders GLTF models for buildings
 // Uses KayKit Medieval Hexagon Pack models
 
-import { Suspense, useMemo, useEffect, useRef } from 'react';
+import { Suspense, useRef } from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import type { BuildingType } from '@/lib/types/village';
@@ -49,14 +49,14 @@ function GLTFModel({
 }: BuildingModelProps) {
   const config = getModelConfig(buildingType);
   const { scene } = useGLTF(config.path);
+  const clonedSceneRef = useRef<THREE.Object3D | null>(null);
   const materialsRef = useRef<THREE.MeshStandardMaterial[]>([]);
 
-  // Clone the scene ONCE - stable reference prevents re-mounting
-  const clonedScene = useMemo(() => {
+  // Clone scene once and keep stable reference
+  if (!clonedSceneRef.current) {
     const clone = scene.clone(true);
     const materials: THREE.MeshStandardMaterial[] = [];
 
-    // Clone materials once for independence, collect refs for updates
     clone.traverse((child) => {
       if (child instanceof THREE.Mesh && child.material) {
         const material = child.material.clone();
@@ -70,24 +70,22 @@ function GLTFModel({
     });
 
     materialsRef.current = materials;
-    return clone;
-  }, [scene, castShadow, receiveShadow]); // NO emissive deps - stable clone!
+    clonedSceneRef.current = clone;
+  }
 
-  // Update emissive properties imperatively - no re-clone needed
-  useEffect(() => {
-    const color = new THREE.Color(emissiveColor);
-    materialsRef.current.forEach((material) => {
-      material.emissive = color;
-      material.emissiveIntensity = emissiveIntensity;
-    });
-  }, [emissiveIntensity, emissiveColor]);
+  // Update emissive properties imperatively each render
+  const color = new THREE.Color(emissiveColor);
+  materialsRef.current.forEach((material) => {
+    material.emissive = color;
+    material.emissiveIntensity = emissiveIntensity;
+  });
 
   // Apply config transforms
   const finalScale = scale * config.scale;
 
   return (
     <primitive
-      object={clonedScene}
+      object={clonedSceneRef.current}
       scale={[finalScale, finalScale, finalScale]}
       rotation={[0, config.rotationY, 0]}
       position={[0, config.yOffset, 0]}
