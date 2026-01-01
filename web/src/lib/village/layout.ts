@@ -14,7 +14,10 @@ import type {
   BuildingType,
   HexCoord,
   VillagePosition,
+  VillageProp,
+  VillageLayoutWithProps,
 } from '@/lib/types/village';
+import type { PropType } from '@/lib/village/models';
 import {
   DISTRICT_LAYOUT,
   CATEGORY_TO_BUILDING,
@@ -426,4 +429,134 @@ export function getConnectedRoads(
   buildingId: string
 ): VillageRoad[] {
   return layout.roads.filter(r => r.fromId === buildingId || r.toId === buildingId);
+}
+
+// ============================================
+// PROP GENERATION (Phase 5)
+// ============================================
+
+const TREE_TYPES: PropType[] = ['tree_a', 'tree_b'];
+const DECOR_TYPES: PropType[] = ['barrel', 'crate_a', 'crate_b', 'sack'];
+const ROCK_TYPES: PropType[] = ['rock_a', 'rock_b'];
+
+/**
+ * Generate props around buildings and at district edges
+ */
+export function generateProps(
+  layout: VillageLayout,
+  options: { propsPerBuilding?: number; treeDensity?: number } = {}
+): VillageProp[] {
+  const { propsPerBuilding = 2, treeDensity = 0.3 } = options;
+  const props: VillageProp[] = [];
+  const occupiedPositions = new Set<string>();
+
+  // Track building positions to avoid overlap
+  layout.buildings.forEach((b) => {
+    occupiedPositions.add(`${Math.round(b.position.x)},${Math.round(b.position.z)}`);
+  });
+
+  const isOccupied = (x: number, z: number): boolean => {
+    const key = `${Math.round(x)},${Math.round(z)}`;
+    return occupiedPositions.has(key);
+  };
+
+  const addOccupied = (x: number, z: number): void => {
+    occupiedPositions.add(`${Math.round(x)},${Math.round(z)}`);
+  };
+
+  // 1. Add decoration props near each building
+  layout.buildings.forEach((building, buildingIdx) => {
+    for (let i = 0; i < propsPerBuilding; i++) {
+      const angle = (Math.PI * 2 * i) / propsPerBuilding + buildingIdx * 0.5;
+      const distance = 1.5 + Math.random() * 0.5;
+      const x = building.position.x + Math.cos(angle) * distance;
+      const z = building.position.z + Math.sin(angle) * distance;
+
+      if (isOccupied(x, z)) continue;
+
+      const propType = DECOR_TYPES[buildingIdx % DECOR_TYPES.length];
+      props.push({
+        id: `prop-${building.id}-${i}`,
+        propType,
+        position: { x, z },
+        rotation: Math.random() * Math.PI * 2,
+        scale: 0.8 + Math.random() * 0.4,
+      });
+      addOccupied(x, z);
+    }
+  });
+
+  // 2. Add trees around district edges
+  layout.districts.forEach((district, districtIdx) => {
+    const numTrees = Math.floor(district.buildingCount * treeDensity);
+    const { minX, maxX, minZ, maxZ } = district.bounds;
+    const padding = 3;
+
+    for (let i = 0; i < numTrees; i++) {
+      // Place trees at edges of district
+      const edge = i % 4;
+      let x: number, z: number;
+
+      switch (edge) {
+        case 0: // Top edge
+          x = minX - padding + Math.random() * (maxX - minX + padding * 2);
+          z = minZ - padding - Math.random() * 2;
+          break;
+        case 1: // Bottom edge
+          x = minX - padding + Math.random() * (maxX - minX + padding * 2);
+          z = maxZ + padding + Math.random() * 2;
+          break;
+        case 2: // Left edge
+          x = minX - padding - Math.random() * 2;
+          z = minZ - padding + Math.random() * (maxZ - minZ + padding * 2);
+          break;
+        default: // Right edge
+          x = maxX + padding + Math.random() * 2;
+          z = minZ - padding + Math.random() * (maxZ - minZ + padding * 2);
+      }
+
+      if (isOccupied(x, z)) continue;
+
+      props.push({
+        id: `tree-${district.category}-${i}`,
+        propType: TREE_TYPES[(districtIdx + i) % TREE_TYPES.length],
+        position: { x, z },
+        rotation: Math.random() * Math.PI * 2,
+        scale: 0.9 + Math.random() * 0.3,
+      });
+      addOccupied(x, z);
+    }
+  });
+
+  // 3. Add scattered rocks
+  const numRocks = Math.floor(layout.buildings.length * 0.15);
+  for (let i = 0; i < numRocks; i++) {
+    const x = layout.bounds.minX + Math.random() * (layout.bounds.maxX - layout.bounds.minX);
+    const z = layout.bounds.minZ + Math.random() * (layout.bounds.maxZ - layout.bounds.minZ);
+
+    if (isOccupied(x, z)) continue;
+
+    props.push({
+      id: `rock-${i}`,
+      propType: ROCK_TYPES[i % ROCK_TYPES.length],
+      position: { x, z },
+      rotation: Math.random() * Math.PI * 2,
+      scale: 0.7 + Math.random() * 0.6,
+    });
+    addOccupied(x, z);
+  }
+
+  return props;
+}
+
+/**
+ * Build village layout with props included
+ */
+export function buildVillageLayoutWithProps(
+  graphData: ForceGraphData,
+  options: VillageLayoutOptions = {}
+): VillageLayoutWithProps {
+  const layout = buildVillageLayout(graphData, options);
+  const props = generateProps(layout);
+  return { ...layout, props };
 }

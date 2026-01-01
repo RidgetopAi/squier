@@ -23,6 +23,8 @@ export {
   getBuildingById,
   getBuildingByMemoryId,
   getConnectedRoads,
+  generateProps,
+  buildVillageLayoutWithProps,
 } from './layout';
 
 // GLTF model utilities (Phase 3)
@@ -37,5 +39,13 @@ export {
   clearModelCache,
   hasModel,
   FALLBACK_MODEL_PATH,
+  // Phase 5: Props
+  PROPS_BASE_PATH,
+  PROP_MODEL_CONFIGS,
+  ALL_PROP_TYPES,
+  getPropConfig,
+  getPropPath,
+  preloadAllPropModels,
+  clearPropCache,
 } from './models';
-export type { BuildingModelConfig } from './models';
+export type { BuildingModelConfig, PropType, PropModelConfig } from './models';

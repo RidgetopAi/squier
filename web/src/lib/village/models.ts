@@ -17,6 +17,11 @@ import type { BuildingType } from '@/lib/types/village';
 export const MODELS_BASE_PATH = '/models/buildings';
 
 /**
+ * Base path for prop models
+ */
+export const PROPS_BASE_PATH = '/models/props';
+
+/**
  * Model configuration for each building type
  */
 export interface BuildingModelConfig {
@@ -180,3 +185,146 @@ export function hasModel(buildingType: BuildingType): boolean {
  * The Building component will use box geometry as fallback
  */
 export const FALLBACK_MODEL_PATH = null;
+
+// ============================================
+// PROP MODELS
+// ============================================
+
+/**
+ * Prop types available for village decoration
+ */
+export type PropType =
+  | 'barrel'
+  | 'crate_a'
+  | 'crate_b'
+  | 'sack'
+  | 'bucket'
+  | 'wheelbarrow'
+  | 'tree_a'
+  | 'tree_b'
+  | 'rock_a'
+  | 'rock_b';
+
+/**
+ * Prop model configuration
+ */
+export interface PropModelConfig {
+  path: string;
+  scale: number;
+  rotationY: number;
+  yOffset: number;
+}
+
+/**
+ * Prop model configurations
+ */
+export const PROP_MODEL_CONFIGS: Record<PropType, PropModelConfig> = {
+  barrel: {
+    path: `${PROPS_BASE_PATH}/barrel.gltf`,
+    scale: 2.0,
+    rotationY: 0,
+    yOffset: 0,
+  },
+  crate_a: {
+    path: `${PROPS_BASE_PATH}/crate_A_small.gltf`,
+    scale: 2.0,
+    rotationY: 0,
+    yOffset: 0,
+  },
+  crate_b: {
+    path: `${PROPS_BASE_PATH}/crate_B_small.gltf`,
+    scale: 2.0,
+    rotationY: Math.PI / 4,
+    yOffset: 0,
+  },
+  sack: {
+    path: `${PROPS_BASE_PATH}/sack.gltf`,
+    scale: 2.0,
+    rotationY: 0,
+    yOffset: 0,
+  },
+  bucket: {
+    path: `${PROPS_BASE_PATH}/bucket_water.gltf`,
+    scale: 2.0,
+    rotationY: 0,
+    yOffset: 0,
+  },
+  wheelbarrow: {
+    path: `${PROPS_BASE_PATH}/wheelbarrow.gltf`,
+    scale: 2.0,
+    rotationY: Math.PI / 6,
+    yOffset: 0,
+  },
+  tree_a: {
+    path: `${PROPS_BASE_PATH}/tree_single_A.gltf`,
+    scale: 2.5,
+    rotationY: 0,
+    yOffset: 0,
+  },
+  tree_b: {
+    path: `${PROPS_BASE_PATH}/tree_single_B.gltf`,
+    scale: 2.5,
+    rotationY: 0,
+    yOffset: 0,
+  },
+  rock_a: {
+    path: `${PROPS_BASE_PATH}/rock_single_A.gltf`,
+    scale: 2.0,
+    rotationY: 0,
+    yOffset: 0,
+  },
+  rock_b: {
+    path: `${PROPS_BASE_PATH}/rock_single_B.gltf`,
+    scale: 2.0,
+    rotationY: Math.PI / 3,
+    yOffset: 0,
+  },
+};
+
+/**
+ * All prop types for iteration
+ */
+export const ALL_PROP_TYPES: PropType[] = [
+  'barrel',
+  'crate_a',
+  'crate_b',
+  'sack',
+  'bucket',
+  'wheelbarrow',
+  'tree_a',
+  'tree_b',
+  'rock_a',
+  'rock_b',
+];
+
+/**
+ * Get prop model config
+ */
+export function getPropConfig(propType: PropType): PropModelConfig {
+  return PROP_MODEL_CONFIGS[propType];
+}
+
+/**
+ * Get prop model path
+ */
+export function getPropPath(propType: PropType): string {
+  return PROP_MODEL_CONFIGS[propType].path;
+}
+
+/**
+ * Preload all prop models
+ */
+export function preloadAllPropModels(): void {
+  ALL_PROP_TYPES.forEach((type) => {
+    useGLTF.preload(getPropPath(type));
+  });
+}
+
+/**
+ * Clear prop model cache
+ */
+export function clearPropCache(): void {
+  ALL_PROP_TYPES.forEach((type) => {
+    useGLTF.clear(getPropPath(type));
+  });
+}

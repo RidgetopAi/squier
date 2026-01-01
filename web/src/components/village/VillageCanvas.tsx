@@ -13,12 +13,14 @@ import { BuildingsLayer } from './Building';
 import { RoadsLayer } from './Road';
 import { VillageGround } from './DistrictGround';
 import { DISTRICT_EDGE_COLORS } from './HexTile';
-import { preloadAllBuildingModels } from '@/lib/village/models';
-import type { VillageBuilding, VillageLayout, VillageDistrict } from '@/lib/types/village';
+import { PropsLayer } from './InstancedProps';
+import { preloadAllBuildingModels, preloadAllPropModels } from '@/lib/village/models';
+import type { VillageBuilding, VillageLayout, VillageDistrict, VillageProp } from '@/lib/types/village';
 
-// Preload all building GLTF models at module load time
+// Preload all GLTF models at module load time
 // This starts fetching models before the scene renders
 preloadAllBuildingModels();
+preloadAllPropModels();
 
 // ============================================
 // SIMPLE GROUND (for loading/empty states)
@@ -236,6 +238,7 @@ function LoadingState() {
 
 interface VillageContentProps {
   layout: VillageLayout;
+  props: VillageProp[];
   selectedBuildingId: string | null;
   hoveredBuildingId: string | null;
   onBuildingClick: (building: VillageBuilding) => void;
@@ -244,6 +247,7 @@ interface VillageContentProps {
 
 function VillageContent({
   layout,
+  props,
   selectedBuildingId,
   hoveredBuildingId,
   onBuildingClick,
@@ -266,6 +270,9 @@ function VillageContent({
         roads={layout.roads}
         selectedBuildingId={selectedBuildingId}
       />
+
+      {/* Props (barrels, trees, rocks - between roads and buildings) */}
+      <PropsLayer props={props} />
 
       {/* Buildings */}
       <BuildingsLayer
@@ -296,7 +303,7 @@ export interface VillageCanvasProps {
  */
 export function VillageCanvas({ onBuildingSelect, onBuildingHover }: VillageCanvasProps) {
   // Fetch layout data
-  const { layout, isLoading, isError, isEmpty } = useVillageLayout({
+  const { layout, props, isLoading, isError, isEmpty } = useVillageLayout({
     maxBuildings: 120,
     minSalience: 0,
   });
@@ -368,6 +375,7 @@ export function VillageCanvas({ onBuildingSelect, onBuildingHover }: VillageCanv
   return (
     <VillageContent
       layout={layout}
+      props={props}
       selectedBuildingId={selection.buildingId}
       hoveredBuildingId={selection.hoveredBuildingId}
       onBuildingClick={handleBuildingClick}

@@ -3,6 +3,8 @@
 // ============================================
 // Types for Memory Village 3D visualization
 
+import type { PropType } from '@/lib/village/models';
+
 // ============================================
 // BUILDING TYPES
 // ============================================
@@ -224,6 +226,28 @@ export const DISTRICT_LAYOUT: Record<MemoryCategory, HexCoord> = {
 /**
  * Keywords to help classify memories into categories
  */
+// ============================================
+// PROP PLACEMENT TYPES
+// ============================================
+
+/**
+ * A prop placement in the village
+ */
+export interface VillageProp {
+  id: string;
+  propType: PropType;
+  position: VillagePosition;
+  rotation: number;
+  scale: number;
+}
+
+/**
+ * Extended village layout with props
+ */
+export interface VillageLayoutWithProps extends VillageLayout {
+  props: VillageProp[];
+}
+
 export const CATEGORY_KEYWORDS: Record<MemoryCategory, string[]> = {
   social: [
     'friend', 'family', 'people', 'relationship', 'conversation',

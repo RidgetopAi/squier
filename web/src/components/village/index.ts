@@ -6,3 +6,5 @@ export { BuildingModel, BuildingModelWithFallback } from './BuildingModel';
 export { Road, RoadsLayer } from './Road';
 export { HexTile, HexTilesLayer, DISTRICT_GROUND_COLORS, DISTRICT_EDGE_COLORS } from './HexTile';
 export { DistrictGround, VillageGround } from './DistrictGround';
+export { PropsLayer, OptimizedPropsLayer, InstancedPropGroup } from './InstancedProps';
+export type { PropPlacement } from './InstancedProps';
