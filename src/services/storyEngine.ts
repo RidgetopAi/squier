@@ -24,6 +24,16 @@ import {
   flattenNeighborhoods,
   type GraphNode,
 } from './memoryGraph.js';
+import {
+  getCachedStory,
+  cacheStory,
+  getCacheStats as getStoryCacheStats,
+  smartInvalidate as invalidateStoryCache,
+  invalidateAll as clearStoryCache,
+} from './storyCache.js';
+
+// Re-export cache functions for external use
+export { getStoryCacheStats, invalidateStoryCache, clearStoryCache };
 
 // === TYPES ===
 
@@ -347,12 +357,21 @@ async function fetchRelevantSummaries(intent: StoryIntent): Promise<StoryEvidenc
  * Generate a biographical narrative from the memory graph
  *
  * This is the core function of the Story Engine. It:
- * 1. Gathers evidence based on story intent
- * 2. Expands via graph traversal
- * 3. Synthesizes a coherent narrative
+ * 1. Checks cache for existing story
+ * 2. Gathers evidence based on story intent
+ * 3. Expands via graph traversal
+ * 4. Synthesizes a coherent narrative
+ * 5. Caches the result
  */
 export async function generateStory(request: StoryRequest): Promise<StoryResult> {
   const { query, intent } = request;
+
+  // Step 0: Check cache first
+  const cached = getCachedStory(query, intent);
+  if (cached) {
+    console.log(`[StoryEngine] Cache hit - returning cached story`);
+    return cached;
+  }
 
   // Step 1: Gather seed evidence based on intent
   let seedEvidence: StoryEvidenceNode[] = [];
@@ -392,11 +411,16 @@ export async function generateStory(request: StoryRequest): Promise<StoryResult>
   // Step 4: Synthesize narrative
   const narrative = await synthesizeNarrative(query, intent, sortedEvidence);
 
-  return {
+  const result: StoryResult = {
     narrative,
     evidence: sortedEvidence,
     intent,
   };
+
+  // Step 5: Cache the result
+  cacheStory(query, intent, result);
+
+  return result;
 }
 
 /**

@@ -19,6 +19,7 @@ import { createNote } from './notes.js';
 import { createList, addItem, findListByName } from './lists.js';
 import { searchEntities } from './entities.js';
 import { getUserIdentity, setInitialIdentity } from './identity.js';
+import { invalidateStoryCache } from './storyEngine.js';
 
 // === TYPES ===
 
@@ -1087,6 +1088,14 @@ async function extractFromConversation(
         });
 
         memoriesCreated++;
+
+        // Invalidate relevant story cache entries (Phase 4)
+        // Smart invalidation based on memory content
+        try {
+          invalidateStoryCache(mem.content);
+        } catch {
+          // Silent - cache invalidation is non-critical
+        }
 
         // Classify memory for living summaries
         let classifications: CategoryClassification[] = [];
