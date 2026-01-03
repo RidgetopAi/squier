@@ -171,17 +171,21 @@ export function GroundMist({
 }: GroundMistProps) {
   const materialRefs = useRef<THREE.ShaderMaterial[]>([]);
 
-  const uniforms = useMemo(
-    () => ({
-      uTime: { value: 0 },
-      uColor: { value: new THREE.Color(color) },
-      uOpacity: { value: opacity },
-      uCameraPosition: { value: new THREE.Vector3() },
-    }),
-    [color, opacity]
-  );
+  // Create stable uniforms for each layer - NO spreading on every render
+  const layerUniforms = useMemo(() => {
+    const uniformsArray = [];
+    for (let i = 0; i < layers; i++) {
+      uniformsArray.push({
+        uTime: { value: 0 },
+        uColor: { value: new THREE.Color(color) },
+        uOpacity: { value: opacity * (1 - i * 0.2) },
+        uCameraPosition: { value: new THREE.Vector3() },
+      });
+    }
+    return uniformsArray;
+  }, [color, opacity, layers]);
 
-  // Animation
+  // Animation - update uniforms directly via refs
   useFrame(({ clock, camera }) => {
     const time = clock.getElapsedTime();
     materialRefs.current.forEach((mat) => {
@@ -216,10 +220,7 @@ export function GroundMist({
             }}
             vertexShader={mistVertexShader}
             fragmentShader={mistFragmentShader}
-            uniforms={{
-              ...uniforms,
-              uOpacity: { value: opacity * (1 - index * 0.2) }, // Fade upper layers
-            }}
+            uniforms={layerUniforms[index]}
             transparent
             depthWrite={false}
             side={THREE.DoubleSide}
@@ -294,18 +295,35 @@ export function EtherealWisps({
   const groupRef = useRef<THREE.Group>(null);
   const materialsRef = useRef<THREE.ShaderMaterial[]>([]);
 
-  // Generate wisp positions
-  const wispPositions = useMemo(() => {
-    const positions: [number, number, number][] = [];
+  // Generate wisp data (positions, dimensions) - memoized to prevent recalc
+  const wispData = useMemo(() => {
+    const data: Array<{
+      pos: [number, number, number];
+      height: number;
+      width: number;
+    }> = [];
     for (let i = 0; i < count; i++) {
-      positions.push([
-        bounds.minX + Math.random() * (bounds.maxX - bounds.minX),
-        0,
-        bounds.minZ + Math.random() * (bounds.maxZ - bounds.minZ),
-      ]);
+      data.push({
+        pos: [
+          bounds.minX + Math.random() * (bounds.maxX - bounds.minX),
+          0,
+          bounds.minZ + Math.random() * (bounds.maxZ - bounds.minZ),
+        ],
+        height: 4 + Math.random() * 4,
+        width: 0.8 + Math.random() * 0.6,
+      });
     }
-    return positions;
-  }, [count, bounds]);
+    return data;
+  }, [count, bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ]);
+
+  // Create stable uniforms for each wisp - NO spreading
+  const wispUniforms = useMemo(() => {
+    return wispData.map(() => ({
+      uTime: { value: 0 },
+      uColor: { value: new THREE.Color(color) },
+      uOpacity: { value: 0.15 },
+    }));
+  }, [wispData, color]);
 
   // Animation
   useFrame(({ clock }) => {
@@ -317,39 +335,25 @@ export function EtherealWisps({
     });
   });
 
-  const uniforms = useMemo(
-    () => ({
-      uTime: { value: 0 },
-      uColor: { value: new THREE.Color(color) },
-      uOpacity: { value: 0.15 },
-    }),
-    [color]
-  );
-
   return (
     <group ref={groupRef}>
-      {wispPositions.map((pos, index) => {
-        const height = 4 + Math.random() * 4;
-        const width = 0.8 + Math.random() * 0.6;
-
-        return (
-          <mesh key={index} position={pos}>
-            <planeGeometry args={[width, height]} />
-            <shaderMaterial
-              ref={(el) => {
-                if (el) materialsRef.current[index] = el;
-              }}
-              vertexShader={wispVertexShader}
-              fragmentShader={wispFragmentShader}
-              uniforms={{ ...uniforms }}
-              transparent
-              depthWrite={false}
-              side={THREE.DoubleSide}
-              blending={THREE.AdditiveBlending}
-            />
-          </mesh>
-        );
-      })}
+      {wispData.map((wisp, index) => (
+        <mesh key={index} position={wisp.pos}>
+          <planeGeometry args={[wisp.width, wisp.height]} />
+          <shaderMaterial
+            ref={(el) => {
+              if (el) materialsRef.current[index] = el;
+            }}
+            vertexShader={wispVertexShader}
+            fragmentShader={wispFragmentShader}
+            uniforms={wispUniforms[index]}
+            transparent
+            depthWrite={false}
+            side={THREE.DoubleSide}
+            blending={THREE.AdditiveBlending}
+          />
+        </mesh>
+      ))}
     </group>
   );
 }

@@ -6,7 +6,7 @@
 // Renders a memory as a 3D building using GLTF models
 // P3-T7: Performance optimizations with memoization and LOD
 
-import React, { memo, useRef, useMemo, useCallback, Suspense, useState } from 'react';
+import React, { memo, useRef, useMemo, useCallback, Suspense } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Group, Mesh } from 'three';
@@ -34,8 +34,8 @@ function SimpleBuilding({ scale, color }: SimpleBuildingProps) {
   );
 }
 
-// Simple distance-based LOD using React state instead of THREE.LOD
-// More reliable than THREE.LOD which has ordering/timing issues with React
+// Simple distance-based LOD using refs (NO STATE) to avoid re-render cascade
+// Directly toggles THREE.js object visibility instead of React state
 interface DistanceLODProps {
   threshold: number;
   near: React.ReactNode;
@@ -47,22 +47,25 @@ const _worldPos = new THREE.Vector3();
 
 function DistanceLOD({ threshold, near, far }: DistanceLODProps) {
   const groupRef = useRef<THREE.Group>(null);
+  const nearRef = useRef<THREE.Group>(null);
+  const farRef = useRef<THREE.Group>(null);
   const { camera } = useThree();
-  const [isNear, setIsNear] = useState(true);
-  
+
   useFrame(() => {
-    if (!groupRef.current) return;
+    if (!groupRef.current || !nearRef.current || !farRef.current) return;
     groupRef.current.getWorldPosition(_worldPos);
     const distance = camera.position.distanceTo(_worldPos);
     const shouldBeNear = distance < threshold;
-    if (shouldBeNear !== isNear) {
-      setIsNear(shouldBeNear);
-    }
+
+    // Directly set visibility on THREE.js objects - no React re-render!
+    nearRef.current.visible = shouldBeNear;
+    farRef.current.visible = !shouldBeNear;
   });
-  
+
   return (
     <group ref={groupRef}>
-      {isNear ? near : far}
+      <group ref={nearRef}>{near}</group>
+      <group ref={farRef} visible={false}>{far}</group>
     </group>
   );
 }

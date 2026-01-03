@@ -6,7 +6,7 @@
 // Efficient rendering of repeated props using R3F instancing
 // Phase 5: Props, Villagers & Performance
 
-import React, { memo, useMemo, useRef } from 'react';
+import React, { memo, useMemo, useRef, useEffect } from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import type { PropType } from '@/lib/village/models';
@@ -123,6 +123,13 @@ export const InstancedPropGroup = memo(function InstancedPropGroup({
     });
     return mat ?? new THREE.MeshStandardMaterial({ color: '#8B4513' });
   }, [scene]);
+
+  // Cleanup: dispose cloned geometry on unmount
+  useEffect(() => {
+    return () => {
+      geometry?.dispose();
+    };
+  }, [geometry]);
 
   useMemo(() => {
     if (!meshRef.current) return;

@@ -6,7 +6,7 @@
 // Floating dust motes and firefly-like particles
 // for dreamy memory village atmosphere
 
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -168,6 +168,18 @@ export function DreamParticles({
     () => new THREE.BufferAttribute(velocities, 3),
     [velocities]
   );
+
+  // Cleanup: dispose geometry and material on unmount
+  useEffect(() => {
+    return () => {
+      if (pointsRef.current) {
+        pointsRef.current.geometry?.dispose();
+        if (pointsRef.current.material instanceof THREE.Material) {
+          pointsRef.current.material.dispose();
+        }
+      }
+    };
+  }, []);
 
   return (
     <points ref={pointsRef}>
