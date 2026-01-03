@@ -16,7 +16,7 @@ import {
   DepthOfField,
   Noise,
 } from '@react-three/postprocessing';
-import { BlendFunction, KernelSize } from 'postprocessing';
+import { BlendFunction, KernelSize, Resolution } from 'postprocessing';
 import * as THREE from 'three';
 
 // ============================================
@@ -60,10 +60,10 @@ export function DreamEffects({
       <EffectComposer>
         <Bloom
           intensity={bloomIntensity}
-          kernelSize={KernelSize.LARGE}
-          luminanceThreshold={0.4}
-          luminanceSmoothing={0.9}
-          mipmapBlur
+          kernelSize={KernelSize.MEDIUM}
+          luminanceThreshold={0.5}
+          luminanceSmoothing={0.8}
+          resolutionScale={0.5}
         />
         <Vignette
           offset={0.3}
@@ -94,10 +94,10 @@ export function DreamEffects({
       <EffectComposer>
         <Bloom
           intensity={bloomIntensity}
-          kernelSize={KernelSize.LARGE}
-          luminanceThreshold={0.4}
-          luminanceSmoothing={0.9}
-          mipmapBlur
+          kernelSize={KernelSize.MEDIUM}
+          luminanceThreshold={0.5}
+          luminanceSmoothing={0.8}
+          resolutionScale={0.5}
         />
         <Vignette
           offset={0.3}
@@ -124,10 +124,10 @@ export function DreamEffects({
       <EffectComposer>
         <Bloom
           intensity={bloomIntensity}
-          kernelSize={KernelSize.LARGE}
-          luminanceThreshold={0.4}
-          luminanceSmoothing={0.9}
-          mipmapBlur
+          kernelSize={KernelSize.MEDIUM}
+          luminanceThreshold={0.5}
+          luminanceSmoothing={0.8}
+          resolutionScale={0.5}
         />
         <Vignette
           offset={0.3}

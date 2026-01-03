@@ -313,19 +313,19 @@ function VillageContent({
       {/* District accent lights */}
       <DistrictLights districts={layout.districts} />
 
-      {/* Ground mist - swirling fog layers */}
+      {/* Ground mist - swirling fog layers (reduced for performance) */}
       <GroundMist
         size={Math.max(effectBounds.maxX - effectBounds.minX, effectBounds.maxZ - effectBounds.minZ) + 20}
         height={0.3}
-        opacity={0.35}
-        layers={3}
+        opacity={0.3}
+        layers={2}
       />
 
       {/* Ethereal wisps - vertical mist columns */}
-      <EtherealWisps count={12} bounds={effectBounds} />
+      <EtherealWisps count={6} bounds={effectBounds} />
 
-      {/* Floating particles - dust motes and fireflies */}
-      <DreamParticles count={400} bounds={effectBounds} />
+      {/* Floating particles - dust motes and fireflies (reduced for performance) */}
+      <DreamParticles count={150} bounds={effectBounds} />
 
       {/* District hex tile ground */}
       <VillageGround layout={layout} />
@@ -353,10 +353,10 @@ function VillageContent({
 
       {/* Post-processing effects - bloom, vignette, chromatic aberration */}
       <DreamEffects
-        bloomIntensity={0.5}
-        vignetteDarkness={0.45}
-        chromaticOffset={0.0015}
-        enableNoise
+        bloomIntensity={0.45}
+        vignetteDarkness={0.4}
+        chromaticOffset={0.001}
+        enableNoise={false}
       />
     </>
   );

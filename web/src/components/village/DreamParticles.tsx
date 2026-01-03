@@ -28,30 +28,24 @@ const particleVertexShader = /* glsl */ `
   void main() {
     vec3 pos = position;
 
-    // Gentle drift movement
-    pos.x += sin(uTime * 0.3 + aPhase * 6.28) * aVelocity.x * 2.0;
-    pos.y += mod(uTime * aVelocity.y + aPhase * 10.0, 20.0) - 10.0; // Loop upward
-    pos.z += cos(uTime * 0.2 + aPhase * 6.28) * aVelocity.z * 2.0;
-
-    // Swirl around Y axis
-    float swirl = uTime * 0.1 + aPhase * 6.28;
-    float swirlRadius = 0.5;
-    pos.x += sin(swirl) * swirlRadius;
-    pos.z += cos(swirl) * swirlRadius;
+    // Simple drift movement (reduced calculations)
+    float phase = aPhase * 6.28;
+    pos.x += sin(uTime * 0.2 + phase) * aVelocity.x;
+    pos.y += mod(uTime * aVelocity.y + aPhase * 10.0, 18.0) - 4.0;
+    pos.z += cos(uTime * 0.15 + phase) * aVelocity.z;
 
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
 
     // Size attenuation
-    float size = aScale * uPixelRatio * 30.0;
-    gl_PointSize = size * (300.0 / -mvPosition.z);
-    gl_PointSize = clamp(gl_PointSize, 1.0, 50.0);
+    float size = aScale * uPixelRatio * 25.0;
+    gl_PointSize = size * (250.0 / -mvPosition.z);
+    gl_PointSize = clamp(gl_PointSize, 1.0, 40.0);
 
     gl_Position = projectionMatrix * mvPosition;
 
-    // Fade based on height and time
-    float heightFade = smoothstep(-5.0, 0.0, pos.y) * smoothstep(15.0, 5.0, pos.y);
-    float pulse = 0.5 + 0.5 * sin(uTime * 2.0 + aPhase * 6.28);
-    vAlpha = heightFade * (0.3 + pulse * 0.7);
+    // Simple fade based on height
+    float heightFade = smoothstep(-3.0, 1.0, pos.y) * smoothstep(14.0, 6.0, pos.y);
+    vAlpha = heightFade * (0.4 + 0.4 * sin(uTime + phase));
     vPhase = aPhase;
   }
 `;

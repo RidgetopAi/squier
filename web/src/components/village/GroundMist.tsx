@@ -101,13 +101,13 @@ const mistFragmentShader = /* glsl */ `
     return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
   }
 
-  // Fractal Brownian Motion
+  // Fractal Brownian Motion (reduced octaves for performance)
   float fbm(vec3 p) {
     float value = 0.0;
     float amplitude = 0.5;
     float frequency = 1.0;
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 2; i++) {
       value += amplitude * snoise(p * frequency);
       amplitude *= 0.5;
       frequency *= 2.0;
