@@ -351,13 +351,14 @@ function VillageContent({
         onBuildingHover={onBuildingHover}
       />
 
-      {/* Post-processing effects - bloom, vignette, chromatic aberration */}
+      {/* Post-processing disabled for performance testing
       <DreamEffects
         bloomIntensity={0.45}
         vignetteDarkness={0.4}
         chromaticOffset={0.001}
         enableNoise={false}
       />
+      */}
     </>
   );
 }
