@@ -19,6 +19,7 @@ import { VillagersLayer } from './Villager';
 import { FirstPersonControls } from './FirstPersonControls';
 import { GroundMist, EtherealWisps } from './GroundMist';
 import { AuroraSky } from './AuroraSky';
+import { DreamParticles } from './DreamParticles';
 import { DreamEffects } from './DreamEffects';
 import { DreamLighting, DreamAtmosphere } from './DreamLighting';
 import { preloadAllBuildingModels, preloadAllPropModels } from '@/lib/village/models';
@@ -331,6 +332,14 @@ function VillageContent({
         color1="#a855f7"
         color2="#22c55e"
         color3="#7c3aed"
+      />
+
+      {/* Floating particles - small, sparse, drifting through village */}
+      <DreamParticles
+        count={80}
+        bounds={effectBounds}
+        color1="#c4b5fd"
+        color2="#86efac"
       />
 
       {/* District hex tile ground */}

@@ -17,6 +17,7 @@ import * as THREE from 'three';
 const particleVertexShader = /* glsl */ `
   uniform float uTime;
   uniform float uPixelRatio;
+  uniform float uSize;
 
   attribute float aScale;
   attribute float aPhase;
@@ -28,24 +29,24 @@ const particleVertexShader = /* glsl */ `
   void main() {
     vec3 pos = position;
 
-    // Simple drift movement (reduced calculations)
+    // Gentle drift movement
     float phase = aPhase * 6.28;
-    pos.x += sin(uTime * 0.2 + phase) * aVelocity.x;
-    pos.y += mod(uTime * aVelocity.y + aPhase * 10.0, 18.0) - 4.0;
-    pos.z += cos(uTime * 0.15 + phase) * aVelocity.z;
+    pos.x += sin(uTime * 0.15 + phase) * aVelocity.x * 1.5;
+    pos.y += mod(uTime * aVelocity.y * 0.5 + aPhase * 12.0, 14.0) - 2.0;
+    pos.z += cos(uTime * 0.12 + phase) * aVelocity.z * 1.5;
 
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
 
-    // Size attenuation
-    float size = aScale * uPixelRatio * 25.0;
-    gl_PointSize = size * (250.0 / -mvPosition.z);
-    gl_PointSize = clamp(gl_PointSize, 1.0, 40.0);
+    // Size attenuation - smaller particles
+    float size = aScale * uPixelRatio * uSize;
+    gl_PointSize = size * (200.0 / -mvPosition.z);
+    gl_PointSize = clamp(gl_PointSize, 0.5, 20.0);
 
     gl_Position = projectionMatrix * mvPosition;
 
-    // Simple fade based on height
-    float heightFade = smoothstep(-3.0, 1.0, pos.y) * smoothstep(14.0, 6.0, pos.y);
-    vAlpha = heightFade * (0.4 + 0.4 * sin(uTime + phase));
+    // Fade based on height - visible lower in scene
+    float heightFade = smoothstep(-2.0, 0.5, pos.y) * smoothstep(12.0, 4.0, pos.y);
+    vAlpha = heightFade * (0.3 + 0.3 * sin(uTime * 0.8 + phase));
     vPhase = aPhase;
   }
 `;
@@ -86,6 +87,7 @@ interface DreamParticlesProps {
   bounds?: { minX: number; maxX: number; minZ: number; maxZ: number };
   color1?: string;
   color2?: string;
+  size?: number;
 }
 
 export function DreamParticles({
@@ -93,6 +95,7 @@ export function DreamParticles({
   bounds = { minX: -30, maxX: 30, minZ: -30, maxZ: 30 },
   color1 = '#ffd700', // Warm gold
   color2 = '#a78bfa', // Soft violet
+  size = 12, // Smaller default
 }: DreamParticlesProps) {
   const pointsRef = useRef<THREE.Points>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
@@ -143,8 +146,9 @@ export function DreamParticles({
       uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
       uColor1: { value: new THREE.Color(color1) },
       uColor2: { value: new THREE.Color(color2) },
+      uSize: { value: size },
     }),
-    [color1, color2]
+    [color1, color2, size]
   );
 
   // Create buffer attributes with useMemo for stability
