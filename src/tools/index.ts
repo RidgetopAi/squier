@@ -172,6 +172,14 @@ import {
   listRecentNotesToolDescription,
   listRecentNotesToolParameters,
   listRecentNotesToolHandler,
+  createNoteToolName,
+  createNoteToolDescription,
+  createNoteToolParameters,
+  createNoteToolHandler,
+  appendToNoteToolName,
+  appendToNoteToolDescription,
+  appendToNoteToolParameters,
+  appendToNoteToolHandler,
 } from './notes.js';
 
 import {
@@ -187,6 +195,18 @@ import {
   listAllListsToolDescription,
   listAllListsToolParameters,
   listAllListsToolHandler,
+  createListToolName,
+  createListToolDescription,
+  createListToolParameters,
+  createListToolHandler,
+  addListItemToolName,
+  addListItemToolDescription,
+  addListItemToolParameters,
+  addListItemToolHandler,
+  toggleListItemToolName,
+  toggleListItemToolDescription,
+  toggleListItemToolParameters,
+  toggleListItemToolHandler,
 } from './lists.js';
 
 import {
@@ -207,15 +227,22 @@ import {
 // Register time tool
 registerTool(timeToolName, timeToolDescription, timeToolParameters, timeToolHandler);
 
-// Register notes tools
+// Register notes tools (read)
 registerTool(searchNotesToolName, searchNotesToolDescription, searchNotesToolParameters, searchNotesToolHandler);
 registerTool(getPinnedNotesToolName, getPinnedNotesToolDescription, getPinnedNotesToolParameters, getPinnedNotesToolHandler);
 registerTool(listRecentNotesToolName, listRecentNotesToolDescription, listRecentNotesToolParameters, listRecentNotesToolHandler);
+// Register notes tools (write)
+registerTool(createNoteToolName, createNoteToolDescription, createNoteToolParameters, createNoteToolHandler);
+registerTool(appendToNoteToolName, appendToNoteToolDescription, appendToNoteToolParameters, appendToNoteToolHandler);
 
-// Register lists tools
+// Register lists tools (read)
 registerTool(searchListsToolName, searchListsToolDescription, searchListsToolParameters, searchListsToolHandler);
 registerTool(getListItemsToolName, getListItemsToolDescription, getListItemsToolParameters, getListItemsToolHandler);
 registerTool(listAllListsToolName, listAllListsToolDescription, listAllListsToolParameters, listAllListsToolHandler);
+// Register lists tools (write)
+registerTool(createListToolName, createListToolDescription, createListToolParameters, createListToolHandler);
+registerTool(addListItemToolName, addListItemToolDescription, addListItemToolParameters, addListItemToolHandler);
+registerTool(toggleListItemToolName, toggleListItemToolDescription, toggleListItemToolParameters, toggleListItemToolHandler);
 
 // Register calendar tools
 registerTool(getUpcomingEventsToolName, getUpcomingEventsToolDescription, getUpcomingEventsToolParameters, getUpcomingEventsToolHandler);
