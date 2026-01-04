@@ -1,11 +1,15 @@
 /**
  * Calendar Tools
  *
- * LLM tools for reading user calendar events from Google Calendar.
+ * LLM tools for reading and creating user calendar events in Google Calendar.
  * Queries the google_events table (synced from Google) for actual calendar events.
+ * Can create new events directly in Google Calendar.
  */
 
-import { getAllEvents, type GoogleEvent } from '../services/google/events.js';
+import { getAllEvents, pushEventToGoogle, type GoogleEvent } from '../services/google/events.js';
+import { getDefaultPushCalendar } from '../services/google/calendars.js';
+import { listSyncEnabledAccounts } from '../services/google/auth.js';
+import { config } from '../config/index.js';
 import type { ToolHandler } from './types.js';
 
 /**
@@ -281,3 +285,169 @@ export const getEventsDueSoonToolParameters = {
 };
 
 export const getEventsDueSoonToolHandler: ToolHandler<GetEventsDueSoonArgs> = handleGetEventsDueSoon;
+
+// =============================================================================
+// CREATE CALENDAR EVENT TOOL
+// =============================================================================
+
+interface CreateCalendarEventArgs {
+  title: string;
+  start_time: string;
+  duration_minutes?: number;
+  all_day?: boolean;
+  description?: string;
+  location?: string;
+}
+
+/**
+ * Parse a date/time string flexibly
+ * Supports ISO 8601, or date strings like "2026-01-09" with optional time
+ */
+function parseDateTime(input: string, allDay: boolean): Date {
+  // If all-day, just parse the date portion
+  if (allDay) {
+    // Handle YYYY-MM-DD format
+    const dateMatch = input.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (dateMatch) {
+      const [, year, month, day] = dateMatch;
+      return new Date(parseInt(year!, 10), parseInt(month!, 10) - 1, parseInt(day!, 10));
+    }
+  }
+
+  // Try parsing as ISO 8601 first
+  const date = new Date(input);
+  if (!isNaN(date.getTime())) {
+    return date;
+  }
+
+  throw new Error(`Unable to parse date/time: ${input}`);
+}
+
+async function handleCreateCalendarEvent(args: CreateCalendarEventArgs): Promise<string> {
+  const {
+    title,
+    start_time,
+    duration_minutes = 60,
+    all_day = false,
+    description,
+    location
+  } = args;
+
+  if (!title || title.trim().length === 0) {
+    return JSON.stringify({ error: 'Title is required', event: null });
+  }
+
+  if (!start_time) {
+    return JSON.stringify({ error: 'Start time is required', event: null });
+  }
+
+  try {
+    // Get the first sync-enabled Google account
+    const accounts = await listSyncEnabledAccounts();
+    if (accounts.length === 0) {
+      return JSON.stringify({
+        error: 'No Google account connected. Please connect a Google account first.',
+        event: null
+      });
+    }
+    const account = accounts[0]!;
+
+    // Get the default calendar for pushing events
+    const calendar = await getDefaultPushCalendar(account.id);
+    if (!calendar) {
+      return JSON.stringify({
+        error: 'No calendar available for creating events. Please configure a default calendar.',
+        event: null
+      });
+    }
+
+    // Check if calendar supports writes
+    if (calendar.sync_direction === 'read_only') {
+      return JSON.stringify({
+        error: `Calendar "${calendar.summary}" is read-only. Please configure a writable calendar.`,
+        event: null
+      });
+    }
+
+    // Parse the start time
+    let startDate: Date;
+    try {
+      startDate = parseDateTime(start_time, all_day);
+    } catch (parseError) {
+      return JSON.stringify({
+        error: `Invalid start_time format: ${start_time}. Use ISO 8601 format (e.g., "2026-01-09T08:00:00" or "2026-01-09" for all-day).`,
+        event: null
+      });
+    }
+
+    // Create the event in Google Calendar
+    const result = await pushEventToGoogle(calendar, {
+      id: crypto.randomUUID(), // Generate a commitment ID for tracking
+      title: title.trim(),
+      description: description?.trim(),
+      due_at: startDate,
+      duration_minutes: all_day ? 24 * 60 : duration_minutes, // All-day = 24 hours
+      all_day,
+      timezone: config.timezone,
+    });
+
+    // Calculate end time for response
+    const endDate = new Date(startDate.getTime() + (all_day ? 24 * 60 : duration_minutes) * 60 * 1000);
+
+    return JSON.stringify({
+      message: `Event "${title}" created successfully in "${calendar.summary}"`,
+      event: {
+        id: result.event_id,
+        title: title.trim(),
+        description: description?.trim() || null,
+        location: location || null,
+        start_time: all_day ? startDate.toISOString().split('T')[0] : startDate.toISOString(),
+        end_time: all_day ? endDate.toISOString().split('T')[0] : endDate.toISOString(),
+        all_day,
+        calendar: calendar.summary,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[CreateCalendarEvent] Error:', error);
+    return JSON.stringify({ error: `Failed to create calendar event: ${message}`, event: null });
+  }
+}
+
+export const createCalendarEventToolName = 'create_calendar_event';
+
+export const createCalendarEventToolDescription =
+  'Create a new event in the user\'s Google Calendar. Use this when the user asks to add something to their calendar, schedule an event, or block time. Examples: "add a meeting to my calendar", "schedule dentist appointment", "block Friday 8am-5pm for Pad-A-Thon".';
+
+export const createCalendarEventToolParameters = {
+  type: 'object',
+  properties: {
+    title: {
+      type: 'string',
+      description: 'The title/name of the event (e.g., "Team Meeting", "Dentist Appointment")',
+    },
+    start_time: {
+      type: 'string',
+      description: 'The start date/time in ISO 8601 format. For timed events use full datetime (e.g., "2026-01-09T08:00:00"). For all-day events use date only (e.g., "2026-01-09").',
+    },
+    duration_minutes: {
+      type: 'number',
+      description: 'Duration in minutes (default: 60). For multi-hour events, calculate minutes (e.g., 8am-5pm = 540 minutes).',
+    },
+    all_day: {
+      type: 'boolean',
+      description: 'Whether this is an all-day event (default: false). If true, only the date portion of start_time is used.',
+    },
+    description: {
+      type: 'string',
+      description: 'Optional description or notes for the event.',
+    },
+    location: {
+      type: 'string',
+      description: 'Optional location for the event.',
+    },
+  },
+  required: ['title', 'start_time'],
+};
+
+export const createCalendarEventToolHandler: ToolHandler<CreateCalendarEventArgs> = handleCreateCalendarEvent;

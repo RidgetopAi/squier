@@ -222,6 +222,10 @@ import {
   getEventsDueSoonToolDescription,
   getEventsDueSoonToolParameters,
   getEventsDueSoonToolHandler,
+  createCalendarEventToolName,
+  createCalendarEventToolDescription,
+  createCalendarEventToolParameters,
+  createCalendarEventToolHandler,
 } from './calendar.js';
 
 // Register time tool
@@ -244,7 +248,9 @@ registerTool(createListToolName, createListToolDescription, createListToolParame
 registerTool(addListItemToolName, addListItemToolDescription, addListItemToolParameters, addListItemToolHandler);
 registerTool(toggleListItemToolName, toggleListItemToolDescription, toggleListItemToolParameters, toggleListItemToolHandler);
 
-// Register calendar tools
+// Register calendar tools (read)
 registerTool(getUpcomingEventsToolName, getUpcomingEventsToolDescription, getUpcomingEventsToolParameters, getUpcomingEventsToolHandler);
 registerTool(getTodaysEventsToolName, getTodaysEventsToolDescription, getTodaysEventsToolParameters, getTodaysEventsToolHandler);
 registerTool(getEventsDueSoonToolName, getEventsDueSoonToolDescription, getEventsDueSoonToolParameters, getEventsDueSoonToolHandler);
+// Register calendar tools (write)
+registerTool(createCalendarEventToolName, createCalendarEventToolDescription, createCalendarEventToolParameters, createCalendarEventToolHandler);
