@@ -270,14 +270,15 @@ export default function CalendarPage() {
         }
 
         setEvents(allEvents);
+        setLoading(false);
       } catch (err) {
         // Ignore abort errors - they're expected when navigating quickly
+        // IMPORTANT: Don't change loading state on abort - let the next fetch handle it
         if (err instanceof Error && err.name === 'AbortError') {
           return;
         }
         console.error('Failed to fetch events:', err);
         setEvents([]);
-      } finally {
         setLoading(false);
       }
     };
