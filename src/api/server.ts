@@ -26,6 +26,11 @@ import listsRouter from './routes/lists.js';
 import identityRouter from './routes/identity.js';
 import { initScheduler, shutdownScheduler } from '../services/scheduler.js';
 import { migrateFromPersonalitySummary } from '../services/identity.js';
+import { syncAllAccounts } from '../services/google/sync.js';
+
+// Google Calendar sync interval (15 minutes)
+const CALENDAR_SYNC_INTERVAL_MS = 15 * 60 * 1000;
+let calendarSyncTimer: NodeJS.Timeout | null = null;
 
 const app = express();
 const httpServer = createServer(app);
@@ -101,12 +106,37 @@ httpServer.listen(port, async () => {
   // Start the reminder scheduler
   initScheduler();
   console.log(`Reminder scheduler started`);
+
+  // Start Google Calendar sync scheduler
+  const runCalendarSync = async () => {
+    try {
+      console.log('[CalendarSync] Starting sync...');
+      const results = await syncAllAccounts();
+      const accountCount = results.size;
+      let totalEvents = 0;
+      results.forEach((r) => { totalEvents += r.events.pulled; });
+      console.log(`[CalendarSync] Synced ${accountCount} account(s), ${totalEvents} events pulled`);
+    } catch (error) {
+      console.error('[CalendarSync] Sync failed:', error);
+    }
+  };
+
+  // Run initial sync after short delay (let server fully start)
+  setTimeout(runCalendarSync, 5000);
+
+  // Schedule periodic syncs
+  calendarSyncTimer = setInterval(runCalendarSync, CALENDAR_SYNC_INTERVAL_MS);
+  console.log(`Google Calendar sync scheduler started (every ${CALENDAR_SYNC_INTERVAL_MS / 60000} minutes)`);
 });
 
 // Graceful shutdown
 const shutdown = () => {
   console.log('Shutting down gracefully...');
   shutdownScheduler();
+  if (calendarSyncTimer) {
+    clearInterval(calendarSyncTimer);
+    calendarSyncTimer = null;
+  }
   httpServer.close(() => {
     console.log('Server closed');
     process.exit(0);
