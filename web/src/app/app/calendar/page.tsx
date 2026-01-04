@@ -240,6 +240,9 @@ export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Debug: log every render
+  console.log(`[Calendar RENDER] loading=${loading}, events=${events.length}, viewMode=${viewMode}, date=${currentDate.toISOString().split('T')[0]}`);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: '', description: '', startDate: '', startTime: '', endTime: '', allDay: false });
@@ -247,8 +250,11 @@ export default function CalendarPage() {
 
   useEffect(() => {
     const controller = new AbortController();
+    const effectId = Math.random().toString(36).slice(2, 8);
+    console.log(`[Calendar ${effectId}] Effect running - viewMode=${viewMode}, date=${currentDate.toISOString().split('T')[0]}`);
 
     const fetchEvents = async () => {
+      console.log(`[Calendar ${effectId}] Setting loading=true`);
       setLoading(true);
       try {
         let url: string;
@@ -258,6 +264,7 @@ export default function CalendarPage() {
           url = `${API_URL}/api/calendar/month?year=${currentDate.getFullYear()}&month=${currentDate.getMonth() + 1}`;
         }
 
+        console.log(`[Calendar ${effectId}] Fetching: ${url}`);
         const res = await fetch(url, { signal: controller.signal });
         const data = await res.json();
 
@@ -269,15 +276,18 @@ export default function CalendarPage() {
           });
         }
 
+        console.log(`[Calendar ${effectId}] Fetched ${allEvents.length} events, setting state`);
         setEvents(allEvents);
         setLoading(false);
+        console.log(`[Calendar ${effectId}] State set - events=${allEvents.length}, loading=false`);
       } catch (err) {
         // Ignore abort errors - they're expected when navigating quickly
         // IMPORTANT: Don't change loading state on abort - let the next fetch handle it
         if (err instanceof Error && err.name === 'AbortError') {
+          console.log(`[Calendar ${effectId}] Aborted - not changing state`);
           return;
         }
-        console.error('Failed to fetch events:', err);
+        console.error(`[Calendar ${effectId}] Failed to fetch events:`, err);
         setEvents([]);
         setLoading(false);
       }
@@ -285,7 +295,10 @@ export default function CalendarPage() {
 
     fetchEvents();
 
-    return () => controller.abort();
+    return () => {
+      console.log(`[Calendar ${effectId}] Cleanup - aborting`);
+      controller.abort();
+    };
   }, [viewMode, currentDate]);
 
   // Keep fetchEvents for manual refresh (e.g., after creating event)
