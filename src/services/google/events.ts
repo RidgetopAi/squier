@@ -240,12 +240,13 @@ export async function pullEvents(
 }
 
 /**
- * Push a commitment to Google Calendar as an event
+ * Push an event to Google Calendar
+ * Can optionally link to a Squire commitment via commitment_id
  */
 export async function pushEventToGoogle(
   calendar: GoogleCalendar,
-  commitment: {
-    id: string;
+  event: {
+    id?: string; // Optional commitment ID to link to
     title: string;
     description?: string;
     due_at: Date;
@@ -257,33 +258,33 @@ export async function pushEventToGoogle(
   const authClient = await getAuthenticatedClient(calendar.google_account_id);
   const calendarApi = google.calendar({ version: 'v3', auth: authClient });
 
-  const duration = commitment.duration_minutes || 60; // Default 1 hour
-  const endTime = new Date(commitment.due_at.getTime() + duration * 60 * 1000);
+  const duration = event.duration_minutes || 60; // Default 1 hour
+  const endTime = new Date(event.due_at.getTime() + duration * 60 * 1000);
 
   const eventResource: calendar_v3.Schema$Event = {
-    summary: commitment.title,
-    description: commitment.description,
+    summary: event.title,
+    description: event.description,
   };
 
-  if (commitment.all_day) {
+  if (event.all_day) {
     // All-day event uses date format
     eventResource.start = {
-      date: commitment.due_at.toISOString().split('T')[0],
-      timeZone: commitment.timezone || config.timezone,
+      date: event.due_at.toISOString().split('T')[0],
+      timeZone: event.timezone || config.timezone,
     };
     eventResource.end = {
       date: endTime.toISOString().split('T')[0],
-      timeZone: commitment.timezone || config.timezone,
+      timeZone: event.timezone || config.timezone,
     };
   } else {
     // Timed event uses dateTime
     eventResource.start = {
-      dateTime: commitment.due_at.toISOString(),
-      timeZone: commitment.timezone || config.timezone,
+      dateTime: event.due_at.toISOString(),
+      timeZone: event.timezone || config.timezone,
     };
     eventResource.end = {
       dateTime: endTime.toISOString(),
-      timeZone: commitment.timezone || config.timezone,
+      timeZone: event.timezone || config.timezone,
     };
   }
 
@@ -316,15 +317,15 @@ export async function pushEventToGoogle(
   `, [
     calendar.id,
     response.data.id,
-    commitment.title,
-    commitment.description || null,
-    commitment.due_at,
+    event.title,
+    event.description || null,
+    event.due_at,
     endTime,
-    commitment.all_day || false,
-    commitment.timezone || config.timezone,
+    event.all_day || false,
+    event.timezone || config.timezone,
     'confirmed',
     response.data.etag,
-    commitment.id,
+    event.id || null,  // commitment_id is optional
     JSON.stringify(response.data),
   ]);
 

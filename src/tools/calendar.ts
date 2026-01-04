@@ -381,8 +381,8 @@ async function handleCreateCalendarEvent(args: CreateCalendarEventArgs): Promise
     }
 
     // Create the event in Google Calendar
+    // Note: Not linking to a commitment - this is a standalone calendar event
     const result = await pushEventToGoogle(calendar, {
-      id: crypto.randomUUID(), // Generate a commitment ID for tracking
       title: title.trim(),
       description: description?.trim(),
       due_at: startDate,
