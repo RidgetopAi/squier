@@ -413,18 +413,29 @@ export default function CalendarPage() {
   weekStart.setDate(weekStart.getDate() - weekStart.getDay());
   weekStart.setHours(0, 0, 0, 0);
 
+  // Debug: log week range
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  console.log(`[Calendar] Week range: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}, total events in state: ${events.length}`);
+
   // Calculate month start for month view
   const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
   const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
   const firstDayOfWeek = monthStart.getDay();
 
   const getEventsForDay = (date: Date): CalendarEvent[] => {
-    return events.filter(e => isSameDay(new Date(e.start), date))
+    const dayEvents = events.filter(e => isSameDay(new Date(e.start), date))
       .sort((a, b) => {
         if (a.allDay && !b.allDay) return -1;
         if (!a.allDay && b.allDay) return 1;
         return new Date(a.start).getTime() - new Date(b.start).getTime();
       });
+    // Debug: log which events match each day
+    if (events.length > 0) {
+      console.log(`[Calendar] getEventsForDay(${date.toISOString().split('T')[0]}) → ${dayEvents.length} events`,
+        dayEvents.map(e => ({ title: e.title, start: e.start })));
+    }
+    return dayEvents;
   };
 
   const renderWeekView = () => {
