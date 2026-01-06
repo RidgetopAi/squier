@@ -3,6 +3,7 @@ import { generateEmbedding } from '../providers/embeddings.js';
 import { expandRecurrence, getNextOccurrence } from './recurrence.js';
 import { config } from '../config/index.js';
 import { listSyncEnabledAccounts } from './google/auth.js';
+import { refreshCommitmentsSummary } from './summaries.js';
 
 // Commitment status values (from IMPLEMENTATION-TRACKER.md locked naming)
 export type CommitmentStatus = 'open' | 'in_progress' | 'completed' | 'canceled' | 'snoozed';
@@ -387,6 +388,7 @@ export async function deleteCommitment(id: string): Promise<boolean> {
 
 /**
  * Resolve a commitment (mark as completed, canceled, etc.)
+ * Also triggers a refresh of the commitments living summary to prevent staleness.
  */
 export async function resolveCommitment(
   id: string,
@@ -414,7 +416,17 @@ export async function resolveCommitment(
     [statusMap[resolution_type], resolution_type, resolution_memory_id ?? null, id]
   );
 
-  return (result.rows[0] as Commitment) ?? null;
+  const resolved = (result.rows[0] as Commitment) ?? null;
+
+  // Trigger background refresh of commitments summary to prevent staleness
+  // Fire-and-forget to not slow down the resolution
+  if (resolved) {
+    refreshCommitmentsSummary().catch((err) => {
+      console.error('[Commitments] Failed to refresh summary after resolution:', err);
+    });
+  }
+
+  return resolved;
 }
 
 /**

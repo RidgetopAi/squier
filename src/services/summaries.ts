@@ -560,3 +560,92 @@ export async function getSummaryStats(): Promise<{
 export function isValidCategory(category: string): category is SummaryCategory {
   return SUMMARY_CATEGORIES.includes(category as SummaryCategory);
 }
+
+// === COMMITMENTS-SPECIFIC REFRESH ===
+
+/**
+ * Refresh the commitments living summary from actual commitment data.
+ *
+ * This is different from generateSummary() which uses memory links.
+ * This function queries the commitments table directly to ensure
+ * the summary reflects current commitment state (open vs completed).
+ *
+ * Call this when commitments are resolved to prevent stale summaries.
+ */
+export async function refreshCommitmentsSummary(): Promise<LivingSummary> {
+  // Fetch current open commitments from the actual commitments table
+  const commitmentsResult = await pool.query(`
+    SELECT title, description, due_at, status, all_day
+    FROM commitments
+    WHERE status IN ('open', 'in_progress', 'snoozed')
+    ORDER BY
+      CASE WHEN due_at IS NULL THEN 1 ELSE 0 END,
+      due_at ASC
+    LIMIT 20
+  `);
+
+  const openCommitments = commitmentsResult.rows;
+
+  // Build context for LLM
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'America/New_York',
+  });
+
+  let commitmentList = '';
+  if (openCommitments.length === 0) {
+    commitmentList = 'No open commitments at this time.';
+  } else {
+    commitmentList = openCommitments.map((c, i) => {
+      const dueInfo = c.due_at
+        ? ` (due: ${new Date(c.due_at).toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            timeZone: 'America/New_York',
+          })})`
+        : '';
+      const statusInfo = c.status === 'snoozed' ? ' [snoozed]' : '';
+      return `${i + 1}. ${c.title}${dueInfo}${statusInfo}`;
+    }).join('\n');
+  }
+
+  const systemPrompt = `You are a personal assistant summarizing someone's current commitments and obligations.
+
+Rules:
+1. ONLY describe commitments that are currently OPEN - not past ones
+2. Use RELATIVE time references ("tomorrow", "this Wednesday", "next week") instead of absolute dates
+3. Keep it concise but actionable
+4. Use second person ("you have", "you need to")
+5. Group by urgency if possible (today, this week, upcoming, no deadline)
+6. DO NOT mention any dates that have already passed
+7. Keep it to 100-200 words maximum
+
+Today's date is: ${dateStr}`;
+
+  const prompt = `Current open commitments:
+${commitmentList}
+
+Generate a fresh summary of current commitments. Return ONLY the summary text, no preamble.`;
+
+  const response = await completeText(prompt, systemPrompt, {
+    temperature: 0.3,
+    maxTokens: 400,
+  });
+
+  // Update the summary
+  const updated = await updateSummary(
+    'commitments',
+    response.trim(),
+    'commitments-refresh',
+    0
+  );
+
+  console.log(`[Summaries] Refreshed commitments summary with ${openCommitments.length} open items`);
+
+  return updated;
+}

@@ -8,6 +8,7 @@ import {
   getSummaryStats,
   isValidCategory,
   SUMMARY_CATEGORIES,
+  refreshCommitmentsSummary,
   type SummaryCategory,
 } from '../../services/summaries.js';
 
@@ -122,6 +123,26 @@ router.post('/generate-all', async (_req: Request, res: Response) => {
   } catch (error) {
     console.error('Failed to update summaries:', error);
     res.status(500).json({ error: 'Failed to update summaries' });
+  }
+});
+
+/**
+ * POST /api/summaries/commitments/refresh
+ * Force refresh the commitments summary from actual commitment data.
+ * Use this when the summary is stale (contains outdated dates/events).
+ */
+router.post('/commitments/refresh', async (_req: Request, res: Response) => {
+  try {
+    const summary = await refreshCommitmentsSummary();
+
+    res.json({
+      success: true,
+      summary,
+      message: 'Commitments summary refreshed from current data',
+    });
+  } catch (error) {
+    console.error('Failed to refresh commitments summary:', error);
+    res.status(500).json({ error: 'Failed to refresh commitments summary' });
   }
 });
 
