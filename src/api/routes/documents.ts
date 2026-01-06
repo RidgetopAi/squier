@@ -26,6 +26,13 @@ import {
   generateChunkEmbeddings,
   embedAndStoreChunks,
   generateQueryEmbedding,
+  // High-level search
+  searchDocumentsOptimized,
+  getSearchStats,
+  // Ephemeral processing
+  summarizeDocument,
+  askDocument,
+  getCacheStats as getEphemeralCacheStats,
 } from '../../services/documents/index.js';
 import { getObjectById } from '../../services/objects.js';
 
@@ -363,6 +370,82 @@ router.post('/:id/chunks/embed', async (req: Request, res: Response) => {
   }
 });
 
+// ============================================================================
+// SEARCH ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /api/documents/search
+ * Semantic search across documents with full document metadata
+ *
+ * Query params:
+ *   - q: string (required) - search query
+ *   - limit: number (default: 10)
+ *   - threshold: number (default: 0.5)
+ *   - documentId: string (optional, filter to specific document)
+ */
+router.get('/search', async (req: Request, res: Response) => {
+  try {
+    const query = req.query.q as string;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const threshold = parseFloat(req.query.threshold as string) || 0.5;
+    const documentId = req.query.documentId as string | undefined;
+
+    if (!query) {
+      res.status(400).json({ error: 'Query parameter "q" is required' });
+      return;
+    }
+
+    const response = await searchDocumentsOptimized(query, {
+      limit,
+      threshold,
+      documentId,
+    });
+
+    res.json({
+      success: true,
+      query: response.query,
+      totalResults: response.totalResults,
+      searchTimeMs: response.searchTimeMs,
+      results: response.results.map((r) => ({
+        chunk: {
+          id: r.chunk.id,
+          content: r.chunk.content,
+          tokenCount: r.chunk.tokenCount,
+          pageNumber: r.chunk.pageNumber,
+          sectionTitle: r.chunk.sectionTitle,
+          chunkIndex: r.chunk.chunkIndex,
+        },
+        similarity: r.similarity,
+        document: r.document,
+      })),
+    });
+  } catch (error) {
+    console.error('Document search error:', error);
+    res.status(500).json({
+      error: 'Internal server error during search',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * GET /api/documents/search/stats
+ * Get search statistics
+ */
+router.get('/search/stats', async (_req: Request, res: Response) => {
+  try {
+    const stats = await getSearchStats();
+    res.json({ success: true, stats });
+  } catch (error) {
+    console.error('Search stats error:', error);
+    res.status(500).json({
+      error: 'Internal server error getting stats',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
 /**
  * POST /api/documents/chunks/search
  * Search chunks across all documents using semantic similarity
@@ -453,6 +536,138 @@ router.post('/chunks/search/text', async (req: Request, res: Response) => {
       details: error instanceof Error ? error.message : String(error),
     });
   }
+});
+
+// ============================================================================
+// EPHEMERAL PROCESSING ENDPOINTS (Path 2: Direct-to-LLM)
+// ============================================================================
+
+/**
+ * POST /api/documents/summarize
+ * Summarize an uploaded document (ephemeral - no storage)
+ *
+ * Body: multipart/form-data with 'file' field
+ * Query params:
+ *   - style: 'brief' | 'detailed' | 'bullet-points' (default: 'brief')
+ *   - focus: string (optional focus area)
+ *   - maxTokens: number (max summary tokens, default: 500)
+ */
+router.post('/summarize', upload.single('file'), async (req: Request, res: Response) => {
+  try {
+    const file = req.file;
+
+    if (!file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
+    if (!isSupported(file.mimetype)) {
+      res.status(400).json({
+        error: `Unsupported file type: ${file.mimetype}`,
+        supportedTypes: getSupportedMimeTypes(),
+      });
+      return;
+    }
+
+    const style = (req.query.style as 'brief' | 'detailed' | 'bullet-points') ?? 'brief';
+    const focus = req.query.focus as string | undefined;
+    const maxSummaryTokens = req.query.maxTokens
+      ? parseInt(req.query.maxTokens as string, 10)
+      : undefined;
+
+    const result = await summarizeDocument(file.buffer, file.mimetype, file.originalname, {
+      style,
+      focus,
+      maxSummaryTokens,
+    });
+
+    res.json({
+      success: true,
+      summary: result.summary,
+      document: result.documentInfo,
+      usage: result.usage,
+      cached: result.cached,
+    });
+  } catch (error) {
+    console.error('Document summarize error:', error);
+    res.status(500).json({
+      error: 'Internal server error during summarization',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * POST /api/documents/ask
+ * Ask a question about an uploaded document (ephemeral - no storage)
+ *
+ * Body: multipart/form-data with 'file' field
+ * Query params:
+ *   - question: string (required)
+ *   - maxTokens: number (max answer tokens, default: 1000)
+ *   - citations: boolean (include citations, default: true)
+ */
+router.post('/ask', upload.single('file'), async (req: Request, res: Response) => {
+  try {
+    const file = req.file;
+    const question = req.query.question as string;
+
+    if (!file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
+    if (!question) {
+      res.status(400).json({ error: 'Query parameter "question" is required' });
+      return;
+    }
+
+    if (!isSupported(file.mimetype)) {
+      res.status(400).json({
+        error: `Unsupported file type: ${file.mimetype}`,
+        supportedTypes: getSupportedMimeTypes(),
+      });
+      return;
+    }
+
+    const maxAnswerTokens = req.query.maxTokens
+      ? parseInt(req.query.maxTokens as string, 10)
+      : undefined;
+    const includeCitations = req.query.citations !== 'false';
+
+    const result = await askDocument(file.buffer, file.mimetype, file.originalname, question, {
+      maxAnswerTokens,
+      includeCitations,
+    });
+
+    res.json({
+      success: true,
+      answer: result.answer,
+      question: result.question,
+      document: result.documentInfo,
+      usage: result.usage,
+      cached: result.cached,
+    });
+  } catch (error) {
+    console.error('Document ask error:', error);
+    res.status(500).json({
+      error: 'Internal server error during Q&A',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * GET /api/documents/ephemeral/stats
+ * Get ephemeral processing cache statistics
+ */
+router.get('/ephemeral/stats', (_req: Request, res: Response) => {
+  const stats = getEphemeralCacheStats();
+  res.json({
+    success: true,
+    cache: stats,
+    ttlMinutes: 30,
+  });
 });
 
 export default router;

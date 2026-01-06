@@ -14,6 +14,7 @@ import { EntityType } from './entities.js';
 import { getNonEmptySummaries, type LivingSummary } from './summaries.js';
 import { searchNotes, getPinnedNotes } from './notes.js';
 import { searchLists } from './lists.js';
+import { searchForContext } from './documents/search.js';
 
 // === TYPES ===
 
@@ -93,6 +94,17 @@ export interface ListSnapshot {
   similarity?: number;
 }
 
+export interface DocumentSnapshot {
+  id: string;
+  chunkId: string;
+  documentName: string;
+  content: string;
+  pageNumber?: number;
+  sectionTitle?: string;
+  similarity: number;
+  tokenCount: number;
+}
+
 export interface ContextPackage {
   generated_at: string;
   profile: string;
@@ -102,6 +114,7 @@ export interface ContextPackage {
   summaries: SummarySnapshot[];
   notes: NoteSnapshot[];
   lists: ListSnapshot[];
+  documents: DocumentSnapshot[];
   token_count: number;
   disclosure_id: string;
   markdown: string;
@@ -113,6 +126,8 @@ export interface GenerateContextOptions {
   query?: string;
   maxTokens?: number;
   conversationId?: string;
+  includeDocuments?: boolean;
+  maxDocumentTokens?: number;
 }
 
 // === PROFILE FUNCTIONS ===
@@ -430,6 +445,52 @@ function formatListsMarkdown(lists: ListSnapshot[]): string {
 }
 
 /**
+ * Format documents for markdown context
+ *
+ * Design: Include clear source citations the LLM can reference.
+ * Format: [Source: DocName, Page X] for easy attribution.
+ */
+function formatDocumentsMarkdown(documents: DocumentSnapshot[]): string {
+  if (documents.length === 0) return '';
+
+  const lines: string[] = [];
+  lines.push('## Relevant Documents');
+  lines.push('');
+  lines.push('*When using information from these documents, cite the source.*');
+  lines.push('');
+
+  // Group by document name for cleaner output
+  const byDocument = new Map<string, DocumentSnapshot[]>();
+  for (const doc of documents) {
+    const existing = byDocument.get(doc.documentName) ?? [];
+    existing.push(doc);
+    byDocument.set(doc.documentName, existing);
+  }
+
+  let sourceIndex = 1;
+  for (const [docName, chunks] of byDocument) {
+    lines.push(`### ${docName}`);
+    lines.push('');
+    for (const chunk of chunks) {
+      // Build citation reference
+      const pageRef = chunk.pageNumber ? `p.${chunk.pageNumber}` : null;
+      const sectionRef = chunk.sectionTitle ?? null;
+      const locationParts = [pageRef, sectionRef].filter(Boolean);
+      const location = locationParts.length > 0 ? locationParts.join(', ') : `chunk ${sourceIndex}`;
+
+      // Format: [DOC-1: filename, p.5] Content...
+      const citation = `[DOC-${sourceIndex}: ${docName}${location ? ', ' + location : ''}]`;
+      lines.push(`${citation}`);
+      lines.push(chunk.content);
+      lines.push('');
+      sourceIndex++;
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
  * Format memories as JSON
  */
 function formatJson(
@@ -438,6 +499,7 @@ function formatJson(
   summaries: SummarySnapshot[],
   notes: NoteSnapshot[],
   lists: ListSnapshot[],
+  documents: DocumentSnapshot[],
   profile: ContextProfile,
   query?: string
 ): object {
@@ -488,6 +550,16 @@ function formatJson(
       entity_name: l.entity_name,
       similarity: l.similarity,
     })),
+    documents: documents.map((d) => ({
+      id: d.id,
+      chunkId: d.chunkId,
+      documentName: d.documentName,
+      content: d.content,
+      pageNumber: d.pageNumber,
+      sectionTitle: d.sectionTitle,
+      similarity: d.similarity,
+      tokenCount: d.tokenCount,
+    })),
   };
 }
 
@@ -503,7 +575,7 @@ function formatJson(
 export async function generateContext(
   options: GenerateContextOptions = {}
 ): Promise<ContextPackage> {
-  const { query, maxTokens, conversationId } = options;
+  const { query, maxTokens, conversationId, includeDocuments = true, maxDocumentTokens = 2000 } = options;
 
   // Get profile
   let profile: ContextProfile;
@@ -707,6 +779,30 @@ export async function generateContext(
     }
   }
 
+  // Get relevant document chunks
+  let documents: DocumentSnapshot[] = [];
+  if (includeDocuments && query) {
+    try {
+      const docResults = await searchForContext(query, {
+        maxTokens: maxDocumentTokens,
+        threshold: 0.4,
+        limit: 10,
+      });
+      documents = docResults.chunks.map((chunk) => ({
+        id: chunk.sourceId.split(':')[0] ?? chunk.sourceId,
+        chunkId: chunk.sourceId,
+        documentName: chunk.documentName,
+        content: chunk.content,
+        pageNumber: chunk.pageNumber,
+        sectionTitle: chunk.sectionTitle,
+        similarity: chunk.similarity,
+        tokenCount: chunk.tokenCount,
+      }));
+    } catch (error) {
+      console.error('[Context] Error fetching documents:', error);
+    }
+  }
+
   // Log disclosure
   const disclosureId = await logDisclosure(
     profile.name,
@@ -726,7 +822,10 @@ export async function generateContext(
   if (lists.length > 0) {
     markdown += '\n' + formatListsMarkdown(lists);
   }
-  const json = formatJson(budgetedMemories, entities, summaries, notes, lists, profile, query);
+  if (documents.length > 0) {
+    markdown += '\n' + formatDocumentsMarkdown(documents);
+  }
+  const json = formatJson(budgetedMemories, entities, summaries, notes, lists, documents, profile, query);
 
   return {
     generated_at: new Date().toISOString(),
@@ -737,6 +836,7 @@ export async function generateContext(
     summaries,
     notes,
     lists,
+    documents,
     token_count: totalTokens,
     disclosure_id: disclosureId,
     markdown,
