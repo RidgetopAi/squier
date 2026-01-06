@@ -24,6 +24,7 @@ import calendarRouter from './routes/calendar.js';
 import notesRouter from './routes/notes.js';
 import listsRouter from './routes/lists.js';
 import identityRouter from './routes/identity.js';
+import documentsRouter from './routes/documents.js';
 import { initScheduler, shutdownScheduler } from '../services/scheduler.js';
 import { migrateFromPersonalitySummary } from '../services/identity.js';
 import { syncAllAccounts } from '../services/google/sync.js';
@@ -74,6 +75,7 @@ app.use('/api/calendar', calendarRouter);
 app.use('/api/notes', notesRouter);
 app.use('/api/lists', listsRouter);
 app.use('/api/identity', identityRouter);
+app.use('/api/documents', documentsRouter);
 
 // 404 handler
 app.use((_req, res) => {
