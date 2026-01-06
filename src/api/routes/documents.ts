@@ -272,7 +272,7 @@ router.post('/:id/chunk', async (req: Request, res: Response) => {
     res.json({
       success: true,
       objectId: id,
-      chunkCount: result.chunks.length,
+      chunks: result.chunks,
       totalTokens: result.totalTokens,
       strategy,
       hasEmbeddings: shouldEmbed,
