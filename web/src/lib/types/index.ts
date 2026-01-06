@@ -622,3 +622,232 @@ export interface ListCompletionStats {
   completed: number;
   percentage: number;
 }
+
+// ============================================
+// Document Intelligence Types (Phase 5-6)
+// ============================================
+
+export type DocumentMimeType =
+  | 'application/pdf'
+  | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  | 'application/msword'
+  | 'text/plain'
+  | 'text/markdown'
+  | 'text/x-markdown'
+  | 'image/png'
+  | 'image/jpeg'
+  | 'image/jpg'
+  | 'image/webp'
+  | 'image/tiff'
+  | 'image/bmp'
+  | 'image/gif';
+
+export type DocumentProcessingStatus =
+  | 'pending'
+  | 'extracting'
+  | 'chunking'
+  | 'embedding'
+  | 'completed'
+  | 'failed';
+
+export interface DocumentMetadata {
+  title?: string;
+  author?: string;
+  pageCount?: number;
+  wordCount: number;
+  createdAt?: string;
+}
+
+export interface ExtractedDocument {
+  text: string;
+  metadata: DocumentMetadata;
+  pages?: string[];
+}
+
+export interface DocumentChunk {
+  id: string;
+  objectId: string;
+  chunkIndex: number;
+  content: string;
+  tokenCount: number;
+  pageNumber?: number;
+  sectionTitle?: string;
+  embedding?: number[];
+  createdAt: string;
+}
+
+export interface DocumentUploadResult {
+  objectId: string;
+  filename: string;
+  mimeType: DocumentMimeType;
+  size: number;
+  extraction: ExtractedDocument;
+  status: DocumentProcessingStatus;
+}
+
+export interface DocumentSearchResult {
+  chunkId: string;
+  objectId: string;
+  content: string;
+  similarity: number;
+  pageNumber?: number;
+  sectionTitle?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ChunkingOptions {
+  strategy: 'semantic' | 'fixed' | 'hybrid';
+  maxTokens?: number;
+  overlapTokens?: number;
+  preserveParagraphs?: boolean;
+}
+
+export interface DocumentSummaryResult {
+  summary: string;
+  keyPoints: string[];
+  wordCount: number;
+  processingTime: number;
+}
+
+export interface DocumentAskResult {
+  answer: string;
+  confidence: number;
+  sources: Array<{
+    pageNumber?: number;
+    excerpt: string;
+  }>;
+}
+
+// ============================================
+// Fact Extraction Types (Phase 6)
+// ============================================
+
+export type FactStatus = 'pending' | 'approved' | 'rejected' | 'merged' | 'auto_approved';
+
+export type FactType =
+  | 'biographical'
+  | 'event'
+  | 'relationship'
+  | 'preference'
+  | 'statement'
+  | 'date'
+  | 'location'
+  | 'organization';
+
+export type FactEntityType = 'person' | 'project' | 'concept' | 'place' | 'organization';
+
+export type FactDateType =
+  | 'event_date'
+  | 'deadline'
+  | 'anniversary'
+  | 'birth_date'
+  | 'death_date'
+  | 'start_date'
+  | 'end_date'
+  | 'reference';
+
+export interface ExtractedFactEntity {
+  name: string;
+  type: FactEntityType;
+  role?: string;
+  confidence: number;
+  mentionText?: string;
+}
+
+export interface ExtractedFactDate {
+  date: string; // YYYY-MM-DD
+  type: FactDateType;
+  confidence: number;
+  rawText: string;
+  isRecurring?: boolean;
+}
+
+export interface ExtractedRelationship {
+  subject: string;
+  predicate: string;
+  object: string;
+  confidence: number;
+  description?: string;
+}
+
+export interface ExtractedFact {
+  id: string;
+  chunkId: string;
+  objectId: string;
+  factType: FactType;
+  content: string;
+  rawText: string;
+  confidence: number;
+  status: FactStatus;
+  reviewedAt?: string;
+  reviewerNotes?: string;
+  entities: ExtractedFactEntity[];
+  dates: ExtractedFactDate[];
+  relationships: ExtractedRelationship[];
+  sourcePage?: number;
+  sourceSection?: string;
+  memoryId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FactExtractionStats {
+  total: number;
+  byStatus: Record<FactStatus, number>;
+  byType: Record<FactType, number>;
+  avgConfidence: number;
+  totalEntities: number;
+  totalDates: number;
+  totalRelationships: number;
+}
+
+export interface FactExtractionBatch {
+  id: string;
+  objectId: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  totalChunks: number;
+  processedChunks: number;
+  factsExtracted: number;
+  factsAutoApproved: number;
+  startedAt?: string;
+  completedAt?: string;
+  errorMessage?: string;
+}
+
+export interface FactExtractionOptions {
+  minConfidence?: number;
+  autoApproveThreshold?: number;
+  extractEntities?: boolean;
+  extractDates?: boolean;
+  extractRelationships?: boolean;
+  maxFactsPerChunk?: number;
+  factTypes?: FactType[];
+}
+
+// Labels for display
+export const FactTypeLabels: Record<FactType, string> = {
+  biographical: 'Biographical',
+  event: 'Event',
+  relationship: 'Relationship',
+  preference: 'Preference',
+  statement: 'Statement',
+  date: 'Date',
+  location: 'Location',
+  organization: 'Organization',
+};
+
+export const FactStatusLabels: Record<FactStatus, string> = {
+  pending: 'Pending Review',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  merged: 'Merged',
+  auto_approved: 'Auto-Approved',
+};
+
+export const FactStatusColors: Record<FactStatus, string> = {
+  pending: 'text-yellow-400',
+  approved: 'text-green-400',
+  rejected: 'text-red-400',
+  merged: 'text-purple-400',
+  auto_approved: 'text-blue-400',
+};

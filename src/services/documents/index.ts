@@ -54,3 +54,50 @@ export {
   type AskOptions,
   type AskResult,
 } from './ephemeral.js';
+
+// Fact Extraction (Phase 6: Document Intelligence)
+export {
+  // Types (avoiding name conflicts)
+  type ExtractedFact,
+  type ExtractedFactEntity,
+  type ExtractedFactDate,
+  type ExtractedRelationship,
+  type FactType,
+  type FactStatus,
+  type FactExtractionOptions,
+  type ChunkExtractionResult,
+  type DocumentExtractionResult,
+  FACT_TYPES,
+  FACT_STATUSES,
+  ENTITY_TYPES as FACT_ENTITY_TYPES,
+  DATE_TYPES,
+  DEFAULT_EXTRACTION_OPTIONS as DEFAULT_FACT_EXTRACTION_OPTIONS,
+  rowToFact,
+  factToRow,
+  // Core extraction
+  extractFactsFromChunk,
+  extractFactsFromChunks,
+  // Batch extraction
+  extractFactsFromDocument,
+  getExtractionProgress,
+  // Storage operations
+  storeFact,
+  storeFacts,
+  getFact,
+  getFactsByDocument,
+  getFactsByChunk,
+  getPendingFacts,
+  updateFactStatus,
+  bulkUpdateFactStatus,
+  linkFactToMemory,
+  mergeFacts,
+  updateFactContent,
+  deleteFact,
+  deleteFactsByDocument,
+  deleteFactsByChunk,
+  createBatch,
+  updateBatchProgress,
+  getBatch,
+  getBatchesByDocument,
+  getFactStats,
+} from './factExtraction/index.js';

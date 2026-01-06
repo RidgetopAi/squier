@@ -670,4 +670,532 @@ router.get('/ephemeral/stats', (_req: Request, res: Response) => {
   });
 });
 
+// ============================================================================
+// FACT EXTRACTION ENDPOINTS (Phase 6: Document Intelligence)
+// ============================================================================
+
+import {
+  extractFactsFromDocument,
+  extractFactsFromChunk,
+  getExtractionProgress,
+  getFactsByDocument,
+  getPendingFacts,
+  getFact,
+  updateFactStatus,
+  bulkUpdateFactStatus,
+  updateFactContent,
+  deleteFact,
+  getFactStats,
+  getBatch,
+  getBatchesByDocument,
+  type FactStatus,
+  type FactType,
+  type FactExtractionOptions,
+} from '../../services/documents/factExtraction/index.js';
+import { getChunkById } from '../../services/documents/chunker/chunkStorage.js';
+
+/**
+ * POST /api/documents/:objectId/extract-facts
+ * Extract facts from all chunks of a document
+ *
+ * Body (optional):
+ *   - minConfidence: number (0-1, default: 0.5)
+ *   - autoApproveThreshold: number (0-1, default: 0.9)
+ *   - extractEntities: boolean (default: true)
+ *   - extractDates: boolean (default: true)
+ *   - extractRelationships: boolean (default: true)
+ *   - maxFactsPerChunk: number (default: 10)
+ *   - factTypes: string[] (optional, filter fact types)
+ */
+router.post('/:objectId/extract-facts', async (req: Request, res: Response) => {
+  try {
+    const objectId = req.params.objectId;
+    if (!objectId) {
+      res.status(400).json({ error: 'Document ID is required' });
+      return;
+    }
+
+    // Verify document exists
+    const object = await getObjectById(objectId);
+    if (!object) {
+      res.status(404).json({ error: 'Document not found' });
+      return;
+    }
+
+    // Build extraction options
+    const options: Partial<FactExtractionOptions> = {};
+
+    if (req.body.minConfidence !== undefined) {
+      options.minConfidence = Number(req.body.minConfidence);
+    }
+    if (req.body.autoApproveThreshold !== undefined) {
+      options.autoApproveThreshold = Number(req.body.autoApproveThreshold);
+    }
+    if (req.body.extractEntities !== undefined) {
+      options.extractEntities = Boolean(req.body.extractEntities);
+    }
+    if (req.body.extractDates !== undefined) {
+      options.extractDates = Boolean(req.body.extractDates);
+    }
+    if (req.body.extractRelationships !== undefined) {
+      options.extractRelationships = Boolean(req.body.extractRelationships);
+    }
+    if (req.body.maxFactsPerChunk !== undefined) {
+      options.maxFactsPerChunk = Number(req.body.maxFactsPerChunk);
+    }
+    if (req.body.factTypes && Array.isArray(req.body.factTypes)) {
+      options.factTypes = req.body.factTypes as FactType[];
+    }
+
+    // Extract facts from document
+    const result = await extractFactsFromDocument(objectId, options);
+
+    res.json({
+      success: result.success,
+      batchId: result.batchId,
+      objectId: result.objectId,
+      chunksProcessed: result.chunksProcessed,
+      factsExtracted: result.factsExtracted,
+      factsAutoApproved: result.factsAutoApproved,
+      totalDurationMs: result.totalDurationMs,
+      errors: result.errors.length > 0 ? result.errors : undefined,
+    });
+  } catch (error) {
+    console.error('Fact extraction error:', error);
+    res.status(500).json({
+      error: 'Internal server error during fact extraction',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * POST /api/documents/chunks/:chunkId/extract-facts
+ * Extract facts from a single chunk
+ */
+router.post('/chunks/:chunkId/extract-facts', async (req: Request, res: Response) => {
+  try {
+    const chunkId = req.params.chunkId;
+    if (!chunkId) {
+      res.status(400).json({ error: 'Chunk ID is required' });
+      return;
+    }
+
+    // Get the chunk
+    const chunk = await getChunkById(chunkId);
+    if (!chunk) {
+      res.status(404).json({ error: 'Chunk not found' });
+      return;
+    }
+
+    // Build extraction options
+    const options: Partial<FactExtractionOptions> = {};
+    if (req.body.minConfidence !== undefined) {
+      options.minConfidence = Number(req.body.minConfidence);
+    }
+    if (req.body.autoApproveThreshold !== undefined) {
+      options.autoApproveThreshold = Number(req.body.autoApproveThreshold);
+    }
+
+    // Extract facts from chunk
+    const result = await extractFactsFromChunk(chunk, chunk.objectId, options);
+
+    res.json({
+      success: result.success,
+      chunkId: result.chunkId,
+      factsExtracted: result.facts.length,
+      totalEntities: result.totalEntities,
+      totalDates: result.totalDates,
+      totalRelationships: result.totalRelationships,
+      processingDurationMs: result.processingDurationMs,
+      facts: result.facts,
+      error: result.error,
+    });
+  } catch (error) {
+    console.error('Chunk fact extraction error:', error);
+    res.status(500).json({
+      error: 'Internal server error during fact extraction',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * GET /api/documents/:objectId/facts
+ * Get extracted facts for a document
+ *
+ * Query params:
+ *   - status: FactStatus or comma-separated statuses
+ *   - factType: FactType or comma-separated types
+ *   - minConfidence: number (0-1)
+ *   - limit: number
+ *   - offset: number
+ */
+router.get('/:objectId/facts', async (req: Request, res: Response) => {
+  try {
+    const objectId = req.params.objectId;
+    if (!objectId) {
+      res.status(400).json({ error: 'Document ID is required' });
+      return;
+    }
+
+    // Build query options
+    const options: {
+      status?: FactStatus[];
+      factType?: FactType[];
+      minConfidence?: number;
+      limit?: number;
+      offset?: number;
+    } = {};
+
+    if (req.query.status) {
+      options.status = (req.query.status as string).split(',') as FactStatus[];
+    }
+    if (req.query.factType) {
+      options.factType = (req.query.factType as string).split(',') as FactType[];
+    }
+    if (req.query.minConfidence) {
+      options.minConfidence = Number(req.query.minConfidence);
+    }
+    if (req.query.limit) {
+      options.limit = Number(req.query.limit);
+    }
+    if (req.query.offset) {
+      options.offset = Number(req.query.offset);
+    }
+
+    const facts = await getFactsByDocument(objectId, options);
+
+    res.json({
+      success: true,
+      objectId,
+      count: facts.length,
+      facts,
+    });
+  } catch (error) {
+    console.error('Get facts error:', error);
+    res.status(500).json({
+      error: 'Internal server error getting facts',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * GET /api/documents/:objectId/facts/stats
+ * Get fact extraction statistics for a document
+ */
+router.get('/:objectId/facts/stats', async (req: Request, res: Response) => {
+  try {
+    const objectId = req.params.objectId;
+    if (!objectId) {
+      res.status(400).json({ error: 'Document ID is required' });
+      return;
+    }
+
+    const stats = await getFactStats(objectId);
+    const progress = await getExtractionProgress(objectId);
+
+    res.json({
+      success: true,
+      objectId,
+      hasBeenExtracted: progress.hasBeenExtracted,
+      stats,
+    });
+  } catch (error) {
+    console.error('Get fact stats error:', error);
+    res.status(500).json({
+      error: 'Internal server error getting fact stats',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * GET /api/documents/:objectId/facts/batches
+ * Get extraction batches for a document
+ */
+router.get('/:objectId/facts/batches', async (req: Request, res: Response) => {
+  try {
+    const objectId = req.params.objectId;
+    if (!objectId) {
+      res.status(400).json({ error: 'Document ID is required' });
+      return;
+    }
+
+    const batches = await getBatchesByDocument(objectId);
+
+    res.json({
+      success: true,
+      objectId,
+      count: batches.length,
+      batches,
+    });
+  } catch (error) {
+    console.error('Get batches error:', error);
+    res.status(500).json({
+      error: 'Internal server error getting batches',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * GET /api/documents/facts/pending
+ * Get pending facts for review (across all documents)
+ *
+ * Query params:
+ *   - objectId: string (optional, filter by document)
+ *   - limit: number
+ *   - offset: number
+ */
+router.get('/facts/pending', async (req: Request, res: Response) => {
+  try {
+    const options: {
+      objectId?: string;
+      limit?: number;
+      offset?: number;
+    } = {};
+
+    if (req.query.objectId) {
+      options.objectId = req.query.objectId as string;
+    }
+    if (req.query.limit) {
+      options.limit = Number(req.query.limit);
+    }
+    if (req.query.offset) {
+      options.offset = Number(req.query.offset);
+    }
+
+    const facts = await getPendingFacts(options);
+
+    res.json({
+      success: true,
+      count: facts.length,
+      facts,
+    });
+  } catch (error) {
+    console.error('Get pending facts error:', error);
+    res.status(500).json({
+      error: 'Internal server error getting pending facts',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * GET /api/documents/facts/:factId
+ * Get a specific fact by ID
+ */
+router.get('/facts/:factId', async (req: Request, res: Response) => {
+  try {
+    const factId = req.params.factId;
+    if (!factId) {
+      res.status(400).json({ error: 'Fact ID is required' });
+      return;
+    }
+
+    const fact = await getFact(factId);
+    if (!fact) {
+      res.status(404).json({ error: 'Fact not found' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      fact,
+    });
+  } catch (error) {
+    console.error('Get fact error:', error);
+    res.status(500).json({
+      error: 'Internal server error getting fact',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * PATCH /api/documents/facts/:factId/status
+ * Update fact status (approve/reject)
+ *
+ * Body:
+ *   - status: FactStatus (required)
+ *   - notes: string (optional reviewer notes)
+ */
+router.patch('/facts/:factId/status', async (req: Request, res: Response) => {
+  try {
+    const factId = req.params.factId;
+    if (!factId) {
+      res.status(400).json({ error: 'Fact ID is required' });
+      return;
+    }
+
+    const { status, notes } = req.body;
+
+    if (!status) {
+      res.status(400).json({ error: 'status is required' });
+      return;
+    }
+
+    const fact = await updateFactStatus(factId, status as FactStatus, notes);
+    if (!fact) {
+      res.status(404).json({ error: 'Fact not found' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      fact,
+    });
+  } catch (error) {
+    console.error('Update fact status error:', error);
+    res.status(500).json({
+      error: 'Internal server error updating fact status',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * POST /api/documents/facts/bulk-status
+ * Bulk update fact statuses
+ *
+ * Body:
+ *   - factIds: string[] (required)
+ *   - status: FactStatus (required)
+ *   - notes: string (optional)
+ */
+router.post('/facts/bulk-status', async (req: Request, res: Response) => {
+  try {
+    const { factIds, status, notes } = req.body;
+
+    if (!factIds || !Array.isArray(factIds) || factIds.length === 0) {
+      res.status(400).json({ error: 'factIds array is required' });
+      return;
+    }
+
+    if (!status) {
+      res.status(400).json({ error: 'status is required' });
+      return;
+    }
+
+    const count = await bulkUpdateFactStatus(factIds, status as FactStatus, notes);
+
+    res.json({
+      success: true,
+      updatedCount: count,
+    });
+  } catch (error) {
+    console.error('Bulk update fact status error:', error);
+    res.status(500).json({
+      error: 'Internal server error updating fact statuses',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * PATCH /api/documents/facts/:factId/content
+ * Update fact content (for editing during review)
+ *
+ * Body:
+ *   - content: string (required)
+ *   - notes: string (optional)
+ */
+router.patch('/facts/:factId/content', async (req: Request, res: Response) => {
+  try {
+    const factId = req.params.factId;
+    if (!factId) {
+      res.status(400).json({ error: 'Fact ID is required' });
+      return;
+    }
+
+    const { content, notes } = req.body;
+
+    if (!content) {
+      res.status(400).json({ error: 'content is required' });
+      return;
+    }
+
+    const fact = await updateFactContent(factId, content, notes);
+    if (!fact) {
+      res.status(404).json({ error: 'Fact not found' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      fact,
+    });
+  } catch (error) {
+    console.error('Update fact content error:', error);
+    res.status(500).json({
+      error: 'Internal server error updating fact content',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * DELETE /api/documents/facts/:factId
+ * Delete a fact
+ */
+router.delete('/facts/:factId', async (req: Request, res: Response) => {
+  try {
+    const factId = req.params.factId;
+    if (!factId) {
+      res.status(400).json({ error: 'Fact ID is required' });
+      return;
+    }
+
+    const deleted = await deleteFact(factId);
+    if (!deleted) {
+      res.status(404).json({ error: 'Fact not found' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: 'Fact deleted',
+    });
+  } catch (error) {
+    console.error('Delete fact error:', error);
+    res.status(500).json({
+      error: 'Internal server error deleting fact',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * GET /api/documents/facts/batches/:batchId
+ * Get a specific extraction batch by ID
+ */
+router.get('/facts/batches/:batchId', async (req: Request, res: Response) => {
+  try {
+    const batchId = req.params.batchId;
+    if (!batchId) {
+      res.status(400).json({ error: 'Batch ID is required' });
+      return;
+    }
+
+    const batch = await getBatch(batchId);
+    if (!batch) {
+      res.status(404).json({ error: 'Batch not found' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      batch,
+    });
+  } catch (error) {
+    console.error('Get batch error:', error);
+    res.status(500).json({
+      error: 'Internal server error getting batch',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
 export default router;

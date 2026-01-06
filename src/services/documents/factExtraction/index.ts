@@ -1,0 +1,50 @@
+/**
+ * Fact Extraction Module
+ *
+ * Phase 6: Document Intelligence - LLM-based extraction of facts, entities,
+ * dates, and relationships from document chunks.
+ *
+ * Main exports:
+ * - extractFactsFromChunk: Extract facts from a single chunk
+ * - extractFactsFromDocument: Batch extract from all document chunks
+ * - Fact storage CRUD operations
+ * - Types and interfaces
+ */
+
+// Types
+export * from './types.js';
+
+// Core extraction
+export { extractFactsFromChunk, extractFactsFromChunks } from './extractor.js';
+
+// Batch extraction
+export { extractFactsFromDocument, getExtractionProgress } from './batch.js';
+
+// Storage operations
+export {
+  // Create
+  storeFact,
+  storeFacts,
+  // Read
+  getFact,
+  getFactsByDocument,
+  getFactsByChunk,
+  getPendingFacts,
+  // Update
+  updateFactStatus,
+  bulkUpdateFactStatus,
+  linkFactToMemory,
+  mergeFacts,
+  updateFactContent,
+  // Delete
+  deleteFact,
+  deleteFactsByDocument,
+  deleteFactsByChunk,
+  // Batch tracking
+  createBatch,
+  updateBatchProgress,
+  getBatch,
+  getBatchesByDocument,
+  // Statistics
+  getFactStats,
+} from './storage.js';
