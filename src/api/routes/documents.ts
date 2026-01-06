@@ -34,7 +34,8 @@ import {
   askDocument,
   getCacheStats as getEphemeralCacheStats,
 } from '../../services/documents/index.js';
-import { getObjectById } from '../../services/objects.js';
+import { getObjectById, createObject } from '../../services/objects.js';
+import { pool } from '../../db/pool.js';
 
 const router = Router();
 
@@ -109,9 +110,36 @@ router.post('/extract', upload.single('file'), async (req: Request, res: Respons
       return;
     }
 
+    // Store as an object in the database
+    const { object, isDuplicate } = await createObject({
+      name: file.originalname,
+      filename: file.originalname,
+      mimeType: file.mimetype,
+      data: file.buffer,
+      source: 'upload',
+      metadata: {
+        extraction: {
+          pageCount: result.document?.metadata?.pageCount,
+          wordCount: result.document?.metadata?.wordCount,
+          format: result.document?.format,
+        },
+      },
+    });
+
+    // Update object with extracted text (processing complete)
+    await pool.query(
+      `UPDATE objects
+       SET extracted_text = $1,
+           processing_status = 'completed',
+           processed_at = NOW()
+       WHERE id = $2`,
+      [result.document?.text || '', object.id]
+    );
+
     res.json({
-      success: true,
-      document: result.document,
+      objectId: object.id,
+      extraction: result.document,
+      isDuplicate,
       file: {
         originalName: file.originalname,
         mimeType: file.mimetype,
