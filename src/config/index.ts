@@ -33,10 +33,11 @@ export const config = {
     ollamaUrl: optional('OLLAMA_URL', 'http://localhost:11434'),
   },
   llm: {
-    provider: optional('LLM_PROVIDER', 'groq') as 'groq' | 'xai' | 'ollama',
+    provider: optional('LLM_PROVIDER', 'groq') as 'groq' | 'xai' | 'ollama' | 'gemini',
     model: optional('LLM_MODEL', 'llama-3.3-70b-versatile'),
     groqApiKey: process.env['GROQ_API_KEY'] ?? '',
     xaiApiKey: process.env['XAI_API_KEY'] ?? '',
+    geminiApiKey: process.env['GEMINI_API_KEY'] ?? '',
     ollamaUrl: optional('OLLAMA_URL', 'http://localhost:11434'),
     maxTokens: parseInt(optional('LLM_MAX_TOKENS', '4096'), 10),
     temperature: parseFloat(optional('LLM_TEMPERATURE', '0.7')),
