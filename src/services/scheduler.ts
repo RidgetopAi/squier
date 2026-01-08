@@ -12,7 +12,7 @@ import {
   sendReminderNotification,
   isPushConfigured,
 } from './push.js';
-import { getCommitment } from './commitments.js';
+import { getCommitment, expireCandidates } from './commitments.js';
 
 // ========================================
 // Types
@@ -177,6 +177,14 @@ async function tick(): Promise<TickResult> {
     // Wake snoozed reminders
     const snoozedResult = await processSnoozedReminders();
 
+    // Phase 4: Expire unconfirmed commitment candidates (24h TTL)
+    let expiredCount = 0;
+    try {
+      expiredCount = await expireCandidates();
+    } catch (err) {
+      console.error('[Scheduler] Failed to expire candidates:', err);
+    }
+
     // Update stats
     stats.totalProcessed += pendingResult.processed + retryResult.processed;
     stats.totalSent += pendingResult.sent + retryResult.sent;
@@ -184,8 +192,8 @@ async function tick(): Promise<TickResult> {
     stats.totalRetried += retryResult.processed;
     stats.totalUnsnoozed += snoozedResult.woken;
 
-    if (config.verbose && (pendingResult.processed > 0 || retryResult.processed > 0 || snoozedResult.woken > 0)) {
-      log(`Tick complete: pending=${pendingResult.sent}/${pendingResult.processed}, retries=${retryResult.sent}/${retryResult.processed}, unsnoozed=${snoozedResult.woken}`);
+    if (config.verbose && (pendingResult.processed > 0 || retryResult.processed > 0 || snoozedResult.woken > 0 || expiredCount > 0)) {
+      log(`Tick complete: pending=${pendingResult.sent}/${pendingResult.processed}, retries=${retryResult.sent}/${retryResult.processed}, unsnoozed=${snoozedResult.woken}, expired=${expiredCount}`);
     }
 
     return {

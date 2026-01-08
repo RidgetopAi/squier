@@ -6,7 +6,8 @@ import { listSyncEnabledAccounts } from './google/auth.js';
 import { refreshCommitmentsSummary } from './summaries.js';
 
 // Commitment status values (from IMPLEMENTATION-TRACKER.md locked naming)
-export type CommitmentStatus = 'open' | 'in_progress' | 'completed' | 'canceled' | 'snoozed';
+// Phase 4: Added 'candidate', 'dismissed', 'expired' for confirmation workflow
+export type CommitmentStatus = 'candidate' | 'open' | 'in_progress' | 'completed' | 'canceled' | 'snoozed' | 'dismissed' | 'expired';
 export type ResolutionType = 'completed' | 'canceled' | 'no_longer_relevant' | 'superseded';
 export type SourceType = 'chat' | 'manual' | 'google_sync';
 export type GoogleSyncStatus = 'local_only' | 'synced' | 'pending_push' | 'pending_pull' | 'conflict';
@@ -38,6 +39,9 @@ export interface Commitment {
   tags: string[];
   metadata: Record<string, unknown>;
   embedding: number[] | null;
+  // Phase 4: Candidate workflow fields
+  confirmation_offered_at: Date | null;
+  auto_expires_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -143,14 +147,21 @@ export async function createCommitment(input: CreateCommitmentInput): Promise<Co
   const embedding = await generateEmbedding(textForEmbedding);
   const embeddingStr = `[${embedding.join(',')}]`;
 
+  // Phase 4: Commitments from chat start as 'candidate', others start as 'open'
+  // Candidates auto-expire after 24 hours if not confirmed
+  const initialStatus = source_type === 'chat' ? 'candidate' : 'open';
+  const autoExpiresAt = source_type === 'chat' 
+    ? new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+    : null;
+
   const result = await pool.query(
     `INSERT INTO commitments (
       title, description, memory_id, source_type,
       due_at, timezone, all_day, duration_minutes,
       rrule, recurrence_end_at, original_due_at,
-      tags, metadata, embedding
+      tags, metadata, embedding, status, auto_expires_at
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $5, $11, $12, $13)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $5, $11, $12, $13, $14, $15)
     RETURNING *`,
     [
       title,
@@ -166,8 +177,14 @@ export async function createCommitment(input: CreateCommitmentInput): Promise<Co
       tags,
       JSON.stringify(metadata),
       embeddingStr,
+      initialStatus,
+      autoExpiresAt,
     ]
   );
+
+  if (initialStatus === 'candidate') {
+    console.log(`[Commitments] Created CANDIDATE: "${title}" (expires in 24h)`);
+  }
 
   const commitment = result.rows[0] as Commitment;
 
@@ -807,4 +824,124 @@ export function parseOccurrenceId(occurrenceId: string): {
     occurrenceDate: null,
     isOccurrence: false,
   };
+}
+
+// ============================================================
+// PHASE 4: COMMITMENT CANDIDATE WORKFLOW
+// ============================================================
+
+/**
+ * Get pending candidates that haven't been offered for confirmation yet.
+ * Returns candidates in creation order (oldest first).
+ */
+export async function getPendingCandidates(limit: number = 1): Promise<Commitment[]> {
+  const result = await pool.query(
+    `SELECT * FROM commitments
+     WHERE status = 'candidate'
+       AND confirmation_offered_at IS NULL
+       AND (auto_expires_at IS NULL OR auto_expires_at > NOW())
+     ORDER BY created_at ASC
+     LIMIT $1`,
+    [limit]
+  );
+  return result.rows as Commitment[];
+}
+
+/**
+ * Mark a candidate as having been offered for confirmation.
+ * Prevents the same candidate from being surfaced multiple times.
+ */
+export async function markConfirmationOffered(commitmentId: string): Promise<void> {
+  await pool.query(
+    `UPDATE commitments 
+     SET confirmation_offered_at = NOW()
+     WHERE id = $1 AND status = 'candidate'`,
+    [commitmentId]
+  );
+}
+
+/**
+ * Confirm a candidate, promoting it to 'open' status.
+ * Called when user responds positively to "Would you like me to track this?"
+ */
+export async function confirmCandidate(commitmentId: string): Promise<Commitment | null> {
+  const result = await pool.query(
+    `UPDATE commitments 
+     SET status = 'open', auto_expires_at = NULL, updated_at = NOW()
+     WHERE id = $1 AND status = 'candidate'
+     RETURNING *`,
+    [commitmentId]
+  );
+  
+  if (result.rows.length > 0) {
+    console.log(`[Commitments] Candidate CONFIRMED: "${result.rows[0].title}"`);
+    // Refresh summaries since we have a new active commitment
+    try {
+      await refreshCommitmentsSummary();
+    } catch {
+      // Non-critical
+    }
+    return result.rows[0] as Commitment;
+  }
+  return null;
+}
+
+/**
+ * Dismiss a candidate (user said no).
+ * Called when user responds negatively to confirmation prompt.
+ */
+export async function dismissCandidate(commitmentId: string): Promise<Commitment | null> {
+  const result = await pool.query(
+    `UPDATE commitments 
+     SET status = 'dismissed', auto_expires_at = NULL, updated_at = NOW()
+     WHERE id = $1 AND status = 'candidate'
+     RETURNING *`,
+    [commitmentId]
+  );
+  
+  if (result.rows.length > 0) {
+    console.log(`[Commitments] Candidate DISMISSED: "${result.rows[0].title}"`);
+    return result.rows[0] as Commitment;
+  }
+  return null;
+}
+
+/**
+ * Expire candidates that have passed their auto_expires_at time.
+ * Called by scheduler on a regular interval.
+ */
+export async function expireCandidates(): Promise<number> {
+  const result = await pool.query(
+    `UPDATE commitments 
+     SET status = 'expired', updated_at = NOW()
+     WHERE status = 'candidate'
+       AND auto_expires_at IS NOT NULL
+       AND auto_expires_at < NOW()
+     RETURNING id, title`
+  );
+  
+  const count = result.rowCount ?? 0;
+  if (count > 0) {
+    console.log(`[Commitments] Expired ${count} unconfirmed candidates`);
+    for (const row of result.rows) {
+      console.log(`  - "${row.title}"`);
+    }
+  }
+  return count;
+}
+
+/**
+ * Get the most recently offered candidate (for response detection).
+ * Used to match user's "yes/no" response to the right candidate.
+ */
+export async function getLastOfferedCandidate(): Promise<Commitment | null> {
+  const result = await pool.query(
+    `SELECT * FROM commitments
+     WHERE status = 'candidate'
+       AND confirmation_offered_at IS NOT NULL
+       AND (auto_expires_at IS NULL OR auto_expires_at > NOW())
+     ORDER BY confirmation_offered_at DESC
+     LIMIT 1`
+  );
+  return result.rows[0] as Commitment | null;
 }

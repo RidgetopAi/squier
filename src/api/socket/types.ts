@@ -131,6 +131,8 @@ export interface ServerToClientEvents {
   'insight:created': (payload: InsightCreatedPayload) => void;
   'connection:status': (payload: ConnectionStatusPayload) => void;
   'commitment:created': (payload: CommitmentCreatedPayload) => void;
+  'commitment:candidate': (payload: CommitmentCreatedPayload) => void; // Phase 4: candidate offered
+  'commitment:dismissed': (payload: CommitmentCreatedPayload) => void; // Phase 4: candidate dismissed
   'reminder:created': (payload: ReminderCreatedPayload) => void;
   'message:synced': (payload: MessageSyncedPayload) => void;
 }

@@ -14,6 +14,12 @@ import { consolidateAll } from '../../services/consolidation.js';
 import { processMessageRealTime } from '../../services/chatExtraction.js';
 import { getUserIdentity } from '../../services/identity.js';
 import {
+  markConfirmationOffered,
+  confirmCandidate,
+  dismissCandidate,
+  getLastOfferedCandidate,
+} from '../../services/commitments.js';
+import {
   getToolDefinitions,
   hasTools,
   executeTools,
@@ -70,6 +76,94 @@ function scheduleConsolidation(): void {
   console.log('[AutoSleep] Consolidation scheduled for 15 min from now');
 }
 
+// === PHASE 4: COMMITMENT CANDIDATE RESPONSE DETECTION ===
+
+// Patterns for detecting confirmation/dismissal responses
+const CONFIRM_PATTERNS = /^(yes|yeah|yep|yup|sure|ok|okay|please|do that|track it|add it|confirm|absolutely|definitely|of course|go ahead)\b/i;
+const DISMISS_PATTERNS = /^(no|nah|nope|don't|skip|nevermind|never mind|cancel|dismiss|not now|forget it|no thanks)\b/i;
+
+/**
+ * Check if user is responding to a commitment confirmation prompt.
+ * If so, handle it and send a response directly.
+ * Returns true if handled (caller should skip normal LLM flow).
+ */
+async function checkCandidateResponse(
+  message: string,
+  socket: TypedSocket,
+  io: TypedIO,
+  conversationId: string
+): Promise<boolean> {
+  // Check if there's a recently offered candidate
+  const candidate = await getLastOfferedCandidate();
+  if (!candidate) {
+    return false;
+  }
+
+  // Check if the message is a confirmation or dismissal
+  const isConfirm = CONFIRM_PATTERNS.test(message.trim());
+  const isDismiss = DISMISS_PATTERNS.test(message.trim());
+
+  if (!isConfirm && !isDismiss) {
+    return false;
+  }
+
+  let responseText: string;
+
+  if (isConfirm) {
+    const confirmed = await confirmCandidate(candidate.id);
+    if (confirmed) {
+      responseText = `✓ Got it! I'm now tracking "${candidate.title}" as a task.`;
+      socket.emit('commitment:created', {
+        id: candidate.id,
+        title: candidate.title,
+      });
+    } else {
+      responseText = `I couldn't find that task to confirm. It may have already been processed.`;
+    }
+  } else {
+    const dismissed = await dismissCandidate(candidate.id);
+    if (dismissed) {
+      responseText = `No problem, I won't track "${candidate.title}".`;
+      socket.emit('commitment:dismissed', {
+        id: candidate.id,
+        title: candidate.title,
+      });
+    } else {
+      responseText = `I couldn't find that task to dismiss. It may have already been processed.`;
+    }
+  }
+
+  // Send the response as a streaming chunk + done
+  socket.emit('chat:chunk', {
+    conversationId,
+    chunk: responseText,
+    done: false,
+  });
+  socket.emit('chat:done', { conversationId });
+
+  // Persist the assistant message
+  const { addMessage: addChatMessage } = await import('../../services/conversations.js');
+  await addChatMessage({
+    conversationId,
+    role: 'assistant',
+    content: responseText,
+  });
+
+  // Broadcast to other devices
+  io.to(`conversation:${conversationId}`).emit('message:synced', {
+    conversationId,
+    message: {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content: responseText,
+      timestamp: new Date().toISOString(),
+    },
+  });
+
+  console.log(`[Socket] Candidate ${isConfirm ? 'CONFIRMED' : 'DISMISSED'}: "${candidate.title}"`);
+  return true;
+}
+
 // === FOLLOW-UP ACKNOWLEDGMENT TEMPLATES ===
 
 function formatReminderAcknowledgment(title: string, remindAt: string): string {
@@ -105,8 +199,10 @@ function formatReminderAcknowledgment(title: string, remindAt: string): string {
   return `\n\n---\n✓ I've set a reminder for you: "${title}" ${timeStr}.`;
 }
 
-function formatCommitmentAcknowledgment(title: string): string {
-  return `\n\n---\n✓ I've noted your commitment: "${title}"`;
+// Phase 4: Changed from acknowledgment to confirmation prompt
+// Commitments now start as 'candidate' and need user confirmation
+function formatCommitmentConfirmationPrompt(title: string): string {
+  return `\n\n---\n📋 Would you like me to track "${title}" as a task?`;
 }
 
 // System prompt for Squire
@@ -241,6 +337,14 @@ async function handleChatMessage(
       content: message,
       timestamp: userMessage.created_at.toISOString(),
     }, socket.id);
+
+    // Phase 4: Check for commitment confirmation/dismissal response
+    // If user just said yes/no to a candidate prompt, handle it immediately
+    const candidateResponse = await checkCandidateResponse(message, socket, io, conversationId);
+    if (candidateResponse) {
+      // User confirmed/dismissed - we've already sent a response, skip LLM
+      return;
+    }
 
     // Step 1.5: Start real-time extraction for commitments/reminders
     // Runs in parallel with context fetch and LLM response - awaited after streaming
@@ -386,12 +490,15 @@ Use this narrative to respond naturally. You can expand on it or answer follow-u
         });
         console.log(`[Socket] Reminder created: "${extracted.reminderCreated.title}"`);
       } else if (extracted.commitmentCreated) {
-        followUp = formatCommitmentAcknowledgment(extracted.commitmentCreated.title);
-        socket.emit('commitment:created', {
+        // Phase 4: Commitments are now candidates - prompt for confirmation
+        followUp = formatCommitmentConfirmationPrompt(extracted.commitmentCreated.title);
+        // Mark as offered so we know which candidate to confirm on user response
+        await markConfirmationOffered(extracted.commitmentCreated.id);
+        socket.emit('commitment:candidate', {
           id: extracted.commitmentCreated.id,
           title: extracted.commitmentCreated.title,
         });
-        console.log(`[Socket] Commitment created: "${extracted.commitmentCreated.title}"`);
+        console.log(`[Socket] Commitment CANDIDATE offered: "${extracted.commitmentCreated.title}"`);
       }
 
       // Stream the follow-up as additional chunks
