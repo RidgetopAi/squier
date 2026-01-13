@@ -228,6 +228,17 @@ import {
   createCalendarEventToolHandler,
 } from './calendar.js';
 
+import {
+  listOpenCommitmentsToolName,
+  listOpenCommitmentsToolDescription,
+  listOpenCommitmentsToolParameters,
+  listOpenCommitmentsToolHandler,
+  completeCommitmentToolName,
+  completeCommitmentToolDescription,
+  completeCommitmentToolParameters,
+  completeCommitmentToolHandler,
+} from './commitments.js';
+
 // Register time tool
 registerTool(timeToolName, timeToolDescription, timeToolParameters, timeToolHandler);
 
@@ -254,3 +265,7 @@ registerTool(getTodaysEventsToolName, getTodaysEventsToolDescription, getTodaysE
 registerTool(getEventsDueSoonToolName, getEventsDueSoonToolDescription, getEventsDueSoonToolParameters, getEventsDueSoonToolHandler);
 // Register calendar tools (write)
 registerTool(createCalendarEventToolName, createCalendarEventToolDescription, createCalendarEventToolParameters, createCalendarEventToolHandler);
+
+// Register commitment tools
+registerTool(listOpenCommitmentsToolName, listOpenCommitmentsToolDescription, listOpenCommitmentsToolParameters, listOpenCommitmentsToolHandler);
+registerTool(completeCommitmentToolName, completeCommitmentToolDescription, completeCommitmentToolParameters, completeCommitmentToolHandler);
