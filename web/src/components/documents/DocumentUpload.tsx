@@ -321,7 +321,7 @@ export function DocumentUpload({
                         Drop file here or click to browse
                       </p>
                       <p className="text-sm text-foreground-muted mt-1">
-                        PDF, Word, Text, Markdown, or Images (max 50MB)
+                        PDF, Word, Text, Markdown, CSV, or Images (max 50MB)
                       </p>
                     </div>
                   </div>
