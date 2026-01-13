@@ -148,10 +148,22 @@ async function handleCompleteCommitment(args: CompleteCommitmentArgs | null): Pr
       }
 
       const bestMatch = matches[0]!;
-      if (matches.length > 1 && bestMatch.similarity < 0.8) {
-        // Multiple matches, not confident - return options
+      const secondMatch = matches[1];
+
+      // Decide whether to use best match or ask for clarification
+      // Use best match if:
+      // 1. It's the only match, OR
+      // 2. It's >= 60% similar (decent match), OR
+      // 3. It's significantly better than second match (15%+ gap)
+      const isClearWinner =
+        matches.length === 1 ||
+        bestMatch.similarity >= 0.6 ||
+        (secondMatch && bestMatch.similarity - secondMatch.similarity >= 0.15);
+
+      if (!isClearWinner && matches.length > 1) {
+        // Matches are too close in similarity - ask for clarification
         return JSON.stringify({
-          error: 'Multiple commitments match that description. Please be more specific or use the commitment_id.',
+          error: 'Multiple similar commitments found. Which one did you mean?',
           matches: matches.map((m) => ({
             id: m.id,
             title: m.title,
