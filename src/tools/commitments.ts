@@ -12,8 +12,76 @@ import {
   type Commitment,
   type ResolutionType,
 } from '../services/commitments.js';
+import {
+  listReminders,
+  markReminderAcknowledged,
+  type Reminder,
+} from '../services/reminders.js';
+import { generateEmbedding } from '../providers/embeddings.js';
+import { pool } from '../db/pool.js';
 import { config } from '../config/index.js';
 import type { ToolHandler } from './types.js';
+
+// =============================================================================
+// REMINDER SEARCH HELPER
+// =============================================================================
+
+interface ReminderMatch {
+  reminder: Reminder;
+  similarity: number;
+}
+
+async function findMatchingReminders(
+  text: string,
+  options: { limit?: number; minSimilarity?: number } = {}
+): Promise<ReminderMatch[]> {
+  const { limit = 5, minSimilarity = 0.4 } = options;
+
+  // Search reminders by text similarity (no embedding on reminders, use text search)
+  // First try exact/partial match
+  const textResult = await pool.query<Reminder>(
+    `SELECT * FROM reminders
+     WHERE status IN ('pending', 'sent')
+       AND (title ILIKE $1 OR title ILIKE $2)
+     ORDER BY scheduled_for DESC
+     LIMIT $3`,
+    [`%${text}%`, `%${text.split(' ').join('%')}%`, limit]
+  );
+
+  if (textResult.rows.length > 0) {
+    return textResult.rows.map((r) => ({
+      reminder: r,
+      similarity: 0.7, // Text match gets decent similarity
+    }));
+  }
+
+  // Fall back to embedding search if we have the embedding column
+  try {
+    const embedding = await generateEmbedding(text);
+    const embeddingStr = `[${embedding.join(',')}]`;
+
+    // Check if reminders have embeddings (they might not)
+    const result = await pool.query<Reminder & { similarity: number }>(
+      `SELECT r.*,
+              1 - (r.embedding <=> $1::vector) as similarity
+       FROM reminders r
+       WHERE r.status IN ('pending', 'sent')
+         AND r.embedding IS NOT NULL
+         AND 1 - (r.embedding <=> $1::vector) >= $2
+       ORDER BY similarity DESC
+       LIMIT $3`,
+      [embeddingStr, minSimilarity, limit]
+    );
+
+    return result.rows.map((r) => ({
+      reminder: r,
+      similarity: r.similarity,
+    }));
+  } catch {
+    // Embedding search failed, return empty
+    return [];
+  }
+}
 
 // =============================================================================
 // HELPERS
@@ -56,38 +124,73 @@ async function handleListOpenCommitments(args: ListOpenCommitmentsArgs | null): 
   const { limit = 20 } = args ?? {};
 
   try {
+    // Get open commitments
     const commitments = await listCommitments({
       status: ['open', 'in_progress'],
       limit,
     });
 
-    if (commitments.length === 0) {
+    // Get pending/sent reminders
+    const reminders = await listReminders({
+      status: ['pending', 'sent'],
+      limit,
+    });
+
+    const formattedCommitments = commitments.map((c) => ({
+      ...formatCommitment(c),
+      type: 'commitment',
+    }));
+
+    const formattedReminders = reminders.map((r) => ({
+      id: r.id,
+      title: r.title ?? 'Untitled reminder',
+      description: r.body,
+      status: r.status,
+      due_at: r.scheduled_for?.toISOString() ?? null,
+      due_label: r.scheduled_for
+        ? r.scheduled_for.toLocaleDateString('en-US', {
+            timeZone: config.timezone,
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+          })
+        : 'No time set',
+      is_overdue: r.scheduled_for && new Date(r.scheduled_for) < new Date(),
+      type: 'reminder',
+    }));
+
+    const allItems = [...formattedCommitments, ...formattedReminders];
+
+    if (allItems.length === 0) {
       return JSON.stringify({
-        message: 'No open commitments or tasks',
+        message: 'No open commitments, tasks, or reminders',
         count: 0,
-        commitments: [],
+        items: [],
       });
     }
 
-    const formatted = commitments.map(formatCommitment);
-    const overdueCount = formatted.filter((c) => c.is_overdue).length;
+    const overdueCount = allItems.filter((c) => c.is_overdue).length;
 
     return JSON.stringify({
-      count: formatted.length,
+      count: allItems.length,
+      commitment_count: formattedCommitments.length,
+      reminder_count: formattedReminders.length,
       overdue_count: overdueCount,
-      usage_note: 'Use the commitment id when calling complete_commitment. You can also match by title.',
-      commitments: formatted,
+      usage_note: 'Use complete_commitment with id or title_match to mark items done. Works for both commitments and reminders.',
+      items: allItems,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return JSON.stringify({ error: `Failed to list commitments: ${message}`, commitments: [] });
+    return JSON.stringify({ error: `Failed to list items: ${message}`, items: [] });
   }
 }
 
 export const listOpenCommitmentsToolName = 'list_open_commitments';
 
 export const listOpenCommitmentsToolDescription =
-  'List the user\'s open commitments and tasks. Use this when the user asks "what do I have to do?", "what tasks are open?", "show my commitments", or when you need to find a specific commitment to mark complete.';
+  'List the user\'s open commitments, tasks, and pending reminders. Use this when the user asks "what do I have to do?", "what tasks are open?", "show my commitments", "what reminders do I have?", or when you need to find something to mark complete.';
 
 export const listOpenCommitmentsToolParameters = {
   type: 'object',
@@ -128,94 +231,149 @@ async function handleCompleteCommitment(args: CompleteCommitmentArgs | null): Pr
 
   try {
     let targetId: string | null = null;
+    let targetType: 'commitment' | 'reminder' = 'commitment';
 
-    // If we have a direct ID, use it
+    // If we have a direct ID, try commitment first, then reminder
     if (commitment_id) {
       targetId = commitment_id;
+      // We'll try commitment first in the resolution step
     } else if (title_match) {
-      // Search by title similarity
-      const matches = await findMatchingCommitments(title_match, {
+      // Search commitments first
+      const commitmentMatches = await findMatchingCommitments(title_match, {
         limit: 3,
         minSimilarity: 0.4,
       });
 
-      if (matches.length === 0) {
+      // Also search reminders
+      const reminderMatches = await findMatchingReminders(title_match, {
+        limit: 3,
+        minSimilarity: 0.4,
+      });
+
+      // Combine and sort by similarity
+      type Match = { id: string; title: string; similarity: number; type: 'commitment' | 'reminder' };
+      const allMatches: Match[] = [
+        ...commitmentMatches.map((m) => ({
+          id: m.id,
+          title: m.title,
+          similarity: m.similarity,
+          type: 'commitment' as const,
+        })),
+        ...reminderMatches.map((m) => ({
+          id: m.reminder.id,
+          title: m.reminder.title ?? 'Untitled reminder',
+          similarity: m.similarity,
+          type: 'reminder' as const,
+        })),
+      ].sort((a, b) => b.similarity - a.similarity);
+
+      if (allMatches.length === 0) {
         return JSON.stringify({
-          error: `No open commitment found matching "${title_match}"`,
+          error: `No open commitment or reminder found matching "${title_match}"`,
           resolved: null,
-          suggestion: 'Use list_open_commitments to see all open commitments',
+          suggestion: 'Use list_open_commitments to see all open items',
         });
       }
 
-      const bestMatch = matches[0]!;
-      const secondMatch = matches[1];
+      const bestMatch = allMatches[0]!;
+      const secondMatch = allMatches[1];
 
-      // Decide whether to use best match or ask for clarification
-      // Use best match if:
-      // 1. It's the only match, OR
-      // 2. It's >= 60% similar (decent match), OR
-      // 3. It's significantly better than second match (15%+ gap)
+      // Use best match if it's clearly the winner
       const isClearWinner =
-        matches.length === 1 ||
+        allMatches.length === 1 ||
         bestMatch.similarity >= 0.6 ||
         (secondMatch && bestMatch.similarity - secondMatch.similarity >= 0.15);
 
-      if (!isClearWinner && matches.length > 1) {
-        // Matches are too close in similarity - ask for clarification
+      if (!isClearWinner && allMatches.length > 1) {
         return JSON.stringify({
-          error: 'Multiple similar commitments found. Which one did you mean?',
-          matches: matches.map((m) => ({
+          error: 'Multiple similar items found. Which one did you mean?',
+          matches: allMatches.slice(0, 5).map((m) => ({
             id: m.id,
             title: m.title,
+            type: m.type,
             similarity: Math.round(m.similarity * 100) + '%',
           })),
           resolved: null,
         });
       }
 
-      // Use best match
       targetId = bestMatch.id;
+      targetType = bestMatch.type;
     }
 
     if (!targetId) {
       return JSON.stringify({
-        error: 'Could not determine which commitment to complete',
+        error: 'Could not determine which item to complete',
         resolved: null,
       });
     }
 
-    // Resolve the commitment
+    // Try to resolve based on type
+    if (targetType === 'reminder' || commitment_id) {
+      // If it's a reminder OR we have a direct ID (try both)
+      if (targetType === 'reminder') {
+        const reminder = await markReminderAcknowledged(targetId);
+        if (reminder) {
+          return JSON.stringify({
+            message: `Marked reminder "${reminder.title}" as done`,
+            resolved: {
+              id: reminder.id,
+              title: reminder.title,
+              type: 'reminder',
+              status: 'acknowledged',
+            },
+          });
+        }
+      }
+    }
+
+    // Try commitment resolution
     const resolved = await resolveCommitment(targetId, {
       resolution_type,
     });
 
-    if (!resolved) {
+    if (resolved) {
       return JSON.stringify({
-        error: `Commitment ${targetId} not found or already resolved`,
-        resolved: null,
+        message: `Marked "${resolved.title}" as ${resolution_type}`,
+        resolved: {
+          id: resolved.id,
+          title: resolved.title,
+          type: 'commitment',
+          status: resolved.status,
+          resolution_type: resolved.resolution_type,
+          resolved_at: resolved.resolved_at?.toISOString(),
+        },
+      });
+    }
+
+    // Last resort: try as reminder if commitment failed
+    const reminder = await markReminderAcknowledged(targetId);
+    if (reminder) {
+      return JSON.stringify({
+        message: `Marked reminder "${reminder.title}" as done`,
+        resolved: {
+          id: reminder.id,
+          title: reminder.title,
+          type: 'reminder',
+          status: 'acknowledged',
+        },
       });
     }
 
     return JSON.stringify({
-      message: `Marked "${resolved.title}" as ${resolution_type}`,
-      resolved: {
-        id: resolved.id,
-        title: resolved.title,
-        status: resolved.status,
-        resolution_type: resolved.resolution_type,
-        resolved_at: resolved.resolved_at?.toISOString(),
-      },
+      error: `Item ${targetId} not found or already completed`,
+      resolved: null,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return JSON.stringify({ error: `Failed to complete commitment: ${message}`, resolved: null });
+    return JSON.stringify({ error: `Failed to complete item: ${message}`, resolved: null });
   }
 }
 
 export const completeCommitmentToolName = 'complete_commitment';
 
 export const completeCommitmentToolDescription =
-  'Mark a commitment or task as complete (or canceled). Use this when the user says they finished something, completed a task, or wants to mark something done. You can specify by ID (from list_open_commitments) or by title match. Examples: "mark the dentist appointment done", "I finished that report", "cancel the meeting task".';
+  'Mark a commitment, task, or reminder as complete/done. Use this when the user says they finished something, completed a task, did a reminder, or wants to mark something done. Searches both commitments AND reminders. You can specify by ID or by title match. Examples: "mark the dentist appointment done", "I finished that", "that call is done".';
 
 export const completeCommitmentToolParameters = {
   type: 'object',
