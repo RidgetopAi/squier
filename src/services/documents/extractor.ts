@@ -18,6 +18,7 @@ import {
 import { pdfExtractor } from './pdfExtractor.js';
 import { docxExtractor } from './docxExtractor.js';
 import { textExtractor } from './textExtractor.js';
+import { csvExtractor } from './csvExtractor.js';
 import { ocrExtractor } from './ocrExtractor.js';
 
 /**
@@ -26,6 +27,7 @@ import { ocrExtractor } from './ocrExtractor.js';
 const extractors: DocumentExtractor[] = [
   pdfExtractor,
   docxExtractor,
+  csvExtractor, // CSV before text so it takes priority for .csv files
   textExtractor,
   ocrExtractor,
 ];
@@ -55,6 +57,7 @@ function mimeFromExtension(filePath: string): string | null {
     '.txt': 'text/plain',
     '.md': 'text/markdown',
     '.markdown': 'text/markdown',
+    '.csv': 'text/csv',
     '.png': 'image/png',
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',

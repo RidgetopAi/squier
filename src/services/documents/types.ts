@@ -17,6 +17,10 @@ export const EXTRACTABLE_MIME_TYPES = [
   'text/plain',
   'text/markdown',
   'text/x-markdown',
+  // CSV
+  'text/csv',
+  'application/csv',
+  'text/comma-separated-values',
   // Images (for OCR)
   'image/png',
   'image/jpeg',
