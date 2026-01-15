@@ -676,10 +676,23 @@ Return JSON with:
 - delay_minutes: number | null - for RELATIVE times AND same-day times
 - scheduled_at: string | null - ONLY for future dates (not today)
 
-CRITICAL TIMEZONE RULE - The user is in Eastern Time (EST/EDT):
+CRITICAL TIMEZONE RULES - The user is in Eastern Time (EST/EDT, UTC-5):
 - ALWAYS use delay_minutes for SAME-DAY reminders (e.g., "at 10:30", "at 2pm today")
 - ONLY use scheduled_at for FUTURE DATES (tomorrow or later)
 - Calculate delay_minutes from the current time shown above
+
+**CRITICAL: Converting Local Time to UTC for scheduled_at:**
+The user speaks in Eastern Time (EST). You must convert to UTC by ADDING 5 hours.
+- 9:00 AM EST = 14:00 UTC (add 5 hours)
+- 2:00 PM EST (14:00 local) = 19:00 UTC (add 5 hours)
+- 10:00 AM EST = 15:00 UTC (add 5 hours)
+- Midnight (12:00 AM) EST = 05:00 UTC (add 5 hours)
+
+**CRITICAL: Default Time When No Time Specified:**
+When the user gives a DATE but NO TIME (e.g., "Friday the 16th", "on January 20"):
+- Default to 9:00 AM in the user's local time (EST)
+- 9:00 AM EST = 14:00 UTC
+- So scheduled_at should use T14:00:00Z for date-only reminders
 
 For same-day times, calculate delay_minutes like this:
 - Current time is ${dt.formatted}
@@ -711,11 +724,20 @@ Output: {"is_reminder": true, "title": "Call the office", "delay_minutes": 250, 
 Input: "remind me at 10:30 to check the oven" (SAME-DAY - use delay_minutes!)
 Output: {"is_reminder": true, "title": "Check the oven", "delay_minutes": 10, "scheduled_at": null}
 
-Input: "remind me on Wednesday at 2pm about the meeting" (FUTURE DATE - use scheduled_at)
+Input: "remind me on Wednesday at 2pm about the meeting" (FUTURE DATE with time - convert 2pm EST to 19:00 UTC)
 Output: {"is_reminder": true, "title": "Meeting", "delay_minutes": null, "scheduled_at": "${dt.weekdayDates.wednesday}T19:00:00Z"}
 
-Input: "remind me on January 15, 2026 at 9am about the appointment" (FUTURE DATE - use scheduled_at)
+Input: "remind me on Wednesday about the meeting" (FUTURE DATE, NO time - default to 9am EST = 14:00 UTC)
+Output: {"is_reminder": true, "title": "Meeting", "delay_minutes": null, "scheduled_at": "${dt.weekdayDates.wednesday}T14:00:00Z"}
+
+Input: "remind me on Friday the 16th to check the job" (FUTURE DATE, NO time - default to 9am EST = 14:00 UTC)
+Output: {"is_reminder": true, "title": "Check the job", "delay_minutes": null, "scheduled_at": "2026-01-16T14:00:00Z"}
+
+Input: "remind me on January 15, 2026 at 9am about the appointment" (FUTURE DATE with time - 9am EST = 14:00 UTC)
 Output: {"is_reminder": true, "title": "Appointment", "delay_minutes": null, "scheduled_at": "2026-01-15T14:00:00Z"}
+
+Input: "remind me on January 20" (FUTURE DATE, NO time - default to 9am EST = 14:00 UTC)
+Output: {"is_reminder": true, "title": "Reminder for January 20", "delay_minutes": null, "scheduled_at": "2026-01-20T14:00:00Z"}
 
 Input: "I need to remember my dentist appointment"
 Output: {"is_reminder": false, "title": null, "delay_minutes": null, "scheduled_at": null}
