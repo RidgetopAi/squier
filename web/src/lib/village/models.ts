@@ -14,12 +14,12 @@ import type { BuildingType } from '@/lib/types/village';
 /**
  * Base path for all building models
  */
-export const MODELS_BASE_PATH = '/models/buildings';
+const MODELS_BASE_PATH = '/models/buildings';
 
 /**
  * Base path for prop models
  */
-export const PROPS_BASE_PATH = '/models/props';
+const PROPS_BASE_PATH = '/models/props';
 
 /**
  * Model configuration for each building type
@@ -106,7 +106,7 @@ export const BUILDING_MODEL_CONFIGS: Record<BuildingType, BuildingModelConfig> =
 /**
  * All building types for iteration
  */
-export const ALL_BUILDING_TYPES: BuildingType[] = [
+const ALL_BUILDING_TYPES: BuildingType[] = [
   'tavern',
   'library',
   'blacksmith',
@@ -119,7 +119,7 @@ export const ALL_BUILDING_TYPES: BuildingType[] = [
 /**
  * Get the model path for a building type
  */
-export function getModelPath(buildingType: BuildingType): string {
+function getModelPath(buildingType: BuildingType): string {
   return BUILDING_MODEL_CONFIGS[buildingType].path;
 }
 
@@ -147,44 +147,6 @@ export function preloadAllBuildingModels(): void {
   });
 }
 
-/**
- * Preload specific building types (useful for visible buildings only)
- */
-export function preloadBuildingModels(types: BuildingType[]): void {
-  types.forEach((type) => {
-    const path = getModelPath(type);
-    useGLTF.preload(path);
-  });
-}
-
-/**
- * Clear cached models (useful for memory management)
- */
-export function clearModelCache(): void {
-  ALL_BUILDING_TYPES.forEach((type) => {
-    const path = getModelPath(type);
-    useGLTF.clear(path);
-  });
-}
-
-// ============================================
-// MODEL LOADING HOOK HELPERS
-// ============================================
-
-/**
- * Check if a model file exists for this building type
- * All 7 building types now have KayKit models available
- */
-export function hasModel(buildingType: BuildingType): boolean {
-  // All building types have models from KayKit Medieval Hexagon Pack
-  return ALL_BUILDING_TYPES.includes(buildingType);
-}
-
-/**
- * Fallback model path (simple geometry) - used when model fails to load
- * The Building component will use box geometry as fallback
- */
-export const FALLBACK_MODEL_PATH = null;
 
 // ============================================
 // PROP MODELS
@@ -284,7 +246,7 @@ export const PROP_MODEL_CONFIGS: Record<PropType, PropModelConfig> = {
 /**
  * All prop types for iteration
  */
-export const ALL_PROP_TYPES: PropType[] = [
+const ALL_PROP_TYPES: PropType[] = [
   'barrel',
   'crate_a',
   'crate_b',
@@ -320,11 +282,3 @@ export function preloadAllPropModels(): void {
   });
 }
 
-/**
- * Clear prop model cache
- */
-export function clearPropCache(): void {
-  ALL_PROP_TYPES.forEach((type) => {
-    useGLTF.clear(getPropPath(type));
-  });
-}

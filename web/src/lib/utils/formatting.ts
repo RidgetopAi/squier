@@ -67,18 +67,6 @@ export function truncate(text: string, maxLength: number): string {
   return text.slice(0, maxLength - 3) + '...';
 }
 
-// Format number with K/M suffix
-export function formatCompactNumber(num: number): string {
-  if (num < 1000) return num.toString();
-  if (num < 1000000) return `${(num / 1000).toFixed(1)}K`;
-  return `${(num / 1000000).toFixed(1)}M`;
-}
-
-// Format percentage
-export function formatPercent(value: number, decimals = 0): string {
-  return `${(value * 100).toFixed(decimals)}%`;
-}
-
 // Format salience as display string
 export function formatSalience(salience: number | null | undefined): string {
   if (salience == null || isNaN(salience)) return '—';
@@ -98,24 +86,4 @@ export function formatConfidence(confidence: number): string {
 // Capitalize first letter
 export function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
-// Format entity type for display
-export function formatEntityType(type: string): string {
-  return capitalize(type.replace(/_/g, ' '));
-}
-
-// Pluralize
-export function pluralize(
-  count: number,
-  singular: string,
-  plural?: string
-): string {
-  if (count === 1) return singular;
-  return plural || `${singular}s`;
-}
-
-// Format count with noun
-export function formatCount(count: number, noun: string): string {
-  return `${count} ${pluralize(count, noun)}`;
 }

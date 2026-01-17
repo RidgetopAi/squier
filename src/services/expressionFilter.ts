@@ -92,7 +92,7 @@ IMPORTANT:
  * @param conversationContext - Optional context about current conversation
  * @returns ExpressionFilterResult with pass/block verdicts
  */
-export async function filterMemoriesForExpression(
+async function filterMemoriesForExpression(
   memories: MemoryToFilter[],
   conversationContext?: string
 ): Promise<ExpressionFilterResult> {
@@ -261,7 +261,7 @@ function passAllMemories(memories: MemoryToFilter[]): ExpressionFilterResult {
  * Quick heuristic pre-filter to skip obvious safe memories
  * Returns true if memory should SKIP LLM filter (definitely safe)
  */
-export function shouldSkipFilter(content: string): boolean {
+function shouldSkipFilter(content: string): boolean {
   const lower = content.toLowerCase();
 
   // Biographical facts - always safe
@@ -285,7 +285,7 @@ export function shouldSkipFilter(content: string): boolean {
  * Quick heuristic pre-filter to block obvious junk
  * Returns true if memory should be BLOCKED without LLM call
  */
-export function shouldBlockWithoutFilter(content: string): boolean {
+function shouldBlockWithoutFilter(content: string): boolean {
   const lower = content.toLowerCase();
 
   // Meta-AI debugging patterns - always block

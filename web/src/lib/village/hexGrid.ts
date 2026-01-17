@@ -152,27 +152,6 @@ export function spiralHexPositions(count: number): HexCoord[] {
 }
 
 // ============================================
-// DISTANCE CALCULATIONS
-// ============================================
-
-/**
- * Calculate hex distance between two coordinates
- * (Number of hex steps to move from one to another)
- */
-export function hexDistance(a: HexCoord, b: HexCoord): number {
-  return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
-}
-
-/**
- * Calculate world distance between two positions
- */
-export function worldDistance(a: VillagePosition, b: VillagePosition): number {
-  const dx = b.x - a.x;
-  const dz = b.z - a.z;
-  return Math.sqrt(dx * dx + dz * dz);
-}
-
-// ============================================
 // BOUNDS CALCULATIONS
 // ============================================
 
@@ -219,28 +198,3 @@ export function hexAdd(a: HexCoord, b: HexCoord): HexCoord {
   return { q: a.q + b.q, r: a.r + b.r };
 }
 
-/**
- * Scale hex coordinate by a factor
- */
-export function hexScale(coord: HexCoord, factor: number): HexCoord {
-  return {
-    q: Math.round(coord.q * factor),
-    r: Math.round(coord.r * factor),
-  };
-}
-
-/**
- * Get neighboring hex coordinates
- */
-export function hexNeighbors(coord: HexCoord): HexCoord[] {
-  const directions: HexCoord[] = [
-    { q: 1, r: 0 },
-    { q: 0, r: 1 },
-    { q: -1, r: 1 },
-    { q: -1, r: 0 },
-    { q: 0, r: -1 },
-    { q: 1, r: -1 },
-  ];
-
-  return directions.map(dir => hexAdd(coord, dir));
-}

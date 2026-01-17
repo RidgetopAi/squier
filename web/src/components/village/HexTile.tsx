@@ -91,7 +91,7 @@ export interface HexTileProps {
 /**
  * Single hex tile ground mesh
  */
-export function HexTile({
+function HexTile({
   hexCoord,
   category,
   hexSize = DEFAULT_HEX_SIZE,
@@ -185,4 +185,4 @@ export function HexTilesLayer({
   );
 }
 
-export default HexTile;
+export default HexTilesLayer;

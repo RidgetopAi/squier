@@ -9,7 +9,6 @@ import type {
   ListItem,
   CreateListInput,
   CreateListItemInput,
-  ListCompletionStats,
 } from '@/lib/types';
 
 // ============================================
@@ -42,33 +41,10 @@ export async function fetchLists(options: ListListOptions = {}): Promise<List[]>
 }
 
 /**
- * Get a single list by ID
- */
-export async function fetchList(id: string): Promise<List> {
-  return apiGet<List>(`/api/lists/${id}`);
-}
-
-/**
  * Get a list with all its items
  */
 export async function fetchListWithItems(id: string): Promise<ListWithItems> {
   return apiGet<ListWithItems>(`/api/lists/${id}`, { params: { items: true } });
-}
-
-/**
- * Search lists by query
- */
-export async function searchLists(query: string, limit = 20): Promise<List[]> {
-  return apiGet<List[]>('/api/lists/search', {
-    params: { q: query, limit },
-  });
-}
-
-/**
- * Get lists by entity
- */
-export async function fetchListsByEntity(entityId: string): Promise<List[]> {
-  return apiGet<List[]>(`/api/lists/entity/${entityId}`);
 }
 
 /**
@@ -100,13 +76,6 @@ export async function archiveList(id: string): Promise<void> {
  */
 export async function deleteList(id: string): Promise<void> {
   await apiDelete<void>(`/api/lists/${id}`);
-}
-
-/**
- * Get completion stats for a list
- */
-export async function fetchListStats(id: string): Promise<ListCompletionStats> {
-  return apiGet<ListCompletionStats>(`/api/lists/${id}/stats`);
 }
 
 /**
@@ -179,26 +148,6 @@ export async function toggleItem(
   itemId: string
 ): Promise<ListItem> {
   return apiPost<ListItem>(`/api/lists/${listId}/items/${itemId}/toggle`);
-}
-
-/**
- * Complete an item
- */
-export async function completeItem(
-  listId: string,
-  itemId: string
-): Promise<ListItem> {
-  return apiPost<ListItem>(`/api/lists/${listId}/items/${itemId}/complete`);
-}
-
-/**
- * Uncomplete an item
- */
-export async function uncompleteItem(
-  listId: string,
-  itemId: string
-): Promise<ListItem> {
-  return apiPost<ListItem>(`/api/lists/${listId}/items/${itemId}/uncomplete`);
 }
 
 /**

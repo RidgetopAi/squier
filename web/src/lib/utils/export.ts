@@ -11,7 +11,7 @@ import { formatDateTime } from './formatting';
 /**
  * Export a single memory to Markdown format
  */
-export function memoryToMarkdown(
+function memoryToMarkdown(
   memory: ScoredMemory,
   entities?: EntitySummary[]
 ): string {
@@ -57,7 +57,7 @@ export function memoryToMarkdown(
 /**
  * Export a single memory to plain text format
  */
-export function memoryToText(memory: ScoredMemory): string {
+function memoryToText(memory: ScoredMemory): string {
   const lines: string[] = [];
 
   lines.push('MEMORY');
@@ -80,7 +80,7 @@ export function memoryToText(memory: ScoredMemory): string {
 /**
  * Trigger download of content as a file
  */
-export function downloadAsFile(
+function downloadAsFile(
   content: string,
   filename: string,
   mimeType: string = 'text/plain'

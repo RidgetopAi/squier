@@ -206,18 +206,6 @@ function invalidateDateStories(): number {
 }
 
 /**
- * Invalidate all cached stories
- * Use when major memory changes occur
- */
-export function invalidateAll(): void {
-  const count = cache.size;
-  cache.clear();
-  stats.invalidations += count;
-  stats.size = 0;
-  console.log(`[StoryCache] Cleared all ${count} cached stories`);
-}
-
-/**
  * Smart invalidation based on memory content
  * Analyzes new memory and invalidates relevant cache entries
  */
@@ -282,17 +270,6 @@ function startCleanupInterval(): void {
   if (cleanupInterval) return;
   cleanupInterval = setInterval(cleanupExpired, CLEANUP_INTERVAL_MS);
   console.log('[StoryCache] Started cleanup interval');
-}
-
-// === STATS ===
-
-/**
- * Get cache statistics
- */
-export function getCacheStats(): CacheStats & { hitRate: string } {
-  const total = stats.hits + stats.misses;
-  const hitRate = total > 0 ? ((stats.hits / total) * 100).toFixed(1) + '%' : '0%';
-  return { ...stats, hitRate };
 }
 
 // Start cleanup on module load

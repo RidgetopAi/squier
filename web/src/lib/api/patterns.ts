@@ -104,10 +104,3 @@ export async function fetchPatternStats(): Promise<PatternStatsResponse['stats']
   return response.stats;
 }
 
-/**
- * Fetch patterns by type
- */
-export async function fetchPatternsByType(type: PatternType): Promise<Pattern[]> {
-  const response = await apiGet<PatternsListResponse>(`/api/patterns/type/${type}`);
-  return response.patterns.map(transformPattern);
-}

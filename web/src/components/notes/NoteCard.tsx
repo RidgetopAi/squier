@@ -164,7 +164,7 @@ export function NoteCard({
   );
 }
 
-export function NoteCardCompact({
+function NoteCardCompact({
   note,
   onClick,
 }: {

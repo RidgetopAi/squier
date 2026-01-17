@@ -16,7 +16,7 @@ import * as THREE from 'three';
  * Vertex shader with sine wave displacement
  * Creates organic undulating movement along the beam
  */
-export const beamVertexShader = /* glsl */ `
+const beamVertexShader = /* glsl */ `
   uniform float uTime;
   uniform float uFrequency;
   uniform float uAmplitude;
@@ -48,7 +48,7 @@ export const beamVertexShader = /* glsl */ `
  * Fragment shader with animated glow
  * Creates ethereal light beam appearance
  */
-export const beamFragmentShader = /* glsl */ `
+const beamFragmentShader = /* glsl */ `
   uniform vec3 uColor;
   uniform float uTime;
   uniform float uOpacity;
@@ -135,7 +135,7 @@ export function updateBeamTime(material: THREE.ShaderMaterial, time: number): vo
 /**
  * Update beam color
  */
-export function updateBeamColor(material: THREE.ShaderMaterial, color: THREE.Color | string): void {
+function updateBeamColor(material: THREE.ShaderMaterial, color: THREE.Color | string): void {
   if (material.uniforms.uColor) {
     const c = color instanceof THREE.Color ? color : new THREE.Color(color);
     material.uniforms.uColor.value = c;

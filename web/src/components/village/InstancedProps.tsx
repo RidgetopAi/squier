@@ -96,7 +96,7 @@ interface InstancedPropGroupProps {
   placements: PropPlacement[];
 }
 
-export const InstancedPropGroup = memo(function InstancedPropGroup({
+const InstancedPropGroup = memo(function InstancedPropGroup({
   propType,
   placements,
 }: InstancedPropGroupProps) {
@@ -173,7 +173,7 @@ interface OptimizedPropsLayerProps {
   instanceThreshold?: number;
 }
 
-export const OptimizedPropsLayer = memo(function OptimizedPropsLayer({
+const OptimizedPropsLayer = memo(function OptimizedPropsLayer({
   props,
   instanceThreshold = 10,
 }: OptimizedPropsLayerProps) {
@@ -222,4 +222,4 @@ export const OptimizedPropsLayer = memo(function OptimizedPropsLayer({
   );
 });
 
-export default OptimizedPropsLayer;
+export default PropsLayer;

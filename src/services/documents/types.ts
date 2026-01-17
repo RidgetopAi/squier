@@ -33,12 +33,12 @@ export const EXTRACTABLE_MIME_TYPES = [
 
 export type ExtractableMimeType = (typeof EXTRACTABLE_MIME_TYPES)[number];
 
-export const DOCUMENT_FORMATS = ['pdf', 'docx', 'doc', 'txt', 'md', 'image'] as const;
+const DOCUMENT_FORMATS = ['pdf', 'docx', 'doc', 'txt', 'md', 'image'] as const;
 export type DocumentFormat = (typeof DOCUMENT_FORMATS)[number];
 
 // === EXTRACTION STATUS ===
 
-export const EXTRACTION_STATUSES = ['pending', 'extracting', 'completed', 'failed'] as const;
+const EXTRACTION_STATUSES = ['pending', 'extracting', 'completed', 'failed'] as const;
 export type ExtractionStatus = (typeof EXTRACTION_STATUSES)[number];
 
 // === EXTRACTED DOCUMENT ===
@@ -151,7 +151,7 @@ export interface ExtractionResult {
   errorCode?: ExtractionErrorCode;
 }
 
-export const EXTRACTION_ERROR_CODES = [
+const EXTRACTION_ERROR_CODES = [
   'UNSUPPORTED_FORMAT',
   'FILE_TOO_LARGE',
   'EXTRACTION_TIMEOUT',
@@ -202,61 +202,7 @@ export type ExtractionInput =
   | { type: 'path'; filePath: string; mimeType?: string }
   | { type: 'objectId'; objectId: string };
 
-/**
- * Mapping from file extension to document format
- */
-export const EXTENSION_TO_FORMAT: Record<string, DocumentFormat> = {
-  '.pdf': 'pdf',
-  '.docx': 'docx',
-  '.doc': 'doc',
-  '.txt': 'txt',
-  '.md': 'md',
-  '.markdown': 'md',
-  '.png': 'image',
-  '.jpg': 'image',
-  '.jpeg': 'image',
-  '.webp': 'image',
-  '.tiff': 'image',
-  '.tif': 'image',
-  '.bmp': 'image',
-  '.gif': 'image',
-};
-
-/**
- * Mapping from MIME type to document format
- */
-export const MIME_TO_FORMAT: Record<string, DocumentFormat> = {
-  'application/pdf': 'pdf',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
-  'application/msword': 'doc',
-  'text/plain': 'txt',
-  'text/markdown': 'md',
-  'text/x-markdown': 'md',
-  'image/png': 'image',
-  'image/jpeg': 'image',
-  'image/jpg': 'image',
-  'image/webp': 'image',
-  'image/tiff': 'image',
-  'image/bmp': 'image',
-  'image/gif': 'image',
-};
-
 // === HELPER FUNCTIONS ===
-
-/**
- * Determine the document format from a MIME type
- */
-export function getFormatFromMimeType(mimeType: string): DocumentFormat | null {
-  return MIME_TO_FORMAT[mimeType.toLowerCase()] ?? null;
-}
-
-/**
- * Determine the document format from a file extension
- */
-export function getFormatFromExtension(fileName: string): DocumentFormat | null {
-  const ext = fileName.toLowerCase().slice(fileName.lastIndexOf('.'));
-  return EXTENSION_TO_FORMAT[ext] ?? null;
-}
 
 /**
  * Check if a MIME type is extractable

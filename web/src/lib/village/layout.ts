@@ -405,35 +405,6 @@ export function createEmptyLayout(): VillageLayout {
   };
 }
 
-/**
- * Get building by ID from layout
- */
-export function getBuildingById(
-  layout: VillageLayout,
-  buildingId: string
-): VillageBuilding | undefined {
-  return layout.buildings.find(b => b.id === buildingId);
-}
-
-/**
- * Get building by memory ID from layout
- */
-export function getBuildingByMemoryId(
-  layout: VillageLayout,
-  memoryId: string
-): VillageBuilding | undefined {
-  return layout.buildings.find(b => b.memoryId === memoryId);
-}
-
-/**
- * Get roads connected to a building
- */
-export function getConnectedRoads(
-  layout: VillageLayout,
-  buildingId: string
-): VillageRoad[] {
-  return layout.roads.filter(r => r.fromId === buildingId || r.toId === buildingId);
-}
 
 // ============================================
 // PROP GENERATION (Phase 5)
@@ -608,17 +579,6 @@ export function generateProps(
   return props;
 }
 
-/**
- * Build village layout with props included
- */
-export function buildVillageLayoutWithProps(
-  graphData: ForceGraphData,
-  options: VillageLayoutOptions = {}
-): VillageLayoutWithProps {
-  const layout = buildVillageLayout(graphData, options);
-  const props = generateProps(layout);
-  return { ...layout, props };
-}
 
 // ============================================
 // VILLAGER GENERATION (Phase 5)
@@ -727,15 +687,3 @@ export function generateVillagers(
   return villagers.slice(0, 30);
 }
 
-/**
- * Build complete village layout with props and villagers
- */
-export function buildVillageLayoutFull(
-  graphData: ForceGraphData,
-  options: VillageLayoutOptions = {}
-): VillageLayoutFull {
-  const layout = buildVillageLayout(graphData, options);
-  const props = generateProps(layout);
-  const villagers = generateVillagers(graphData, layout);
-  return { ...layout, props, villagers };
-}

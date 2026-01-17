@@ -15,7 +15,7 @@
 export * from './types.js';
 
 // Core extraction
-export { extractFactsFromChunk, extractFactsFromChunks } from './extractor.js';
+export { extractFactsFromChunk } from './extractor.js';
 
 // Batch extraction
 export { extractFactsFromDocument, getExtractionProgress } from './batch.js';

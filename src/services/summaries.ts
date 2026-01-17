@@ -328,7 +328,7 @@ export async function linkMemoryToCategories(
 /**
  * Get unincorporated memories for a category
  */
-export async function getUnincorporatedMemories(
+async function getUnincorporatedMemories(
   category: SummaryCategory,
   limit: number = 20
 ): Promise<Array<{ memory_id: string; content: string; relevance: number; created_at: Date }>> {
@@ -353,7 +353,7 @@ export async function getUnincorporatedMemories(
 /**
  * Mark memories as incorporated into a summary
  */
-export async function markMemoriesIncorporated(
+async function markMemoriesIncorporated(
   memoryIds: string[],
   category: SummaryCategory,
   version: number

@@ -132,5 +132,4 @@ export const VillagersLayer = memo(function VillagersLayer({
   );
 });
 
-export { VillagerFigure };
 export default VillagersLayer;

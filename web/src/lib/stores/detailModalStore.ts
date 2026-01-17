@@ -32,7 +32,7 @@ interface DetailModalState {
   close: () => void;
 }
 
-export const useDetailModalStore = create<DetailModalState>((set) => ({
+const useDetailModalStore = create<DetailModalState>((set) => ({
   item: null,
   isOpen: false,
 

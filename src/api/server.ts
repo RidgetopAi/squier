@@ -37,7 +37,7 @@ const app = express();
 const httpServer = createServer(app);
 
 // Socket.IO setup with CORS for Next.js dev server
-export const io = new SocketIOServer(httpServer, {
+const io = new SocketIOServer(httpServer, {
   cors: {
     origin: config.server.corsOrigin || 'http://localhost:3000',
     methods: ['GET', 'POST'],

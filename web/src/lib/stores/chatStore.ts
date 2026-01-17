@@ -627,14 +627,8 @@ export function initWebSocketListeners(): () => void {
 }
 
 // Selector hooks for optimized re-renders
-export const useMessages = () => useChatStore((state) => state.messages);
 export const useIsLoading = () => useChatStore((state) => state.isLoading);
 export const useIsLoadingContext = () => useChatStore((state) => state.isLoadingContext);
-export const useIsStreaming = () => useChatStore((state) => state.isStreaming);
-export const useChatError = () => useChatStore((state) => state.error);
-export const useConversationId = () => useChatStore((state) => state.conversationId);
-export const useLastContext = () => useChatStore((state) => state.lastContext);
-export const useLastContextPackage = () => useChatStore((state) => state.lastContextPackage);
 
 // Combined "busy" state - true when chat is processing and navigation should be blocked
 export const useIsChatBusy = () =>

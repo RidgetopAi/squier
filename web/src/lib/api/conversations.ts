@@ -59,37 +59,6 @@ export async function fetchRecentConversation(): Promise<{
 }
 
 /**
- * Fetch a specific conversation with its messages
- */
-export async function fetchConversation(id: string): Promise<{
-  conversation: ConversationResponse;
-  messages: MessageResponse[];
-}> {
-  const response = await apiGet<ApiResponse<{
-    conversation: ConversationResponse;
-    messages: MessageResponse[];
-  }>>(`/api/chat/conversations/${id}`);
-
-  return response.data;
-}
-
-/**
- * Fetch list of conversations (paginated)
- */
-export async function fetchConversations(options?: {
-  limit?: number;
-  offset?: number;
-  status?: 'active' | 'archived';
-}): Promise<ConversationResponse[]> {
-  const response = await apiGet<ApiResponse<ConversationResponse[]>>(
-    '/api/chat/conversations',
-    { params: options }
-  );
-
-  return response.data;
-}
-
-/**
  * Create a new conversation
  */
 export async function createConversation(input: {

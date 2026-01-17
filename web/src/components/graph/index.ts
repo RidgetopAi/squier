@@ -2,7 +2,6 @@
 // GRAPH COMPONENTS
 // ============================================
 
-export { MemoryGraphView, type MemoryGraphViewProps } from './MemoryGraphView';
 export {
   GraphControls,
   type GraphControlsProps,

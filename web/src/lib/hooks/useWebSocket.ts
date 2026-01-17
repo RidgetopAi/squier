@@ -439,12 +439,3 @@ export function leaveConversationRoom(conversationId: string): void {
   }
 }
 
-/**
- * Emit an event directly (for use outside React)
- */
-export function emitEvent(event: string, payload: unknown): void {
-  const sock = getSocket();
-  if (sock.connected) {
-    sock.emit(event, payload);
-  }
-}

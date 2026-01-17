@@ -72,13 +72,6 @@ export async function storeChunks(chunks: DocumentChunk[]): Promise<void> {
   }
 }
 
-/**
- * Store a single chunk
- */
-export async function storeChunk(chunk: DocumentChunk): Promise<void> {
-  await storeChunks([chunk]);
-}
-
 // === GET CHUNKS ===
 
 /**
@@ -109,35 +102,7 @@ export async function getChunkById(chunkId: string): Promise<DocumentChunk | nul
   return row ? rowToChunk(row) : null;
 }
 
-/**
- * Get chunk count for a document
- */
-export async function getChunkCount(objectId: string): Promise<number> {
-  const result = await pool.query<{ count: string }>(
-    'SELECT COUNT(*) as count FROM document_chunks WHERE object_id = $1',
-    [objectId]
-  );
-
-  const row = result.rows[0];
-  return row ? parseInt(row.count, 10) : 0;
-}
-
 // === UPDATE CHUNKS ===
-
-/**
- * Update chunk embedding
- */
-export async function updateChunkEmbedding(
-  chunkId: string,
-  embedding: number[]
-): Promise<void> {
-  await pool.query(
-    `UPDATE document_chunks
-     SET embedding = $2
-     WHERE id = $1`,
-    [chunkId, JSON.stringify(embedding)]
-  );
-}
 
 /**
  * Batch update embeddings for multiple chunks
@@ -181,18 +146,6 @@ export async function deleteChunksByObjectId(objectId: string): Promise<number> 
   );
 
   return result.rowCount ?? 0;
-}
-
-/**
- * Delete a single chunk
- */
-export async function deleteChunk(chunkId: string): Promise<boolean> {
-  const result = await pool.query(
-    'DELETE FROM document_chunks WHERE id = $1',
-    [chunkId]
-  );
-
-  return (result.rowCount ?? 0) > 0;
 }
 
 // === SEARCH CHUNKS ===
@@ -272,8 +225,6 @@ export async function searchChunksByText(
   return result.rows.map(rowToChunk);
 }
 
-// === STATS ===
-
 /**
  * Get chunking statistics for a document
  */
@@ -322,16 +273,3 @@ export async function getChunkStats(objectId: string): Promise<{
   };
 }
 
-/**
- * Check if a document has been chunked
- */
-export async function isDocumentChunked(objectId: string): Promise<boolean> {
-  const result = await pool.query<{ exists: boolean }>(
-    `SELECT EXISTS(
-      SELECT 1 FROM document_chunks WHERE object_id = $1
-    ) as exists`,
-    [objectId]
-  );
-
-  return result.rows[0]?.exists ?? false;
-}

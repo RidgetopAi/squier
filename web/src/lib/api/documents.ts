@@ -8,8 +8,6 @@ import type {
   DocumentChunk,
   DocumentSearchResult,
   ChunkingOptions,
-  DocumentSummaryResult,
-  DocumentAskResult,
 } from '@/lib/types';
 
 const API_BASE = '/api/documents';
@@ -48,27 +46,6 @@ export async function extractDocument(
   return response.json();
 }
 
-/**
- * Get supported MIME types for document upload
- */
-export async function getSupportedTypes(): Promise<{ mimeTypes: string[]; extensions: string[] }> {
-  const response = await fetch(`${API_BASE}/supported-types`);
-  if (!response.ok) throw new Error('Failed to get supported types');
-  return response.json();
-}
-
-/**
- * Check if a MIME type is supported
- */
-export async function checkSupport(mimeType: string): Promise<{ supported: boolean; reason?: string }> {
-  const response = await fetch(`${API_BASE}/check-support`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mimeType }),
-  });
-  if (!response.ok) throw new Error('Failed to check support');
-  return response.json();
-}
 
 /**
  * Chunk a document by object ID
@@ -100,13 +77,6 @@ export async function getDocumentChunks(objectId: string): Promise<{ chunks: Doc
   return response.json();
 }
 
-/**
- * Delete all chunks for a document
- */
-export async function deleteDocumentChunks(objectId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/${objectId}/chunks`, { method: 'DELETE' });
-  if (!response.ok) throw new Error('Failed to delete chunks');
-}
 
 /**
  * Generate embeddings for document chunks
@@ -140,54 +110,6 @@ export async function searchDocuments(
   return response.json();
 }
 
-/**
- * Summarize a document (ephemeral - no storage)
- */
-export async function summarizeDocument(
-  file: File,
-  options?: {
-    maxLength?: number;
-    style?: 'brief' | 'detailed' | 'bullets';
-  }
-): Promise<DocumentSummaryResult> {
-  const formData = new FormData();
-  formData.append('file', file);
-  if (options?.maxLength) formData.append('maxLength', String(options.maxLength));
-  if (options?.style) formData.append('style', options.style);
-
-  const response = await fetch(`${API_BASE}/summarize`, {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Summarization failed' }));
-    throw new Error(error.error || 'Failed to summarize document');
-  }
-
-  return response.json();
-}
-
-/**
- * Ask a question about a document (ephemeral - no storage)
- */
-export async function askDocument(file: File, question: string): Promise<DocumentAskResult> {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('question', question);
-
-  const response = await fetch(`${API_BASE}/ask`, {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Question failed' }));
-    throw new Error(error.error || 'Failed to process question');
-  }
-
-  return response.json();
-}
 
 /**
  * File type helpers
@@ -208,7 +130,7 @@ export const SUPPORTED_EXTENSIONS = [
   '.gif',
 ];
 
-export const MIME_TYPE_MAP: Record<string, string> = {
+const MIME_TYPE_MAP: Record<string, string> = {
   'application/pdf': 'PDF',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word',
   'application/msword': 'Word',
@@ -316,19 +238,6 @@ export async function deleteDocument(id: string): Promise<void> {
   if (!response.ok) throw new Error('Failed to delete document');
 }
 
-/**
- * Get document statistics
- */
-export async function getDocumentStats(): Promise<{
-  total: number;
-  byStatus: Record<string, number>;
-  byProcessingStatus: Record<string, number>;
-  totalSize: number;
-}> {
-  const response = await fetch('/api/objects/stats');
-  if (!response.ok) throw new Error('Failed to get document stats');
-  return response.json();
-}
 
 // ============================================
 // Fact Extraction API (Phase 6)
@@ -339,7 +248,6 @@ import type {
   FactStatus,
   FactType,
   FactExtractionStats,
-  FactExtractionBatch,
   FactExtractionOptions,
 } from '@/lib/types';
 
@@ -419,35 +327,6 @@ export async function getDocumentFactStats(objectId: string): Promise<{
   return response.json();
 }
 
-/**
- * Get pending facts for review (across all documents or filtered)
- */
-export async function getPendingFacts(options?: {
-  objectId?: string;
-  limit?: number;
-  offset?: number;
-}): Promise<{ facts: ExtractedFact[]; count: number }> {
-  const params = new URLSearchParams();
-  if (options?.objectId) params.set('objectId', options.objectId);
-  if (options?.limit) params.set('limit', String(options.limit));
-  if (options?.offset) params.set('offset', String(options.offset));
-
-  const url = `${API_BASE}/facts/pending${params.toString() ? `?${params.toString()}` : ''}`;
-  const response = await fetch(url);
-
-  if (!response.ok) throw new Error('Failed to get pending facts');
-  return response.json();
-}
-
-/**
- * Get a single fact by ID
- */
-export async function getFact(factId: string): Promise<ExtractedFact> {
-  const response = await fetch(`${API_BASE}/facts/${factId}`);
-  if (!response.ok) throw new Error('Failed to get fact');
-  const data = await response.json();
-  return data.fact;
-}
 
 /**
  * Update fact status (approve/reject)
@@ -505,31 +384,3 @@ export async function updateFactContent(
   return data.fact;
 }
 
-/**
- * Delete a fact
- */
-export async function deleteFact(factId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/facts/${factId}`, { method: 'DELETE' });
-  if (!response.ok) throw new Error('Failed to delete fact');
-}
-
-/**
- * Get extraction batches for a document
- */
-export async function getDocumentFactBatches(
-  objectId: string
-): Promise<{ batches: FactExtractionBatch[] }> {
-  const response = await fetch(`${API_BASE}/${objectId}/facts/batches`);
-  if (!response.ok) throw new Error('Failed to get fact batches');
-  return response.json();
-}
-
-/**
- * Get a specific extraction batch
- */
-export async function getFactBatch(batchId: string): Promise<FactExtractionBatch> {
-  const response = await fetch(`${API_BASE}/facts/batches/${batchId}`);
-  if (!response.ok) throw new Error('Failed to get batch');
-  const data = await response.json();
-  return data.batch;
-}

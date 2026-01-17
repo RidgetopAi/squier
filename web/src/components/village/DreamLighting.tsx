@@ -25,7 +25,7 @@ interface AnimatedHemisphereLightProps {
  * Hemisphere light with slowly shifting sky color
  * Creates subtle aurora-like ambient color changes
  */
-export function AnimatedHemisphereLight({
+function AnimatedHemisphereLight({
   skyColorA = '#8b5cf6', // Violet
   skyColorB = '#3b82f6', // Blue
   groundColor = '#2d1f47', // Dark purple
@@ -72,7 +72,7 @@ interface PulsingPointLightProps {
  * Point light with gentle pulsing intensity
  * Creates breathing, living light effect
  */
-export function PulsingPointLight({
+function PulsingPointLight({
   position,
   color = '#ffa500',
   intensity = 0.5,

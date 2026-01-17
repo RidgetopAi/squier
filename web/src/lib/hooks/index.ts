@@ -4,7 +4,6 @@ export type {
   UseSpeechRecognitionReturn,
 } from './useSpeechRecognition';
 
-export { useContextPackage, useContextProfiles } from './useContextPackage';
 export { useSummaries, useSummaryStats } from './useSummaries';
 export {
   useMemories,
@@ -14,10 +13,7 @@ export {
 } from './useMemories';
 export {
   useBeliefs,
-  useBelief,
   useBeliefStats,
-  useBeliefsByCategory,
-  useBeliefConflicts,
 } from './useBeliefs';
 export {
   usePatterns,
@@ -28,14 +24,10 @@ export {
   useEntities,
   useEntity,
   useEntityDetails,
-  useEntitySearch,
   useTopEntities,
 } from './useEntities';
 export {
   useInsights,
-  useInsight,
-  useInsightStats,
-  useInsightsByType,
   useNewInsights,
 } from './useInsights';
 export {
@@ -49,7 +41,6 @@ export { useGraphInteractions, type UseGraphInteractionsResult } from './useGrap
 export {
   useWebSocket,
   getConnectionStatus,
-  emitEvent,
   type UseWebSocketReturn,
   type ChatChunkPayload,
   type ChatContextPayload,

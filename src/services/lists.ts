@@ -287,17 +287,6 @@ export async function archiveList(id: string): Promise<void> {
 }
 
 /**
- * Restore an archived list
- */
-export async function restoreList(id: string): Promise<List | null> {
-  const result = await pool.query(
-    'UPDATE lists SET archived_at = NULL, updated_at = NOW() WHERE id = $1 RETURNING *',
-    [id]
-  );
-  return (result.rows[0] as List) ?? null;
-}
-
-/**
  * Hard delete a list (cascade deletes items)
  */
 export async function deleteList(id: string): Promise<void> {
@@ -449,7 +438,7 @@ export async function findListByName(name: string): Promise<List | null> {
 /**
  * Get all items for a list
  */
-export async function getListItems(listId: string): Promise<ListItem[]> {
+async function getListItems(listId: string): Promise<ListItem[]> {
   const list = await getList(listId);
   if (!list) return [];
 

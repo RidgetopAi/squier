@@ -173,45 +173,4 @@ export function DreamEffects({
   );
 }
 
-// ============================================
-// PRESET CONFIGURATIONS
-// ============================================
-
-/** Soft dreamy preset - gentle effects */
-export function DreamEffectsSoft() {
-  return (
-    <DreamEffects
-      bloomIntensity={0.4}
-      vignetteDarkness={0.4}
-      chromaticOffset={0.001}
-      enableNoise={false}
-    />
-  );
-}
-
-/** Intense dreamy preset - stronger effects */
-export function DreamEffectsIntense() {
-  return (
-    <DreamEffects
-      bloomIntensity={0.8}
-      vignetteDarkness={0.6}
-      chromaticOffset={0.003}
-      enableNoise={true}
-      enableDOF={true}
-    />
-  );
-}
-
-/** Memory haze preset - foggy, nostalgic */
-export function DreamEffectsNostalgic() {
-  return (
-    <DreamEffects
-      bloomIntensity={0.7}
-      vignetteDarkness={0.55}
-      chromaticOffset={0.002}
-      enableNoise={true}
-    />
-  );
-}
-
 export default DreamEffects;

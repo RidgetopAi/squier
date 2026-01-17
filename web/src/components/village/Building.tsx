@@ -96,7 +96,7 @@ interface BuildingProps {
  * - LOD (Level of Detail): shows simple box at distance > 40 units
  * - Memoized computed values
  */
-export const Building = memo(function Building({
+const Building = memo(function Building({
   building,
   selected = false,
   hovered = false,
@@ -234,4 +234,4 @@ export const BuildingsLayer = memo(function BuildingsLayer({
   );
 });
 
-export default Building;
+export default BuildingsLayer;

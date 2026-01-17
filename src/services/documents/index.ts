@@ -68,15 +68,12 @@ export {
   type ChunkExtractionResult,
   type DocumentExtractionResult,
   FACT_TYPES,
-  FACT_STATUSES,
   ENTITY_TYPES as FACT_ENTITY_TYPES,
   DATE_TYPES,
   DEFAULT_EXTRACTION_OPTIONS as DEFAULT_FACT_EXTRACTION_OPTIONS,
   rowToFact,
-  factToRow,
   // Core extraction
   extractFactsFromChunk,
-  extractFactsFromChunks,
   // Batch extraction
   extractFactsFromDocument,
   getExtractionProgress,

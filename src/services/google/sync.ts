@@ -228,7 +228,7 @@ export async function incrementalSync(accountId: string): Promise<FullSyncResult
 /**
  * Push pending commitments to Google Calendar
  */
-export async function pushPendingCommitments(accountId: string): Promise<number> {
+async function pushPendingCommitments(accountId: string): Promise<number> {
   // Get default push calendar
   const calendar = await getDefaultPushCalendar(accountId);
   if (!calendar) {

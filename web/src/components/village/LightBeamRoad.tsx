@@ -89,7 +89,7 @@ interface LightBeamRoadProps {
  * Single light beam road connecting two buildings
  * Features animated undulation and ethereal glow
  */
-export function LightBeamRoad({
+function LightBeamRoad({
   road,
   phaseOffset = 0,
   showGlow = true,
@@ -223,4 +223,4 @@ export function LightBeamsLayer({ roads, selectedBuildingId }: LightBeamsLayerPr
   );
 }
 
-export default LightBeamRoad;
+export default LightBeamsLayer;

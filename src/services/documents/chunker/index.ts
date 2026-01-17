@@ -16,26 +16,18 @@ export { hybridChunker } from './hybridChunker.js';
 // Storage
 export {
   storeChunks,
-  storeChunk,
   getChunksByObjectId,
   getChunkById,
-  getChunkCount,
-  updateChunkEmbedding,
   updateChunkEmbeddings,
   deleteChunksByObjectId,
-  deleteChunk,
   searchChunksBySimilarity,
   searchChunksByText,
   getChunkStats,
-  isDocumentChunked,
 } from './chunkStorage.js';
 
 // Embeddings
 export {
   generateChunkEmbeddings,
-  generateChunkEmbedding,
   embedAndStoreChunks,
   generateQueryEmbedding,
-  hasAllEmbeddings,
-  getEmbeddingCoverage,
 } from './chunkEmbedding.js';

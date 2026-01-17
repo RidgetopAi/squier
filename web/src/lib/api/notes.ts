@@ -30,34 +30,11 @@ export async function fetchNotes(options: ListNotesOptions = {}): Promise<Note[]
 }
 
 /**
- * Get a single note by ID
- */
-export async function fetchNote(id: string): Promise<Note> {
-  return apiGet<Note>(`/api/notes/${id}`);
-}
-
-/**
- * Search notes by query
- */
-export async function searchNotes(query: string, limit = 20): Promise<Note[]> {
-  return apiGet<Note[]>('/api/notes/search', {
-    params: { q: query, limit },
-  });
-}
-
-/**
  * Get pinned notes
  */
 export async function fetchPinnedNotes(): Promise<Note[]> {
   const response = await apiGet<{ notes: Note[] }>('/api/notes/pinned');
   return response.notes;
-}
-
-/**
- * Get notes by entity
- */
-export async function fetchNotesByEntity(entityId: string): Promise<Note[]> {
-  return apiGet<Note[]>(`/api/notes/entity/${entityId}`);
 }
 
 /**
@@ -100,32 +77,6 @@ export async function pinNote(id: string): Promise<Note> {
  */
 export async function unpinNote(id: string): Promise<Note> {
   return apiPost<Note>(`/api/notes/${id}/unpin`);
-}
-
-/**
- * Link note to an entity
- */
-export async function linkNoteToEntity(
-  noteId: string,
-  entityId: string,
-  isPrimary = false
-): Promise<Note> {
-  return apiPost<Note>(`/api/notes/${noteId}/link`, {
-    entity_id: entityId,
-    is_primary: isPrimary,
-  });
-}
-
-/**
- * Unlink note from an entity
- */
-export async function unlinkNoteFromEntity(
-  noteId: string,
-  entityId: string
-): Promise<Note> {
-  return apiPost<Note>(`/api/notes/${noteId}/unlink`, {
-    entity_id: entityId,
-  });
 }
 
 /**

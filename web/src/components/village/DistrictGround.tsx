@@ -78,7 +78,7 @@ export interface DistrictGroundProps {
 /**
  * Render hex tile ground for a single district
  */
-export function DistrictGround({
+function DistrictGround({
   district,
   hexSize = DEFAULT_HEX_SIZE,
   padding = 1,

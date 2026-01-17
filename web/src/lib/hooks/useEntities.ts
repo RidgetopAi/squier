@@ -5,11 +5,10 @@ import {
   fetchEntities,
   fetchEntity,
   fetchEntityDetails,
-  searchEntities,
   fetchTopEntities,
   type FetchEntitiesOptions,
 } from '@/lib/api/entities';
-import type { Entity, EntityType, EntityDetail } from '@/lib/types';
+import type { Entity, EntityDetail } from '@/lib/types';
 
 /**
  * Hook to fetch entities with optional filters
@@ -38,18 +37,6 @@ export function useEntity(id: string | undefined) {
   });
 }
 
-/**
- * Hook to search entities by name
- */
-export function useEntitySearch(query: string, type?: EntityType) {
-  return useQuery<Entity[]>({
-    queryKey: ['entities', 'search', query, type],
-    queryFn: () => searchEntities(query, type),
-    enabled: query.length > 1,
-    staleTime: 1000 * 60 * 2, // 2 minutes
-    refetchOnWindowFocus: false,
-  });
-}
 
 /**
  * Hook to fetch top entities for dashboard display

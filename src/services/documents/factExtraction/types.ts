@@ -7,7 +7,7 @@
 
 // === FACT STATUS ===
 
-export const FACT_STATUSES = [
+const FACT_STATUSES = [
   'pending',
   'approved',
   'rejected',
@@ -397,33 +397,3 @@ export function rowToFact(row: ExtractedFactRow): ExtractedFact {
   };
 }
 
-/**
- * Convert ExtractedFact to database row format (for INSERT)
- */
-export function factToRow(
-  fact: Omit<ExtractedFact, 'id' | 'createdAt' | 'updatedAt'>
-): Omit<ExtractedFactRow, 'id' | 'created_at' | 'updated_at'> {
-  return {
-    chunk_id: fact.chunkId,
-    object_id: fact.objectId,
-    fact_type: fact.factType,
-    content: fact.content,
-    raw_text: fact.rawText,
-    confidence: fact.confidence,
-    status: fact.status,
-    reviewed_at: fact.reviewedAt ?? null,
-    reviewer_notes: fact.reviewerNotes ?? null,
-    entities: fact.entities,
-    dates: fact.dates,
-    relationships: fact.relationships,
-    source_page: fact.sourcePage ?? null,
-    source_section: fact.sourceSection ?? null,
-    position_start: fact.positionStart ?? null,
-    position_end: fact.positionEnd ?? null,
-    memory_id: fact.memoryId ?? null,
-    merged_into_id: fact.mergedIntoId ?? null,
-    extraction_model: fact.extractionModel ?? null,
-    extraction_prompt_version: fact.extractionPromptVersion ?? null,
-    metadata: fact.metadata,
-  };
-}

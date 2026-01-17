@@ -46,18 +46,8 @@ export const useCameraStore = create<CameraState>()(
 
 // Selector hooks
 export const useCameraMode = () => useCameraStore((state) => state.mode);
-export const useIsWalkMode = () => useCameraStore((state) => state.mode === 'walk');
-export const useIsFlyMode = () => useCameraStore((state) => state.mode === 'fly');
 export const useIsPointerLocked = () => useCameraStore((state) => state.isPointerLocked);
 
 // Action selectors
-export const useSetCameraMode = () => useCameraStore((state) => state.setMode);
 export const useToggleCameraMode = () => useCameraStore((state) => state.toggleMode);
 export const useSetPointerLocked = () => useCameraStore((state) => state.setPointerLocked);
-
-// For non-hook contexts
-export const cameraActions = {
-  setMode: (mode: CameraMode) => useCameraStore.getState().setMode(mode),
-  toggleMode: () => useCameraStore.getState().toggleMode(),
-  setPointerLocked: (locked: boolean) => useCameraStore.getState().setPointerLocked(locked),
-};

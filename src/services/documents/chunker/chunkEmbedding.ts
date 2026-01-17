@@ -47,15 +47,6 @@ export async function generateChunkEmbeddings(
   return chunks;
 }
 
-/**
- * Generate embedding for a single chunk
- */
-export async function generateChunkEmbedding(chunk: DocumentChunk): Promise<DocumentChunk> {
-  const embedding = await generateEmbedding(chunk.content);
-  chunk.embedding = embedding;
-  return chunk;
-}
-
 // === STORE WITH EMBEDDINGS ===
 
 /**
@@ -119,30 +110,3 @@ export async function generateQueryEmbedding(query: string): Promise<number[]> {
   return generateEmbedding(query);
 }
 
-// === UTILITY ===
-
-/**
- * Check if all chunks for a document have embeddings
- */
-export async function hasAllEmbeddings(objectId: string): Promise<boolean> {
-  const chunks = await getChunksByObjectId(objectId);
-  return chunks.length > 0 && chunks.every((c) => c.embedding != null);
-}
-
-/**
- * Get embedding coverage for a document
- */
-export async function getEmbeddingCoverage(objectId: string): Promise<{
-  total: number;
-  embedded: number;
-  percentage: number;
-}> {
-  const chunks = await getChunksByObjectId(objectId);
-  const embedded = chunks.filter((c) => c.embedding != null).length;
-
-  return {
-    total: chunks.length,
-    embedded,
-    percentage: chunks.length > 0 ? (embedded / chunks.length) * 100 : 0,
-  };
-}

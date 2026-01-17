@@ -38,7 +38,7 @@ interface RoadProps {
  * Road component - renders a path between two buildings
  * Uses a simple extruded line geometry
  */
-export function Road({ road, highlighted = false, opacity = 1 }: RoadProps) {
+function Road({ road, highlighted = false, opacity = 1 }: RoadProps) {
   const { fromPosition, toPosition, weight, edgeType } = road;
 
   // Validate positions - skip rendering if invalid
@@ -130,4 +130,4 @@ export function RoadsLayer({ roads, selectedBuildingId }: RoadsLayerProps) {
   );
 }
 
-export default Road;
+export default RoadsLayer;

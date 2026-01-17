@@ -206,7 +206,7 @@ export function DreamParticles({
 // FIREFLIES (LARGER, SLOWER, FEWER)
 // ============================================
 
-export function Fireflies({
+function Fireflies({
   count = 30,
   bounds = { minX: -30, maxX: 30, minZ: -30, maxZ: 30 },
 }: {

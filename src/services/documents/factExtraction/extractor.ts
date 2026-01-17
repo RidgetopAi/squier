@@ -497,22 +497,3 @@ Extract all meaningful facts, entities, dates, and relationships from this text.
     };
   }
 }
-
-/**
- * Extract facts from multiple chunks sequentially
- * For batch processing, use the batch service instead
- */
-export async function extractFactsFromChunks(
-  chunks: DocumentChunk[],
-  objectId: string,
-  options: Partial<FactExtractionOptions> = {}
-): Promise<ChunkExtractionResult[]> {
-  const results: ChunkExtractionResult[] = [];
-
-  for (const chunk of chunks) {
-    const result = await extractFactsFromChunk(chunk, objectId, options);
-    results.push(result);
-  }
-
-  return results;
-}

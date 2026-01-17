@@ -149,23 +149,3 @@ export const useActiveMessageId = () => useOverlayStore((state) => state.activeM
 export const useShowMemoriesForMessage = () => useOverlayStore((state) => state.showMemoriesForMessage);
 export const useHideMemories = () => useOverlayStore((state) => state.hideMemories);
 export const useDismissCard = () => useOverlayStore((state) => state.dismissCard);
-export const useClearCards = () => useOverlayStore((state) => state.clearCards);
-
-// Legacy action selector (re-exported via barrel file)
-export const useToggleOverlayVisible = () => useOverlayStore((state) => state.toggleVisible);
-
-// For non-hook contexts (like inside other stores)
-export const overlayActions = {
-  showMemoriesForMessage: (messageId: string, memoryIds: string[]) =>
-    useOverlayStore.getState().showMemoriesForMessage(messageId, memoryIds),
-  hideMemories: () => useOverlayStore.getState().hideMemories(),
-  clearCards: () => useOverlayStore.getState().clearCards(),
-  // Legacy
-  pushCard: (memory: ScoredMemory, entities?: EntitySummary[]) =>
-    useOverlayStore.getState().pushCard(memory, entities),
-  pushCards: (memories: ScoredMemory[], entitiesMap?: Map<string, EntitySummary[]>) =>
-    useOverlayStore.getState().pushCards(memories, entitiesMap),
-  dismissCard: (id: string) => useOverlayStore.getState().dismissCard(id),
-  setVisible: (visible: boolean) => useOverlayStore.getState().setVisible(visible),
-  toggleVisible: () => useOverlayStore.getState().toggleVisible(),
-};
