@@ -57,7 +57,7 @@ function parseCSVLine(line: string): string[] {
 /**
  * CSV Extractor implementation
  */
-export class CSVExtractor implements DocumentExtractor {
+class CSVExtractor implements DocumentExtractor {
   readonly supportedFormats: DocumentFormat[] = ['txt']; // CSV is a text variant
   readonly supportedMimeTypes: string[] = [
     'text/csv',

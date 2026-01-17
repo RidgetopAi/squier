@@ -20,7 +20,7 @@ import {
 /**
  * OCR Extractor implementation using Tesseract.js
  */
-export class OcrExtractor implements DocumentExtractor {
+class OcrExtractor implements DocumentExtractor {
   readonly supportedFormats: DocumentFormat[] = ['image'];
   readonly supportedMimeTypes: string[] = [
     'image/png',

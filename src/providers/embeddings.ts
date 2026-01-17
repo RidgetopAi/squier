@@ -50,7 +50,7 @@ let provider: EmbeddingProvider | null = null;
 /**
  * Get the configured embedding provider
  */
-export function getEmbeddingProvider(): EmbeddingProvider {
+function getEmbeddingProvider(): EmbeddingProvider {
   if (!provider) {
     switch (config.embedding.provider) {
       case 'ollama':

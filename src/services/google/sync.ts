@@ -372,35 +372,3 @@ export async function getLastSuccessfulSync(accountId: string): Promise<Date | n
   return result.rows[0]?.completed_at || null;
 }
 
-/**
- * Mark a commitment for sync to Google
- */
-export async function markCommitmentForSync(
-  commitmentId: string,
-  accountId: string
-): Promise<void> {
-  await pool.query(`
-    UPDATE commitments SET
-      google_account_id = $1,
-      google_sync_status = 'pending_push',
-      updated_at = NOW()
-    WHERE id = $2
-  `, [accountId, commitmentId]);
-}
-
-/**
- * Clear sync state for a commitment (when disconnecting Google)
- */
-export async function clearCommitmentSyncState(commitmentId: string): Promise<void> {
-  await pool.query(`
-    UPDATE commitments SET
-      google_account_id = NULL,
-      google_calendar_id = NULL,
-      google_event_id = NULL,
-      google_sync_status = 'local_only',
-      google_etag = NULL,
-      last_synced_at = NULL,
-      updated_at = NOW()
-    WHERE id = $1
-  `, [commitmentId]);
-}

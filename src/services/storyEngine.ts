@@ -27,13 +27,11 @@ import {
 import {
   getCachedStory,
   cacheStory,
-  getCacheStats as getStoryCacheStats,
   smartInvalidate as invalidateStoryCache,
-  invalidateAll as clearStoryCache,
 } from './storyCache.js';
 
 // Re-export cache functions for external use
-export { getStoryCacheStats, invalidateStoryCache, clearStoryCache };
+export { invalidateStoryCache };
 
 // === TYPES ===
 
@@ -511,31 +509,3 @@ function formatIntentContext(intent: StoryIntent): string {
   }
 }
 
-/**
- * Check if the Story Engine has sufficient evidence to generate a story
- */
-export async function hasEvidenceForIntent(intent: StoryIntent): Promise<boolean> {
-  let count = 0;
-
-  switch (intent.kind) {
-    case 'date_meaning': {
-      const evidence = await fetchMemoriesForDate((intent as { kind: 'date_meaning'; dateText: string }).dateText);
-      count = evidence.length;
-      break;
-    }
-    case 'relationship_story': {
-      const evidence = await fetchMemoriesForPerson((intent as { kind: 'relationship_story'; personName: string | null }).personName);
-      count = evidence.length;
-      break;
-    }
-    case 'self_story': {
-      const evidence = await fetchMemoriesForSelf();
-      count = evidence.length;
-      break;
-    }
-    default:
-      count = 1; // Assume we can try for other intents
-  }
-
-  return count >= 1;
-}

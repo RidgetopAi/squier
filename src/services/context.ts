@@ -136,7 +136,7 @@ export interface GenerateContextOptions {
 /**
  * Get a context profile by name
  */
-export async function getProfile(name: string): Promise<ContextProfile | null> {
+async function getProfile(name: string): Promise<ContextProfile | null> {
   const result = await pool.query(
     'SELECT * FROM context_profiles WHERE name = $1',
     [name]
@@ -147,7 +147,7 @@ export async function getProfile(name: string): Promise<ContextProfile | null> {
 /**
  * Get the default context profile
  */
-export async function getDefaultProfile(): Promise<ContextProfile> {
+async function getDefaultProfile(): Promise<ContextProfile> {
   const result = await pool.query(
     'SELECT * FROM context_profiles WHERE is_default = TRUE LIMIT 1'
   );

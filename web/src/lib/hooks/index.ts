@@ -23,7 +23,6 @@ export {
   usePatterns,
   usePattern,
   usePatternStats,
-  usePatternsByType,
 } from './usePatterns';
 export {
   useEntities,

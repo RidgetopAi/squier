@@ -19,7 +19,7 @@ import {
 /**
  * Text/Markdown Extractor implementation (passthrough)
  */
-export class TextExtractor implements DocumentExtractor {
+class TextExtractor implements DocumentExtractor {
   readonly supportedFormats: DocumentFormat[] = ['txt', 'md'];
   readonly supportedMimeTypes: string[] = [
     'text/plain',

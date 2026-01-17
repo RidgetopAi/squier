@@ -151,10 +151,7 @@ export const useHideMemories = () => useOverlayStore((state) => state.hideMemori
 export const useDismissCard = () => useOverlayStore((state) => state.dismissCard);
 export const useClearCards = () => useOverlayStore((state) => state.clearCards);
 
-// Legacy action selectors (kept for compatibility)
-export const usePushCard = () => useOverlayStore((state) => state.pushCard);
-export const usePushCards = () => useOverlayStore((state) => state.pushCards);
-export const useSetOverlayVisible = () => useOverlayStore((state) => state.setVisible);
+// Legacy action selector (re-exported via barrel file)
 export const useToggleOverlayVisible = () => useOverlayStore((state) => state.toggleVisible);
 
 // For non-hook contexts (like inside other stores)

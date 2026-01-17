@@ -6,15 +6,6 @@ export type ReminderStatus = 'pending' | 'sent' | 'acknowledged' | 'snoozed' | '
 export type ReminderChannel = 'push' | 'in_app' | 'sms' | 'email';
 export type OffsetType = 'before' | 'after' | 'exact';
 
-// Default reminder offsets in minutes
-export const DEFAULT_REMINDER_OFFSETS = {
-  ONE_WEEK: 10080,   // 7 * 24 * 60
-  ONE_DAY: 1440,     // 24 * 60
-  ONE_HOUR: 60,
-  THIRTY_MIN: 30,
-  FIFTEEN_MIN: 15,
-};
-
 export interface Reminder {
   id: string;
   commitment_id: string | null;
@@ -147,42 +138,6 @@ export async function createReminder(input: CreateReminderInput): Promise<Remind
   );
 
   return result.rows[0] as Reminder;
-}
-
-/**
- * Create default reminders for a commitment (1 week, 1 day, 1 hour before)
- */
-export async function createCommitmentReminders(
-  commitmentId: string,
-  dueAt: Date,
-  options: { offsets?: number[]; timezone?: string } = {}
-): Promise<Reminder[]> {
-  const {
-    offsets = [DEFAULT_REMINDER_OFFSETS.ONE_WEEK, DEFAULT_REMINDER_OFFSETS.ONE_DAY, DEFAULT_REMINDER_OFFSETS.ONE_HOUR],
-    timezone = config.timezone,
-  } = options;
-
-  const reminders: Reminder[] = [];
-  const now = new Date();
-
-  for (const offset of offsets) {
-    const scheduledFor = new Date(dueAt.getTime() - offset * 60000);
-
-    // Don't create reminders in the past
-    if (scheduledFor <= now) continue;
-
-    const reminder = await createReminder({
-      commitment_id: commitmentId,
-      scheduled_for: scheduledFor,
-      offset_type: 'before',
-      offset_minutes: offset,
-      timezone,
-      channel: 'push',
-    });
-    reminders.push(reminder);
-  }
-
-  return reminders;
 }
 
 /**
@@ -393,19 +348,6 @@ export async function cancelReminder(id: string): Promise<Reminder | null> {
     [id]
   );
   return (result.rows[0] as Reminder) ?? null;
-}
-
-/**
- * Cancel all pending reminders for a commitment
- */
-export async function cancelCommitmentReminders(commitmentId: string): Promise<number> {
-  const result = await pool.query(
-    `UPDATE reminders
-     SET status = 'canceled', updated_at = NOW()
-     WHERE commitment_id = $1 AND status = 'pending'`,
-    [commitmentId]
-  );
-  return result.rowCount ?? 0;
 }
 
 /**

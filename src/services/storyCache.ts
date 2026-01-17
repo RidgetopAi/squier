@@ -53,7 +53,7 @@ let stats: CacheStats = {
  * Generate a cache key from query and intent
  * Normalizes the query to improve cache hit rate
  */
-export function generateCacheKey(query: string, intent: StoryIntent): string {
+function generateCacheKey(query: string, intent: StoryIntent): string {
   const normalizedQuery = query.toLowerCase().trim().replace(/\s+/g, ' ');
   const intentStr = serializeIntent(intent);
   const combined = `${normalizedQuery}|${intentStr}`;
@@ -165,7 +165,7 @@ function evictLeastRecentlyUsed(): void {
  * Invalidate cache entries by intent kind
  * Called when new memories are added that might affect stories
  */
-export function invalidateByIntentKind(intentKind: string): number {
+function invalidateByIntentKind(intentKind: string): number {
   let count = 0;
   for (const [key, entry] of cache) {
     if (entry.intentKind === intentKind) {
@@ -185,7 +185,7 @@ export function invalidateByIntentKind(intentKind: string): number {
  * Invalidate all self_story entries
  * Call when biographical memories are added
  */
-export function invalidateSelfStories(): number {
+function invalidateSelfStories(): number {
   return invalidateByIntentKind('self_story');
 }
 
@@ -193,7 +193,7 @@ export function invalidateSelfStories(): number {
  * Invalidate all relationship stories
  * Call when relationship-related memories are added
  */
-export function invalidateRelationshipStories(): number {
+function invalidateRelationshipStories(): number {
   return invalidateByIntentKind('relationship_story');
 }
 
@@ -201,7 +201,7 @@ export function invalidateRelationshipStories(): number {
  * Invalidate all date-related stories
  * Call when significant date memories are added
  */
-export function invalidateDateStories(): number {
+function invalidateDateStories(): number {
   return invalidateByIntentKind('date_meaning');
 }
 
@@ -256,7 +256,7 @@ export function smartInvalidate(memoryContent: string): void {
 /**
  * Remove expired entries from cache
  */
-export function cleanupExpired(): number {
+function cleanupExpired(): number {
   const now = Date.now();
   let removed = 0;
 
@@ -278,18 +278,10 @@ export function cleanupExpired(): number {
 // Start periodic cleanup
 let cleanupInterval: NodeJS.Timeout | null = null;
 
-export function startCleanupInterval(): void {
+function startCleanupInterval(): void {
   if (cleanupInterval) return;
   cleanupInterval = setInterval(cleanupExpired, CLEANUP_INTERVAL_MS);
   console.log('[StoryCache] Started cleanup interval');
-}
-
-export function stopCleanupInterval(): void {
-  if (cleanupInterval) {
-    clearInterval(cleanupInterval);
-    cleanupInterval = null;
-    console.log('[StoryCache] Stopped cleanup interval');
-  }
 }
 
 // === STATS ===
@@ -301,19 +293,6 @@ export function getCacheStats(): CacheStats & { hitRate: string } {
   const total = stats.hits + stats.misses;
   const hitRate = total > 0 ? ((stats.hits / total) * 100).toFixed(1) + '%' : '0%';
   return { ...stats, hitRate };
-}
-
-/**
- * Reset cache statistics
- */
-export function resetStats(): void {
-  stats = {
-    size: cache.size,
-    hits: 0,
-    misses: 0,
-    invalidations: 0,
-    totalHitCount: 0,
-  };
 }
 
 // Start cleanup on module load

@@ -175,20 +175,6 @@ export async function getCalendar(calendarId: string): Promise<GoogleCalendar | 
 }
 
 /**
- * Get a calendar by Google calendar ID
- */
-export async function getCalendarByGoogleId(
-  accountId: string,
-  googleCalendarId: string
-): Promise<GoogleCalendar | null> {
-  const result = await pool.query(`
-    SELECT * FROM google_calendars
-    WHERE google_account_id = $1 AND calendar_id = $2
-  `, [accountId, googleCalendarId]);
-  return result.rows[0] as GoogleCalendar || null;
-}
-
-/**
  * Get the default calendar for pushing new Squire events
  */
 export async function getDefaultPushCalendar(accountId: string): Promise<GoogleCalendar | null> {
@@ -287,30 +273,6 @@ export async function updateEventsSyncToken(
         updated_at = NOW()
     WHERE id = $2
   `, [syncToken, calendarId]);
-}
-
-/**
- * Delete a calendar (cascades to events)
- */
-export async function deleteCalendar(calendarId: string): Promise<boolean> {
-  const result = await pool.query(
-    'DELETE FROM google_calendars WHERE id = $1',
-    [calendarId]
-  );
-  return (result.rowCount ?? 0) > 0;
-}
-
-/**
- * Get all calendars across all accounts (for sync worker)
- */
-export async function listAllSyncEnabledCalendars(): Promise<GoogleCalendar[]> {
-  const result = await pool.query(`
-    SELECT gc.* FROM google_calendars gc
-    JOIN google_accounts ga ON gc.google_account_id = ga.id
-    WHERE gc.sync_enabled = TRUE AND ga.sync_enabled = TRUE
-    ORDER BY gc.google_account_id, gc.is_primary DESC
-  `);
-  return result.rows as GoogleCalendar[];
 }
 
 /**

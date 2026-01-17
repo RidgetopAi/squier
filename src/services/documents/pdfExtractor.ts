@@ -21,7 +21,7 @@ import {
 /**
  * PDF Extractor implementation using pdf-parse v2
  */
-export class PdfExtractor implements DocumentExtractor {
+class PdfExtractor implements DocumentExtractor {
   readonly supportedFormats: DocumentFormat[] = ['pdf'];
   readonly supportedMimeTypes: string[] = ['application/pdf'];
 

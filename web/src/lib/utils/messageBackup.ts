@@ -6,7 +6,6 @@
  */
 
 const STORAGE_KEY = 'squire_pending_messages';
-const STORAGE_DRAFT_KEY = 'squire_draft_message';
 
 export interface PendingMessage {
   id: string;
@@ -73,53 +72,3 @@ export function clearAllPendingMessages(): void {
   }
 }
 
-/**
- * Check if there are any orphaned pending messages
- * (messages that were saved but never confirmed)
- */
-export function hasOrphanedMessages(): boolean {
-  return getPendingMessages().length > 0;
-}
-
-/**
- * Save draft message (what user is currently typing)
- */
-export function saveDraftMessage(conversationId: string | null, content: string): void {
-  try {
-    if (!content.trim()) {
-      localStorage.removeItem(STORAGE_DRAFT_KEY);
-      return;
-    }
-    localStorage.setItem(
-      STORAGE_DRAFT_KEY,
-      JSON.stringify({ conversationId, content, timestamp: new Date().toISOString() })
-    );
-  } catch (error) {
-    console.error('[MessageBackup] Failed to save draft:', error);
-  }
-}
-
-/**
- * Get draft message
- */
-export function getDraftMessage(): { conversationId: string | null; content: string } | null {
-  try {
-    const stored = localStorage.getItem(STORAGE_DRAFT_KEY);
-    if (!stored) return null;
-    return JSON.parse(stored);
-  } catch (error) {
-    console.error('[MessageBackup] Failed to get draft:', error);
-    return null;
-  }
-}
-
-/**
- * Clear draft message
- */
-export function clearDraftMessage(): void {
-  try {
-    localStorage.removeItem(STORAGE_DRAFT_KEY);
-  } catch (error) {
-    console.error('[MessageBackup] Failed to clear draft:', error);
-  }
-}

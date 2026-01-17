@@ -113,17 +113,6 @@ export async function getOrCreateSession(): Promise<Session> {
 }
 
 /**
- * Get a session by ID
- */
-export async function getSession(sessionId: string): Promise<Session | null> {
-  const result = await pool.query(
-    `SELECT * FROM sessions WHERE id = $1`,
-    [sessionId]
-  );
-  return (result.rows[0] as Session) ?? null;
-}
-
-/**
  * List sessions with optional filtering
  */
 export async function listSessions(options: {

@@ -13,14 +13,14 @@ import { createEdge } from './edges.js';
 
 // === TYPES ===
 
-export interface ResolutionDetection {
+interface ResolutionDetection {
   is_resolution: boolean;
   resolution_type: ResolutionType | null;
   subject_hint: string | null;
   confidence: 'high' | 'medium' | 'low';
 }
 
-export interface CommitmentMatch {
+interface CommitmentMatch {
   commitment: Commitment;
   similarity: number;
   confidence: 'high' | 'medium' | 'low';
@@ -86,7 +86,7 @@ IMPORTANT: Return ONLY valid JSON object, no markdown, no explanation.`;
 /**
  * Detect if a message indicates resolution of a commitment
  */
-export async function detectResolution(message: string): Promise<ResolutionDetection | null> {
+async function detectResolution(message: string): Promise<ResolutionDetection | null> {
   // Quick pre-check for resolution-related keywords to avoid unnecessary LLM calls
   const resolutionKeywords = /\b(finish|done|complete|cancel|nevermind|never mind|not going to|decided against|no longer|supersed|replaced|instead|rescheduled|taken care|handled|wrapped up|accomplished|achieved)\b/i;
 
@@ -132,7 +132,7 @@ export async function detectResolution(message: string): Promise<ResolutionDetec
 /**
  * Find open commitments that match a resolution hint using embedding similarity
  */
-export async function findMatchingCommitments(
+async function findMatchingCommitments(
   subjectHint: string,
   options: {
     limit?: number;
@@ -184,7 +184,7 @@ export async function findMatchingCommitments(
 /**
  * Find matching commitments using text search as fallback
  */
-export async function findMatchingCommitmentsText(
+async function findMatchingCommitmentsText(
   subjectHint: string,
   options: {
     limit?: number;
@@ -233,7 +233,7 @@ export async function findMatchingCommitmentsText(
  * Process a message for potential commitment resolution
  * Returns resolution candidates with matching commitments
  */
-export async function processMessageForResolution(
+async function processMessageForResolution(
   message: string
 ): Promise<ResolutionCandidate | null> {
   // Step 1: Detect if message indicates resolution
@@ -278,7 +278,7 @@ export async function processMessageForResolution(
  * Auto-resolve a commitment if confidence is high enough
  * Returns true if resolution was applied
  */
-export async function autoResolveCommitment(
+async function autoResolveCommitment(
   candidate: ResolutionCandidate,
   resolutionMemoryId?: string
 ): Promise<boolean> {
@@ -353,88 +353,6 @@ export async function autoResolveCommitment(
   );
 
   return true;
-}
-
-/**
- * Get pending resolution confirmations for a user
- */
-export async function getPendingResolutionConfirmations(_options: {
-  limit?: number;
-} = {}): Promise<ResolutionCandidate[]> {
-  // This would be stored in a queue/table in production
-  // For now, we process in real-time during chat extraction
-  return [];
-}
-
-/**
- * Confirm a resolution manually
- */
-export async function confirmResolution(
-  commitmentId: string,
-  resolutionType: ResolutionType,
-  resolutionMemoryId?: string
-): Promise<Commitment> {
-  const newStatus = resolutionType === 'completed' ? 'completed' : 'canceled';
-
-  const result = await pool.query(
-    `UPDATE commitments
-     SET status = $1,
-         resolved_at = NOW(),
-         resolution_type = $2,
-         resolution_memory_id = $3,
-         updated_at = NOW()
-     WHERE id = $4
-     RETURNING *`,
-    [newStatus, resolutionType, resolutionMemoryId ?? null, commitmentId]
-  );
-
-  if (result.rows.length === 0) {
-    throw new Error(`Commitment ${commitmentId} not found`);
-  }
-
-  const commitment = result.rows[0] as Commitment;
-
-  // Create memory edge if both original and resolution memories exist
-  if (commitment.memory_id && resolutionMemoryId) {
-    try {
-      // Use RESOLVES for completion, CONTRADICTS for cancellation
-      const edgeType = resolutionType === 'completed' || resolutionType === 'superseded'
-        ? 'RESOLVES'
-        : 'CONTRADICTS';
-
-      await createEdge({
-        source_memory_id: commitment.memory_id,
-        target_memory_id: resolutionMemoryId,
-        edge_type: edgeType,
-        weight: 1.0,
-        metadata: {
-          commitment_id: commitment.id,
-          resolution_type: resolutionType,
-        },
-      });
-
-      console.log(
-        `[Resolution] Created ${edgeType} edge from memory ${commitment.memory_id} to ${resolutionMemoryId}`
-      );
-    } catch (edgeError) {
-      console.error('[Resolution] Failed to create memory edge:', edgeError);
-      // Don't fail the resolution if edge creation fails
-    }
-  }
-
-  return commitment;
-}
-
-/**
- * Dismiss a resolution suggestion
- */
-export async function dismissResolutionSuggestion(
-  commitmentId: string,
-  _messageId?: string
-): Promise<void> {
-  // In a full implementation, we'd track dismissed suggestions
-  // to avoid re-suggesting the same match
-  console.log(`[Resolution] Dismissed suggestion for commitment ${commitmentId}`);
 }
 
 // === BATCH PROCESSING ===

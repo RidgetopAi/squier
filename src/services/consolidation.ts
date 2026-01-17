@@ -352,7 +352,7 @@ async function processPatterns(limit: number = 10): Promise<{
 /**
  * Run consolidation for a specific session
  */
-export async function consolidateSession(session: Session): Promise<ConsolidationResult> {
+async function consolidateSession(session: Session): Promise<ConsolidationResult> {
   const startTime = Date.now();
 
   // Mark session as in progress

@@ -9,7 +9,7 @@
  * Salience factor weights (from roadmap)
  * Total = 1.0
  */
-export const SALIENCE_WEIGHTS = {
+const SALIENCE_WEIGHTS = {
   temporal_relevance: 0.20, // deadlines, dates
   relationship: 0.20, // people mentioned
   action_language: 0.20, // commitments, decisions
@@ -281,32 +281,4 @@ export function calculateSalience(content: string): SalienceResult {
   score = Math.round(score * 10) / 10;
 
   return { score, factors };
-}
-
-/**
- * Get a human-readable explanation of salience factors
- */
-export function explainSalience(factors: SalienceFactors): string[] {
-  const explanations: string[] = [];
-
-  if (factors.temporal_relevance >= 4) {
-    explanations.push('Contains time-sensitive information');
-  }
-  if (factors.relationship >= 4) {
-    explanations.push('Involves people or relationships');
-  }
-  if (factors.action_language >= 4) {
-    explanations.push('Contains decisions or commitments');
-  }
-  if (factors.explicit_marking >= 4) {
-    explanations.push('Marked as important');
-  }
-  if (factors.self_reference >= 4) {
-    explanations.push('Personal/identity-related');
-  }
-  if (factors.length_complexity >= 7) {
-    explanations.push('Detailed content');
-  }
-
-  return explanations;
 }

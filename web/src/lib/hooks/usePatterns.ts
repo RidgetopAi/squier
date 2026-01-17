@@ -5,10 +5,9 @@ import {
   fetchPatterns,
   fetchPattern,
   fetchPatternStats,
-  fetchPatternsByType,
   type FetchPatternsOptions,
 } from '@/lib/api/patterns';
-import type { Pattern, PatternType } from '@/lib/types';
+import type { Pattern } from '@/lib/types';
 
 /**
  * Hook to fetch patterns with optional filters
@@ -49,15 +48,3 @@ export function usePatternStats() {
   });
 }
 
-/**
- * Hook to fetch patterns by type
- */
-export function usePatternsByType(type: PatternType | undefined) {
-  return useQuery<Pattern[]>({
-    queryKey: ['patterns', 'type', type],
-    queryFn: () => fetchPatternsByType(type!),
-    enabled: !!type,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchOnWindowFocus: false,
-  });
-}

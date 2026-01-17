@@ -42,7 +42,7 @@ export interface ExtractedMemory {
  * 
  * Part of Phase 0: "Generate Not Retrieve" memory system
  */
-export function calibrateSalienceForBiographical(
+function calibrateSalienceForBiographical(
   mem: ExtractedMemory,
   classifications?: Array<{ category: string; relevance: number }>
 ): number {
@@ -138,7 +138,7 @@ export function calibrateSalienceForBiographical(
  * Part of Phase 2: Memory Graph Traversal
  * Enables date-based seeds for Story Engine queries like "What does February 16th mean to me?"
  */
-export function extractEventDate(content: string): Date | null {
+function extractEventDate(content: string): Date | null {
   const text = content.toLowerCase();
 
   // Month names and abbreviations
@@ -487,7 +487,7 @@ IMPORTANT: Return ONLY valid JSON, no markdown.`;
  * Phase 1 of memory extraction false-positive reduction.
  * Routes extraction differently based on conversation context.
  */
-export async function classifyConversationMode(
+async function classifyConversationMode(
   transcript: string
 ): Promise<ConversationModeResult> {
   const defaultResult: ConversationModeResult = {
@@ -933,7 +933,7 @@ async function resolveEntityName(entityName: string): Promise<string | null> {
 /**
  * Get conversations with pending (unextracted) messages
  */
-export async function getPendingConversations(): Promise<ConversationForExtraction[]> {
+async function getPendingConversations(): Promise<ConversationForExtraction[]> {
   const result = await pool.query<ConversationForExtraction>(`
     SELECT DISTINCT c.id, c.client_id, c.message_count, c.created_at
     FROM conversations c
@@ -950,7 +950,7 @@ export async function getPendingConversations(): Promise<ConversationForExtracti
 /**
  * Get pending user messages for a conversation
  */
-export async function getPendingMessages(
+async function getPendingMessages(
   conversationId: string
 ): Promise<PendingMessage[]> {
   const result = await pool.query<PendingMessage>(`
@@ -1040,7 +1040,7 @@ async function extractFromTranscript(
 /**
  * Mark messages as extracted
  */
-export async function markMessagesExtracted(
+async function markMessagesExtracted(
   conversationId: string,
   messageIds: string[]
 ): Promise<void> {
@@ -1058,7 +1058,7 @@ export async function markMessagesExtracted(
 /**
  * Mark messages as skipped (nothing to extract)
  */
-export async function markMessagesSkipped(
+async function markMessagesSkipped(
   conversationId: string,
   messageIds: string[]
 ): Promise<void> {
@@ -1989,29 +1989,3 @@ async function extractRelationshipsRealTime(message: string): Promise<void> {
   }
 }
 
-/**
- * Get extraction statistics
- */
-export async function getExtractionStats(): Promise<{
-  pendingMessages: number;
-  extractedMessages: number;
-  skippedMessages: number;
-  conversationsWithPending: number;
-}> {
-  const result = await pool.query(`
-    SELECT
-      COUNT(*) FILTER (WHERE extraction_status = 'pending' AND role = 'user') as pending,
-      COUNT(*) FILTER (WHERE extraction_status = 'extracted' AND role = 'user') as extracted,
-      COUNT(*) FILTER (WHERE extraction_status = 'skipped' AND role = 'user') as skipped,
-      COUNT(DISTINCT conversation_id) FILTER (WHERE extraction_status = 'pending' AND role = 'user') as pending_convos
-    FROM chat_messages
-  `);
-
-  const row = result.rows[0];
-  return {
-    pendingMessages: parseInt(row.pending ?? '0', 10),
-    extractedMessages: parseInt(row.extracted ?? '0', 10),
-    skippedMessages: parseInt(row.skipped ?? '0', 10),
-    conversationsWithPending: parseInt(row.pending_convos ?? '0', 10),
-  };
-}

@@ -3,16 +3,14 @@
 // ============================================
 // React hook for triggering and monitoring consolidation
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   triggerConsolidation,
-  getConsolidationStats,
   type ConsolidationResult,
-  type ConsolidationStats,
 } from '@/lib/api/consolidation';
 
 // Query keys
-export const consolidationKeys = {
+const consolidationKeys = {
   all: ['consolidation'] as const,
   stats: () => [...consolidationKeys.all, 'stats'] as const,
 };
@@ -43,17 +41,6 @@ export function useConsolidation() {
   });
 }
 
-/**
- * Hook for fetching consolidation stats
- */
-export function useConsolidationStats() {
-  return useQuery<ConsolidationStats>({
-    queryKey: consolidationKeys.stats(),
-    queryFn: getConsolidationStats,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchOnWindowFocus: false,
-  });
-}
 
 /**
  * Helper to format consolidation result for display

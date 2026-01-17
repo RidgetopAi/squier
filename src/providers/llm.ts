@@ -447,7 +447,7 @@ let provider: LLMProvider | null = null;
 /**
  * Get the configured LLM provider
  */
-export function getLLMProvider(): LLMProvider {
+function getLLMProvider(): LLMProvider {
   if (!provider) {
     switch (config.llm.provider) {
       case 'groq':

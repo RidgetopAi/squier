@@ -217,5 +217,4 @@ export async function extractFromBuffer(
   return extractDocument({ type: 'buffer', buffer, mimeType }, options);
 }
 
-// Re-export types for convenience
-export * from './types.js';
+// Types are exported from index.ts

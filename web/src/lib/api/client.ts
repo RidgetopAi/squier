@@ -9,7 +9,7 @@ const API_BASE_URL = typeof window === 'undefined'
   ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000')
   : '';
 
-export class ApiError extends Error {
+class ApiError extends Error {
   constructor(
     public status: number,
     public statusText: string,
@@ -150,7 +150,3 @@ export async function apiDelete<T>(
   return handleResponse<T>(response);
 }
 
-// Health check
-export async function checkHealth(): Promise<{ status: string }> {
-  return apiGet('/api/health');
-}

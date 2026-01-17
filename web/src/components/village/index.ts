@@ -2,7 +2,7 @@ export { default as VillageScene } from './VillageScene';
 export { VillageCanvas } from './VillageCanvas';
 export { MemoryPanel } from './MemoryPanel';
 export { Building, BuildingsLayer } from './Building';
-export { BuildingModel, BuildingModelWithFallback } from './BuildingModel';
+export { BuildingModel } from './BuildingModel';
 export { Road, RoadsLayer } from './Road';
 export { LightBeamRoad, LightBeamsLayer } from './LightBeamRoad';
 export { HexTile, HexTilesLayer, DISTRICT_GROUND_COLORS, DISTRICT_EDGE_COLORS } from './HexTile';

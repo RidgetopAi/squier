@@ -268,18 +268,3 @@ export async function chatSimple(
   return response.message;
 }
 
-/**
- * Chat with context (full featured)
- */
-export async function chatWithContext(
-  message: string,
-  history: ChatMessage[] = [],
-  contextProfile?: string
-): Promise<ChatResponse> {
-  return chat({
-    message,
-    conversationHistory: history,
-    includeContext: true,
-    contextProfile,
-  });
-}

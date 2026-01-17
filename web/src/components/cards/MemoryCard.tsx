@@ -254,39 +254,4 @@ function SalienceMeter({ score }: { score: number }) {
   );
 }
 
-// Compact card variant for inline display
-export function MemoryCardCompact({
-  memory,
-  onClick,
-}: {
-  memory: ScoredMemory;
-  onClick?: () => void;
-}) {
-  const salienceLevel = Math.min(10, Math.max(1, Math.round(memory.salience_score)));
-
-  return (
-    <motion.button
-      className={`
-        w-full text-left p-3 rounded-lg
-        glass hover:border-primary/50
-        transition-all duration-200
-        salience-glow-${salienceLevel}
-      `}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-    >
-      <p className="text-sm text-foreground line-clamp-2 mb-1">
-        {memory.content}
-      </p>
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-foreground-muted">
-          {formatRelativeTime(memory.created_at)}
-        </span>
-        <SalienceMeter score={memory.salience_score} />
-      </div>
-    </motion.button>
-  );
-}
-
 export default MemoryCard;

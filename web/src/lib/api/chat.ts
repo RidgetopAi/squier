@@ -2,7 +2,7 @@
 // SQUIRE WEB - CHAT API CLIENT
 // ============================================
 
-import { apiPost, apiGet } from './client';
+import { apiPost } from './client';
 import type { ChatMessage } from '@/lib/types';
 
 // === Request/Response Types ===
@@ -37,16 +37,6 @@ export interface ChatApiResponse {
   provider: string;
 }
 
-export interface ChatHealthResponse {
-  status: 'healthy' | 'unavailable';
-  llm: {
-    provider: string;
-    model: string;
-    configured: boolean;
-    available: boolean;
-  };
-}
-
 interface ApiSuccessResponse<T> {
   success: true;
   data: T;
@@ -68,30 +58,7 @@ export async function sendChatMessage(
   return response.data;
 }
 
-/**
- * Send a simple chat message without context
- * For quick responses when memory isn't needed
- */
-export async function sendSimpleChatMessage(
-  message: string,
-  history?: ChatMessage[]
-): Promise<{ message: string; role: 'assistant' }> {
-  const response = await apiPost<ApiSuccessResponse<{ message: string; role: 'assistant' }>>(
-    '/api/chat/simple',
-    { message, history }
-  );
-  return response.data;
-}
 
-/**
- * Check if chat service is available
- */
-export async function checkChatHealth(): Promise<ChatHealthResponse> {
-  const response = await apiGet<ApiSuccessResponse<ChatHealthResponse>>(
-    '/api/chat/health'
-  );
-  return response.data;
-}
 
 /**
  * Convert ChatMessage array to the format expected by the API

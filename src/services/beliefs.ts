@@ -62,7 +62,7 @@ export interface BeliefConflict {
   detected_at: Date;
 }
 
-export interface ExtractedBelief {
+interface ExtractedBelief {
   content: string;
   belief_type: BeliefType;
   confidence: number;
@@ -75,7 +75,7 @@ export interface ExtractedBelief {
 /**
  * Extract beliefs from a memory's content using LLM
  */
-export async function extractBeliefsFromContent(
+async function extractBeliefsFromContent(
   content: string
 ): Promise<ExtractedBelief[]> {
   const systemPrompt = `You are a belief extractor. Given a memory/observation, identify any beliefs the person holds.
@@ -148,7 +148,7 @@ What beliefs does this memory reveal? Return JSON array only.`;
  * Find existing belief that matches (for reinforcement vs creation)
  * Uses simple text similarity for now; could add embeddings later
  */
-export async function findSimilarBelief(
+async function findSimilarBelief(
   content: string,
   beliefType: BeliefType
 ): Promise<Belief | null> {
@@ -179,7 +179,7 @@ export async function findSimilarBelief(
 /**
  * Create a new belief
  */
-export async function createBelief(
+async function createBelief(
   content: string,
   beliefType: BeliefType,
   confidence: number,
@@ -283,7 +283,7 @@ export async function getBeliefsByEntity(entityId: string): Promise<Belief[]> {
 /**
  * Reinforce an existing belief (new evidence found)
  */
-export async function reinforceBelief(
+async function reinforceBelief(
   beliefId: string,
   confidenceBoost: number = 0.1
 ): Promise<Belief> {
@@ -307,7 +307,7 @@ export async function reinforceBelief(
 /**
  * Supersede a belief with a newer one
  */
-export async function supersedeBelief(
+async function supersedeBelief(
   oldBeliefId: string,
   newBeliefId: string
 ): Promise<void> {
@@ -326,7 +326,7 @@ export async function supersedeBelief(
 /**
  * Link a memory as evidence for a belief
  */
-export async function linkEvidence(
+async function linkEvidence(
   beliefId: string,
   memoryId: string,
   supportStrength: number,
@@ -377,7 +377,7 @@ export async function getBeliefEvidence(
 /**
  * Check if a new belief conflicts with existing beliefs
  */
-export async function detectConflicts(
+async function detectConflicts(
   beliefId: string
 ): Promise<BeliefConflict[]> {
   const belief = await getBelief(beliefId);

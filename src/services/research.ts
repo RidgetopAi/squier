@@ -102,10 +102,10 @@ export interface ResearchQuestion {
 
 // === TYPES: SOURCES ===
 
-export const GAP_SOURCE_TYPES = ['memory', 'belief', 'pattern', 'entity', 'insight'] as const;
+const GAP_SOURCE_TYPES = ['memory', 'belief', 'pattern', 'entity', 'insight'] as const;
 export type GapSourceType = (typeof GAP_SOURCE_TYPES)[number];
 
-export const QUESTION_SOURCE_TYPES = ['memory', 'belief', 'pattern', 'entity', 'insight', 'gap'] as const;
+const QUESTION_SOURCE_TYPES = ['memory', 'belief', 'pattern', 'entity', 'insight', 'gap'] as const;
 export type QuestionSourceType = (typeof QUESTION_SOURCE_TYPES)[number];
 
 export interface GapSource {
@@ -175,7 +175,7 @@ interface GapDetectionContext {
 /**
  * Detect knowledge gaps from analyzing entities, beliefs, patterns, and memories
  */
-export async function detectGaps(
+async function detectGaps(
   context: GapDetectionContext
 ): Promise<ExtractedGap[]> {
   if (context.entities.length === 0 && context.recentMemories.length === 0) {
@@ -331,7 +331,7 @@ interface QuestionGenerationContext {
 /**
  * Generate smart questions to ask the user
  */
-export async function generateQuestions(
+async function generateQuestions(
   context: QuestionGenerationContext
 ): Promise<ExtractedQuestion[]> {
   const systemPrompt = `You are a thoughtful question generator. Given knowledge gaps and context, generate smart questions to ask.
@@ -481,7 +481,7 @@ What questions would help us understand them better? Return JSON array only.`;
 /**
  * Find existing gap that matches (to avoid duplicates)
  */
-export async function findSimilarGap(
+async function findSimilarGap(
   content: string,
   gapType: GapType
 ): Promise<KnowledgeGap | null> {
@@ -507,7 +507,7 @@ export async function findSimilarGap(
 /**
  * Find existing question that matches (to avoid duplicates)
  */
-export async function findSimilarQuestion(
+async function findSimilarQuestion(
   content: string,
   questionType: QuestionType
 ): Promise<ResearchQuestion | null> {
@@ -530,7 +530,7 @@ export async function findSimilarQuestion(
 /**
  * Create a new knowledge gap
  */
-export async function createGap(
+async function createGap(
   content: string,
   gapType: GapType,
   severity: number,
@@ -640,7 +640,7 @@ export async function getAllGaps(options?: {
 /**
  * Surface a gap (increment times_surfaced)
  */
-export async function surfaceGap(gapId: string): Promise<KnowledgeGap> {
+async function surfaceGap(gapId: string): Promise<KnowledgeGap> {
   const result = await pool.query<KnowledgeGap>(
     `UPDATE knowledge_gaps
      SET times_surfaced = times_surfaced + 1,
@@ -722,7 +722,7 @@ export async function dismissGap(gapId: string, reason?: string): Promise<Knowle
 /**
  * Create a new research question
  */
-export async function createQuestion(
+async function createQuestion(
   content: string,
   questionType: QuestionType,
   priority: GapPriority = 'medium',
@@ -905,7 +905,7 @@ export async function dismissQuestion(questionId: string): Promise<ResearchQuest
 /**
  * Expire old questions
  */
-export async function expireOldQuestions(): Promise<number> {
+async function expireOldQuestions(): Promise<number> {
   const result = await pool.query(
     `UPDATE research_questions
      SET status = 'expired',
@@ -924,7 +924,7 @@ export async function expireOldQuestions(): Promise<number> {
 /**
  * Link a source to a gap
  */
-export async function linkGapSource(
+async function linkGapSource(
   gapId: string,
   sourceType: GapSourceType,
   sourceId: string,
@@ -945,7 +945,7 @@ export async function linkGapSource(
 /**
  * Link a source to a question
  */
-export async function linkQuestionSource(
+async function linkQuestionSource(
   questionId: string,
   sourceType: QuestionSourceType,
   sourceId: string,

@@ -19,7 +19,7 @@ import {
 /**
  * DOCX Extractor implementation using mammoth
  */
-export class DocxExtractor implements DocumentExtractor {
+class DocxExtractor implements DocumentExtractor {
   readonly supportedFormats: DocumentFormat[] = ['docx'];
   readonly supportedMimeTypes: string[] = [
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

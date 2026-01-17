@@ -1,11 +1,10 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchContext, listContextProfiles, type FetchContextRequest } from '@/lib/api/context';
-import type { ContextPackage } from '@/lib/types';
+import { useQuery } from '@tanstack/react-query';
+import { fetchContext, listContextProfiles } from '@/lib/api/context';
 
 // Query keys for caching
-export const contextKeys = {
+const contextKeys = {
   all: ['context'] as const,
   package: (query?: string, profile?: string) =>
     [...contextKeys.all, 'package', { query, profile }] as const,
@@ -42,24 +41,6 @@ export function useContextPackage(
   });
 }
 
-/**
- * Hook to manually fetch context (imperative)
- * Returns a mutation for on-demand context fetching
- */
-export function useFetchContext() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (request: FetchContextRequest) => fetchContext(request),
-    onSuccess: (data, variables) => {
-      // Cache the result
-      queryClient.setQueryData(
-        contextKeys.package(variables.query, variables.profile),
-        data
-      );
-    },
-  });
-}
 
 /**
  * Hook to list available context profiles
@@ -72,25 +53,3 @@ export function useContextProfiles() {
   });
 }
 
-/**
- * Prefetch context for a query (useful for anticipating user actions)
- */
-export function usePrefetchContext() {
-  const queryClient = useQueryClient();
-
-  return (query: string, profile?: string) => {
-    return queryClient.prefetchQuery({
-      queryKey: contextKeys.package(query, profile),
-      queryFn: () => fetchContext({ query, profile }),
-      staleTime: 60 * 1000,
-    });
-  };
-}
-
-/**
- * Get cached context without triggering a fetch
- */
-export function useCachedContext(query?: string, profile?: string): ContextPackage | undefined {
-  const queryClient = useQueryClient();
-  return queryClient.getQueryData(contextKeys.package(query, profile));
-}

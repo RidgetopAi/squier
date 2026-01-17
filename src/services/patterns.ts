@@ -66,7 +66,7 @@ export interface PatternEvidence {
   extracted_at: Date;
 }
 
-export interface ExtractedPattern {
+interface ExtractedPattern {
   content: string;
   pattern_type: PatternType;
   confidence: number;
@@ -82,7 +82,7 @@ export interface ExtractedPattern {
 /**
  * Extract patterns from a memory's content using LLM
  */
-export async function extractPatternsFromContent(
+async function extractPatternsFromContent(
   content: string,
   existingPatterns: Pattern[] = []
 ): Promise<ExtractedPattern[]> {
@@ -171,7 +171,7 @@ What patterns does this memory reveal or reinforce? Return JSON array only.`;
 /**
  * Find existing pattern that matches (for reinforcement vs creation)
  */
-export async function findSimilarPattern(
+async function findSimilarPattern(
   content: string,
   patternType: PatternType
 ): Promise<Pattern | null> {
@@ -201,7 +201,7 @@ export async function findSimilarPattern(
 /**
  * Create a new pattern
  */
-export async function createPattern(
+async function createPattern(
   content: string,
   patternType: PatternType,
   confidence: number,
@@ -334,7 +334,7 @@ export async function getPatternsByEntity(entityId: string): Promise<Pattern[]> 
 /**
  * Reinforce an existing pattern (new evidence found)
  */
-export async function reinforcePattern(
+async function reinforcePattern(
   patternId: string,
   confidenceBoost: number = 0.05
 ): Promise<Pattern> {
@@ -357,51 +357,13 @@ export async function reinforcePattern(
   return result.rows[0];
 }
 
-/**
- * Mark a pattern as dormant (not seen in a while)
- */
-export async function markPatternDormant(patternId: string): Promise<Pattern> {
-  const result = await pool.query<Pattern>(
-    `UPDATE patterns
-     SET status = 'dormant',
-         dormant_since = NOW(),
-         updated_at = NOW()
-     WHERE id = $1
-     RETURNING *`,
-    [patternId]
-  );
-
-  if (!result.rows[0]) {
-    throw new Error(`Pattern not found: ${patternId}`);
-  }
-  return result.rows[0];
-}
-
-/**
- * Mark a pattern as disproven (contradicted by evidence)
- */
-export async function disprovePattern(patternId: string): Promise<Pattern> {
-  const result = await pool.query<Pattern>(
-    `UPDATE patterns
-     SET status = 'disproven',
-         updated_at = NOW()
-     WHERE id = $1
-     RETURNING *`,
-    [patternId]
-  );
-
-  if (!result.rows[0]) {
-    throw new Error(`Pattern not found: ${patternId}`);
-  }
-  return result.rows[0];
-}
 
 // === EVIDENCE MANAGEMENT ===
 
 /**
  * Link a memory as evidence for a pattern
  */
-export async function linkEvidence(
+async function linkEvidence(
   patternId: string,
   memoryId: string,
   evidenceStrength: number,
@@ -449,20 +411,6 @@ export async function getPatternEvidence(
 }
 
 // === DORMANCY DETECTION ===
-
-/**
- * Find patterns that haven't been observed recently
- * and should be marked as dormant
- */
-export async function findDormantPatterns(daysThreshold: number = 30): Promise<Pattern[]> {
-  const result = await pool.query<Pattern>(
-    `SELECT * FROM patterns
-     WHERE status = 'active'
-       AND last_observed_at < NOW() - INTERVAL '1 day' * $1`,
-    [daysThreshold]
-  );
-  return result.rows;
-}
 
 /**
  * Mark stale patterns as dormant

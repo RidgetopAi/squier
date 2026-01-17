@@ -10,10 +10,6 @@ interface SummariesListResponse {
   summaries: LivingSummary[];
 }
 
-interface SummaryResponse {
-  summary: LivingSummary;
-}
-
 interface SummaryStatsResponse {
   stats: {
     total: number;
@@ -36,14 +32,6 @@ export async function fetchSummaries(nonEmptyOnly = true): Promise<LivingSummary
     params: { nonEmpty: nonEmptyOnly },
   });
   return response.summaries;
-}
-
-/**
- * Fetch a specific summary by category
- */
-export async function fetchSummary(category: SummaryCategory): Promise<LivingSummary> {
-  const response = await apiGet<SummaryResponse>(`/api/summaries/${category}`);
-  return response.summary;
 }
 
 /**

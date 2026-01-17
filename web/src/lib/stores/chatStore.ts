@@ -635,9 +635,6 @@ export const useChatError = () => useChatStore((state) => state.error);
 export const useConversationId = () => useChatStore((state) => state.conversationId);
 export const useLastContext = () => useChatStore((state) => state.lastContext);
 export const useLastContextPackage = () => useChatStore((state) => state.lastContextPackage);
-export const useIsLoadingHistory = () => useChatStore((state) => state.isLoadingHistory);
-export const useHasLoadedInitial = () => useChatStore((state) => state.hasLoadedInitial);
-export const useHasPendingMessage = () => useChatStore((state) => state.pendingUserMessageId !== null);
 
 // Combined "busy" state - true when chat is processing and navigation should be blocked
 export const useIsChatBusy = () =>

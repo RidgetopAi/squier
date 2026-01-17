@@ -266,17 +266,6 @@ export async function archiveNote(id: string): Promise<void> {
 }
 
 /**
- * Restore an archived note
- */
-export async function restoreNote(id: string): Promise<Note | null> {
-  const result = await pool.query(
-    'UPDATE notes SET archived_at = NULL, updated_at = NOW() WHERE id = $1 RETURNING *',
-    [id]
-  );
-  return (result.rows[0] as Note) ?? null;
-}
-
-/**
  * Hard delete a note
  */
 export async function deleteNote(id: string): Promise<void> {

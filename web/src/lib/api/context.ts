@@ -33,17 +33,6 @@ export async function fetchContext(
   return apiPost<ContextPackage>('/api/context', request);
 }
 
-/**
- * Fetch context package (GET - simpler interface)
- */
-export async function fetchContextSimple(
-  query?: string,
-  profile?: string
-): Promise<ContextPackage> {
-  return apiGet<ContextPackage>('/api/context', {
-    params: { query, profile },
-  });
-}
 
 /**
  * List available context profiles
@@ -55,15 +44,3 @@ export async function listContextProfiles(): Promise<ContextProfile[]> {
   return response.profiles;
 }
 
-/**
- * Get disclosure log entries
- */
-export async function getDisclosureLog(
-  limit?: number,
-  conversationId?: string
-): Promise<object[]> {
-  const response = await apiGet<{ entries: object[] }>('/api/context/disclosure', {
-    params: { limit, conversation_id: conversationId },
-  });
-  return response.entries;
-}

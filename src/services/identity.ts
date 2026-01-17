@@ -67,23 +67,6 @@ export async function getUserIdentity(): Promise<UserIdentity | null> {
 }
 
 /**
- * Check if user identity is locked (and therefore should skip detection)
- */
-export async function isIdentityLocked(): Promise<boolean> {
-  const identity = await getUserIdentity();
-  return identity?.is_locked ?? false;
-}
-
-/**
- * Get the user's name if set
- * Returns null if no identity established
- */
-export async function getUserName(): Promise<string | null> {
-  const identity = await getUserIdentity();
-  return identity?.name ?? null;
-}
-
-/**
  * Set the initial user identity
  * Only works if no identity exists yet
  * Automatically locks the identity
@@ -188,14 +171,6 @@ export async function lockIdentity(): Promise<void> {
     SET is_locked = TRUE, locked_at = NOW(), updated_at = NOW()
   `);
   console.log('[Identity] Identity locked');
-}
-
-/**
- * Delete identity (for testing/reset only)
- */
-export async function deleteIdentity(): Promise<void> {
-  await pool.query('DELETE FROM user_identity');
-  console.log('[Identity] Identity deleted');
 }
 
 /**

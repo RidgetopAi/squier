@@ -18,8 +18,7 @@ type RRuleSetType = InstanceType<typeof RRuleSet>;
 type FrequencyType = typeof Frequency[keyof typeof Frequency];
 type WeekdayType = InstanceType<typeof Weekday>;
 
-// Re-export rrule types that consumers might need
-export { RRule, RRuleSet, rrulestr, Frequency, Weekday };
+// rrule types kept private - only used internally
 export type { RRuleType, RRuleSetType, FrequencyType, WeekdayType };
 
 // ============================================
@@ -187,177 +186,12 @@ export function getNextOccurrence(
   }
 }
 
-/**
- * Check if a specific date is an occurrence of the recurrence
- */
-export function isOccurrenceDate(
-  rruleString: string,
-  dtstart: Date,
-  checkDate: Date,
-  toleranceMs: number = 60000 // 1 minute tolerance for time comparison
-): boolean {
-  try {
-    const rule = RRule.fromString(rruleString);
-    const ruleWithStart = new RRule({
-      ...rule.origOptions,
-      dtstart,
-    });
-
-    // Get occurrences in a small window around the check date
-    const windowStart = new Date(checkDate.getTime() - toleranceMs);
-    const windowEnd = new Date(checkDate.getTime() + toleranceMs);
-    const occurrences = ruleWithStart.between(windowStart, windowEnd, true);
-
-    return occurrences.length > 0;
-  } catch {
-    return false;
-  }
-}
-
-// ============================================
-// RRULE Builder Functions
-// ============================================
-
-/**
- * Create an RRULE string from common parameters
- */
-export function buildRRule(params: {
-  frequency: RecurrenceFrequency;
-  interval?: number;
-  daysOfWeek?: DayOfWeek[];
-  until?: Date;
-  count?: number;
-}): string {
-  const { frequency, interval = 1, daysOfWeek, until, count } = params;
-
-  // Map frequency to RRule.Frequency
-  const freqMap: Record<RecurrenceFrequency, FrequencyType> = {
-    daily: Frequency.DAILY,
-    weekly: Frequency.WEEKLY,
-    biweekly: Frequency.WEEKLY, // handled with interval=2
-    monthly: Frequency.MONTHLY,
-    yearly: Frequency.YEARLY,
-  };
-
-  // Map day strings to Weekday objects
-  const weekdayMap: Record<DayOfWeek, WeekdayType> = {
-    MO: RRule.MO,
-    TU: RRule.TU,
-    WE: RRule.WE,
-    TH: RRule.TH,
-    FR: RRule.FR,
-    SA: RRule.SA,
-    SU: RRule.SU,
-  };
-
-  const ruleOptions: Partial<ConstructorParameters<typeof RRule>[0]> = {
-    freq: freqMap[frequency],
-    interval: frequency === 'biweekly' ? 2 : interval,
-  };
-
-  if (daysOfWeek && daysOfWeek.length > 0) {
-    ruleOptions.byweekday = daysOfWeek.map(day => weekdayMap[day]);
-  }
-
-  if (until) {
-    ruleOptions.until = until;
-  }
-
-  if (count) {
-    ruleOptions.count = count;
-  }
-
-  const rule = new RRule(ruleOptions);
-  return rule.toString();
-}
-
-/**
- * Parse an RRULE string into a structured format for editing
- */
-export function parseRRule(rruleString: string): ParsedRecurrence {
-  try {
-    const rule = RRule.fromString(rruleString);
-    const opts = rule.origOptions;
-
-    // Determine frequency label
-    let frequency: ParsedRecurrence['frequency'] = 'custom';
-    if (opts.freq === Frequency.DAILY && (opts.interval ?? 1) === 1) {
-      frequency = 'daily';
-    } else if (opts.freq === Frequency.WEEKLY) {
-      if ((opts.interval ?? 1) === 1) {
-        frequency = 'weekly';
-      } else if (opts.interval === 2) {
-        frequency = 'biweekly';
-      }
-    } else if (opts.freq === Frequency.MONTHLY && (opts.interval ?? 1) === 1) {
-      frequency = 'monthly';
-    } else if (opts.freq === Frequency.YEARLY && (opts.interval ?? 1) === 1) {
-      frequency = 'yearly';
-    }
-
-    // Map weekdays back to strings
-    const dayMap: Record<number, DayOfWeek> = {
-      0: 'MO',
-      1: 'TU',
-      2: 'WE',
-      3: 'TH',
-      4: 'FR',
-      5: 'SA',
-      6: 'SU',
-    };
-
-    let daysOfWeek: DayOfWeek[] | undefined;
-    if (opts.byweekday) {
-      const weekdays = Array.isArray(opts.byweekday) ? opts.byweekday : [opts.byweekday];
-      daysOfWeek = weekdays.map(wd => {
-        if (typeof wd === 'number') {
-          return dayMap[wd] ?? 'MO';
-        }
-        if (typeof wd === 'string') {
-          // WeekdayStr like 'MO', 'TU', etc.
-          return wd as DayOfWeek;
-        }
-        // Weekday object - access the weekday property
-        return dayMap[(wd as { weekday: number }).weekday] ?? 'MO';
-      });
-    }
-
-    return {
-      frequency,
-      interval: opts.interval ?? 1,
-      daysOfWeek,
-      until: opts.until ?? undefined,
-      count: opts.count ?? undefined,
-      isValid: true,
-      rawRule: rruleString,
-    };
-  } catch {
-    return {
-      frequency: 'custom',
-      interval: 1,
-      isValid: false,
-      rawRule: rruleString,
-    };
-  }
-}
-
-/**
- * Get a human-readable description of an RRULE
- */
-export function describeRRule(rruleString: string): string {
-  try {
-    const rule = RRule.fromString(rruleString);
-    return rule.toText();
-  } catch {
-    return 'Invalid recurrence rule';
-  }
-}
 
 // ============================================
 // Recurrence Preset Templates
 // ============================================
 
-export const RecurrencePresets = {
+const RecurrencePresets = {
   DAILY: 'RRULE:FREQ=DAILY',
   WEEKLY: 'RRULE:FREQ=WEEKLY',
   BIWEEKLY: 'RRULE:FREQ=WEEKLY;INTERVAL=2',

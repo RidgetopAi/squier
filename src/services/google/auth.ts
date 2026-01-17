@@ -33,7 +33,7 @@ export interface GoogleAccount {
 /**
  * Create OAuth2 client with credentials
  */
-export function createOAuth2Client() {
+function createOAuth2Client() {
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
     throw new Error('Google OAuth credentials not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.');
   }
@@ -122,7 +122,7 @@ export async function handleOAuthCallback(code: string): Promise<GoogleAccount> 
 /**
  * Refresh access token for an account
  */
-export async function refreshAccessToken(accountId: string): Promise<GoogleAccount> {
+async function refreshAccessToken(accountId: string): Promise<GoogleAccount> {
   const account = await getAccount(accountId);
   if (!account) {
     throw new Error(`Google account not found: ${accountId}`);
@@ -197,17 +197,6 @@ export async function getAccount(accountId: string): Promise<GoogleAccount | nul
   const result = await pool.query(
     'SELECT * FROM google_accounts WHERE id = $1',
     [accountId]
-  );
-  return result.rows[0] as GoogleAccount || null;
-}
-
-/**
- * Get a Google account by email
- */
-export async function getAccountByEmail(email: string): Promise<GoogleAccount | null> {
-  const result = await pool.query(
-    'SELECT * FROM google_accounts WHERE email = $1',
-    [email]
   );
   return result.rows[0] as GoogleAccount || null;
 }
