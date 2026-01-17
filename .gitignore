@@ -38,3 +38,6 @@ claude-desktop-memories/
 # Test coverage
 coverage/
 debug-images/
+
+# Surveyor cache
+.surveyor/
