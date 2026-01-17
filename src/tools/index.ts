@@ -239,6 +239,13 @@ import {
   completeCommitmentToolHandler,
 } from './commitments.js';
 
+import {
+  createReminderToolName,
+  createReminderToolDescription,
+  createReminderToolParameters,
+  createReminderToolHandler,
+} from './reminders.js';
+
 // Register time tool
 registerTool(timeToolName, timeToolDescription, timeToolParameters, timeToolHandler);
 
@@ -269,3 +276,6 @@ registerTool(createCalendarEventToolName, createCalendarEventToolDescription, cr
 // Register commitment tools
 registerTool(listOpenCommitmentsToolName, listOpenCommitmentsToolDescription, listOpenCommitmentsToolParameters, listOpenCommitmentsToolHandler);
 registerTool(completeCommitmentToolName, completeCommitmentToolDescription, completeCommitmentToolParameters, completeCommitmentToolHandler);
+
+// Register reminder tools
+registerTool(createReminderToolName, createReminderToolDescription, createReminderToolParameters, createReminderToolHandler);
