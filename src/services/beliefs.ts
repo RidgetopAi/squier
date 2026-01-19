@@ -8,6 +8,7 @@
 import { pool } from '../db/pool.js';
 import { completeText } from '../providers/llm.js';
 import { generateEmbedding } from '../providers/embeddings.js';
+import { searchEntities } from './entities.js';
 
 // === TYPES ===
 
@@ -666,6 +667,43 @@ export function getBeliefTypeDescription(type: BeliefType): string {
 
 // === HIGH-LEVEL INTEGRATION ===
 
+/**
+ * Resolve an entity name to an entity ID
+ * For about_person beliefs, search for person entities
+ * For about_project beliefs, search for project entities
+ */
+async function resolveEntityName(
+  entityName: string | undefined,
+  beliefType: BeliefType
+): Promise<string | undefined> {
+  if (!entityName) {
+    return undefined;
+  }
+
+  // Determine entity type based on belief type
+  const entityType = beliefType === 'about_person' ? 'person' :
+                     beliefType === 'about_project' ? 'project' : undefined;
+
+  try {
+    const matchingEntities = await searchEntities(entityName, entityType);
+    const firstMatch = matchingEntities[0];
+    if (firstMatch) {
+      console.log(
+        `[Beliefs] Resolved entity "${entityName}" to ${firstMatch.name} (${firstMatch.id})`
+      );
+      return firstMatch.id;
+    } else {
+      console.log(
+        `[Beliefs] Could not resolve entity "${entityName}" - no matching entity found`
+      );
+      return undefined;
+    }
+  } catch (error) {
+    console.error(`[Beliefs] Failed to resolve entity "${entityName}":`, error);
+    return undefined;
+  }
+}
+
 export interface BeliefExtractionResult {
   created: Belief[];
   reinforced: Array<{ belief: Belief; wasReinforced: boolean }>;
@@ -704,11 +742,14 @@ export async function processMemoryForBeliefs(
       result.reinforced.push({ belief: reinforced, wasReinforced: true });
     } else {
       // Create new belief
+      // Resolve entity_name to entity_id for about_person/about_project beliefs
+      const relatedEntityId = await resolveEntityName(ext.entity_name, ext.belief_type);
+
       const belief = await createBelief(
         ext.content,
         ext.belief_type,
         ext.confidence,
-        undefined, // TODO: resolve entity_name to entity_id
+        relatedEntityId,
         model
       );
       await linkEvidence(belief.id, memoryId, ext.confidence, 'supports');
