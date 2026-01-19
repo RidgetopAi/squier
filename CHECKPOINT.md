@@ -129,12 +129,13 @@ Commit: 996d7e5
   - **Review Instance**: 8
   - **Completed by**: Instance 7 | Commit: ef7cd59
 
-- [ ] **TASK-L6**: Remove or improve VAPID_SUBJECT default
+- [x] **TASK-L6**: Remove or improve VAPID_SUBJECT default
   - **File**: `src/services/push.ts:62`
   - **Issue**: Default VAPID_SUBJECT is mailto:admin@squire.local (was rejected by Apple)
-  - **Fix**: Remove default or set more realistic fallback
+  - **Fix**: Removed default, added warning when not configured
   - **Impact**: Production uses env var, but default is misleading
   - **Review Instance**: 7
+  - **Completed by**: Instance 7 | Commit: dfc9db1
 
 ### Optional / Future Enhancements
 
@@ -206,6 +207,7 @@ When ALL tasks checked AND ALL validation passes:
 | 9 | TASK-L3: Make streaming timeout configurable | Complete | Added LLM_API_TIMEOUT_MS env var to config, updated handlers.ts, deployed to VPS |
 | 10 | TASK-L4: Fix commitment duplicate items | Complete | Already done by previous instance (commit 0e336e2), updated checkpoint |
 | 7 | TASK-L5: Make search thresholds configurable | Complete | Added config.search section with SEARCH_*_THRESHOLD env vars, raised defaults (commit ef7cd59) |
+| 7 | TASK-L6: Remove VAPID_SUBJECT default | Complete | Removed misleading default, added warning when not configured (commit dfc9db1) |
 
 ---
 
