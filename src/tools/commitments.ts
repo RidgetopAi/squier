@@ -17,7 +17,6 @@ import {
   markReminderAcknowledged,
   type Reminder,
 } from '../services/reminders.js';
-import { generateEmbedding } from '../providers/embeddings.js';
 import { pool } from '../db/pool.js';
 import { config } from '../config/index.js';
 import type { ToolHandler } from './types.js';
@@ -33,12 +32,12 @@ interface ReminderMatch {
 
 async function findMatchingReminders(
   text: string,
-  options: { limit?: number; minSimilarity?: number } = {}
+  options: { limit?: number } = {}
 ): Promise<ReminderMatch[]> {
-  const { limit = 5, minSimilarity = 0.4 } = options;
+  const { limit = 5 } = options;
 
-  // Search reminders by text similarity (no embedding on reminders, use text search)
-  // First try exact/partial match
+  // Search reminders by text similarity using ILIKE
+  // Reminders have short, simple titles that work well with text search
   const textResult = await pool.query<Reminder>(
     `SELECT * FROM reminders
      WHERE status IN ('pending', 'sent')
@@ -48,39 +47,10 @@ async function findMatchingReminders(
     [`%${text}%`, `%${text.split(' ').join('%')}%`, limit]
   );
 
-  if (textResult.rows.length > 0) {
-    return textResult.rows.map((r) => ({
-      reminder: r,
-      similarity: 0.7, // Text match gets decent similarity
-    }));
-  }
-
-  // Fall back to embedding search if we have the embedding column
-  try {
-    const embedding = await generateEmbedding(text);
-    const embeddingStr = `[${embedding.join(',')}]`;
-
-    // Check if reminders have embeddings (they might not)
-    const result = await pool.query<Reminder & { similarity: number }>(
-      `SELECT r.*,
-              1 - (r.embedding <=> $1::vector) as similarity
-       FROM reminders r
-       WHERE r.status IN ('pending', 'sent')
-         AND r.embedding IS NOT NULL
-         AND 1 - (r.embedding <=> $1::vector) >= $2
-       ORDER BY similarity DESC
-       LIMIT $3`,
-      [embeddingStr, minSimilarity, limit]
-    );
-
-    return result.rows.map((r) => ({
-      reminder: r,
-      similarity: r.similarity,
-    }));
-  } catch {
-    // Embedding search failed, return empty
-    return [];
-  }
+  return textResult.rows.map((r) => ({
+    reminder: r,
+    similarity: 0.7, // Text match gets decent similarity
+  }));
 }
 
 // =============================================================================
@@ -247,7 +217,6 @@ async function handleCompleteCommitment(args: CompleteCommitmentArgs | null): Pr
       // Also search reminders
       const reminderMatches = await findMatchingReminders(title_match, {
         limit: 3,
-        minSimilarity: 0.4,
       });
 
       // Combine and sort by similarity
