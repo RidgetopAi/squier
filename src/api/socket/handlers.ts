@@ -262,7 +262,12 @@ You have access to tools. Use them correctly:
 - Any question about appointments, meetings, events, or times → USE THE TOOL
 - NEVER answer schedule questions from memory or context - always fetch current data
 
-**Notes queries** → use search_notes, get_pinned_notes, or list_recent_notes
+**Notes - reading AND writing:**
+- "what notes do I have about..." / "find my notes on..." → search_notes
+- "show me my pinned notes" → get_pinned_notes
+- "take a note about..." / "remember this..." / "write down..." / "jot down..." → create_note
+- "add to my note about..." → append_to_note
+
 **Lists queries** → use search_lists, get_list_items, or list_all_lists
 
 ### Critical rule
