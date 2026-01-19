@@ -121,12 +121,13 @@ Commit: 996d7e5
   - **Review Instance**: 7
   - **Completed by**: Instance 10 | Commit: 0e336e2
 
-- [ ] **TASK-L5**: Consider raising document search threshold
+- [x] **TASK-L5**: Consider raising document search threshold
   - **Files**: `src/services/documents/search.ts:89` and `src/services/context.ts:808`
   - **Issue**: Default threshold is 0.5/0.4 which may be too permissive
-  - **Fix**: Consider raising to 0.6-0.7 for document search
+  - **Fix**: Made thresholds configurable via env vars and raised defaults slightly
   - **Impact**: May return less relevant chunks
   - **Review Instance**: 8
+  - **Completed by**: Instance 7 | Commit: ef7cd59
 
 - [ ] **TASK-L6**: Remove or improve VAPID_SUBJECT default
   - **File**: `src/services/push.ts:62`
@@ -204,6 +205,7 @@ When ALL tasks checked AND ALL validation passes:
 | 9 | TASK-L2: Make provider endpoint URLs configurable | Complete | Added GROQ_URL, XAI_URL, GEMINI_URL env vars to config, updated all LLM providers, deployed to VPS |
 | 9 | TASK-L3: Make streaming timeout configurable | Complete | Added LLM_API_TIMEOUT_MS env var to config, updated handlers.ts, deployed to VPS |
 | 10 | TASK-L4: Fix commitment duplicate items | Complete | Already done by previous instance (commit 0e336e2), updated checkpoint |
+| 7 | TASK-L5: Make search thresholds configurable | Complete | Added config.search section with SEARCH_*_THRESHOLD env vars, raised defaults (commit ef7cd59) |
 
 ---
 

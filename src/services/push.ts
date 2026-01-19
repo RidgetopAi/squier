@@ -59,7 +59,7 @@ export interface SendResult {
 // Generate with: npx web-push generate-vapid-keys
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@squire.local';
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || '';
 
 // Max consecutive failures before deactivating subscription
 const MAX_FAILURE_COUNT = 5;
@@ -73,6 +73,12 @@ function ensureVapidConfigured(): void {
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
     console.warn('VAPID keys not configured. Push notifications will not work.');
     console.warn('Generate keys with: npx web-push generate-vapid-keys');
+    return;
+  }
+
+  if (!VAPID_SUBJECT) {
+    console.warn('VAPID_SUBJECT not configured. Push notifications may fail on some platforms.');
+    console.warn('Set VAPID_SUBJECT to a mailto: URL (e.g., mailto:admin@yourdomain.com)');
     return;
   }
 
