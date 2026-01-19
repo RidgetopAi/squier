@@ -7,6 +7,7 @@
 
 import { pool } from '../db/pool.js';
 import { completeText } from '../providers/llm.js';
+import { generateEmbedding } from '../providers/embeddings.js';
 
 // === TYPES ===
 
@@ -144,19 +145,20 @@ What beliefs does this memory reveal? Return JSON array only.`;
 
 // === BELIEF SIMILARITY ===
 
+// Minimum similarity score to count as matching belief (same as reinforcement)
+const BELIEF_SIMILARITY_THRESHOLD = 0.85;
+
 /**
  * Find existing belief that matches (for reinforcement vs creation)
- * Uses simple text similarity for now; could add embeddings later
+ * Uses embedding-based similarity search with fallback to exact text match
  */
 async function findSimilarBelief(
   content: string,
   beliefType: BeliefType
 ): Promise<Belief | null> {
-  // Normalize for comparison
+  // First, try exact text match (fast path)
   const normalized = content.toLowerCase().trim();
-
-  // Look for beliefs of same type with similar content
-  const result = await pool.query<Belief>(
+  const exactMatch = await pool.query<Belief>(
     `SELECT * FROM beliefs
      WHERE belief_type = $1
        AND status = 'active'
@@ -165,19 +167,46 @@ async function findSimilarBelief(
     [beliefType, normalized]
   );
 
-  if (result.rows[0]) {
-    return result.rows[0];
+  if (exactMatch.rows[0]) {
+    return exactMatch.rows[0];
   }
 
-  // TODO: Add embedding-based similarity search
-  // For now, exact match only
+  // Generate embedding for similarity search
+  try {
+    const embedding = await generateEmbedding(content);
+    const embeddingStr = `[${embedding.join(',')}]`;
+
+    // Search for similar beliefs using embedding similarity
+    const similarResult = await pool.query<Belief & { similarity: number }>(
+      `SELECT *, 1 - (embedding <=> $1::vector) as similarity
+       FROM beliefs
+       WHERE belief_type = $2
+         AND status = 'active'
+         AND embedding IS NOT NULL
+         AND 1 - (embedding <=> $1::vector) >= $3
+       ORDER BY similarity DESC
+       LIMIT 1`,
+      [embeddingStr, beliefType, BELIEF_SIMILARITY_THRESHOLD]
+    );
+
+    if (similarResult.rows[0]) {
+      console.log(
+        `[Beliefs] Found similar belief (similarity: ${similarResult.rows[0].similarity.toFixed(3)}): "${similarResult.rows[0].content.substring(0, 50)}..."`
+      );
+      return similarResult.rows[0];
+    }
+  } catch (error) {
+    console.error('[Beliefs] Embedding similarity search failed:', error);
+    // Fall through to return null if embedding search fails
+  }
+
   return null;
 }
 
 // === BELIEF CRUD ===
 
 /**
- * Create a new belief
+ * Create a new belief with embedding for similarity search
  */
 async function createBelief(
   content: string,
@@ -186,14 +215,24 @@ async function createBelief(
   relatedEntityId?: string,
   model?: string
 ): Promise<Belief> {
+  // Generate embedding for the belief content
+  let embeddingStr: string | null = null;
+  try {
+    const embedding = await generateEmbedding(content);
+    embeddingStr = `[${embedding.join(',')}]`;
+  } catch (error) {
+    console.error('[Beliefs] Failed to generate embedding for belief:', error);
+    // Continue without embedding - will rely on exact text match
+  }
+
   const result = await pool.query<Belief>(
     `INSERT INTO beliefs (
        content, belief_type, related_entity_id, confidence,
-       extracted_by_model, extraction_prompt_version
+       extracted_by_model, extraction_prompt_version, embedding
      )
-     VALUES ($1, $2, $3, $4, $5, 'v1')
+     VALUES ($1, $2, $3, $4, $5, 'v1', $6::vector)
      RETURNING *`,
-    [content, beliefType, relatedEntityId || null, confidence, model || null]
+    [content, beliefType, relatedEntityId || null, confidence, model || null, embeddingStr]
   );
   return result.rows[0]!;
 }
