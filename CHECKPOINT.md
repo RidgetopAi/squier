@@ -71,12 +71,13 @@ Commit: 996d7e5
   - **Review Instance**: 7
   - **Completed by**: Instance 7 | Commit: 2a9aa4d
 
-- [ ] **TASK-M5**: Implement Object ID extraction in document extractor
+- [x] **TASK-M5**: Implement Object ID extraction in document extractor
   - **File**: `src/services/documents/extractor.ts:136-142`
   - **Issue**: case objectId returns error "Object ID extraction not yet implemented"
   - **Fix**: Implement by fetching object data from objects service
   - **Impact**: Cannot extract from objects already stored by ID
   - **Review Instance**: 8
+  - **Completed by**: Instance 7 | Commit: b622ef6
 
 - [ ] **TASK-M6**: Add embedding column to reminders table (or remove dead code)
   - **File**: `schema/019_reminders.sql` and `src/tools/commitments.ts:59-83`
@@ -192,6 +193,7 @@ When ALL tasks checked AND ALL validation passes:
 | 5 | TASK-M2: Add embedding similarity to findSimilarBelief | Complete | Added schema migration 033, embedding generation in createBelief, similarity search in findSimilarBelief |
 | 6 | TASK-M3: Wire entity name resolution to Beliefs | Complete | Added resolveEntityName helper, import searchEntities, wire entity resolution for about_person/about_project beliefs |
 | 7 | TASK-M4: Fix schema comment mismatch | Complete | Fixed 384-dim → 768-dim in commitments.embedding COMMENT statement |
+| 7 | TASK-M5: Implement object ID extraction | Complete | Added getObjectById/getObjectData integration, handles not found/deleted/read errors, deployed to VPS |
 
 ---
 
