@@ -63,11 +63,12 @@ export interface LLMProvider {
 class GroqLLMProvider implements LLMProvider {
   private apiKey: string;
   private model: string;
-  private baseUrl = 'https://api.groq.com/openai/v1';
+  private baseUrl: string;
 
   constructor() {
     this.apiKey = config.llm.groqApiKey;
     this.model = config.llm.model;
+    this.baseUrl = config.llm.groqUrl;
   }
 
   async complete(
@@ -169,11 +170,12 @@ class GroqLLMProvider implements LLMProvider {
 class XAILLMProvider implements LLMProvider {
   private apiKey: string;
   private model: string;
-  private baseUrl = 'https://api.x.ai/v1';
+  private baseUrl: string;
 
   constructor() {
     this.apiKey = config.llm.xaiApiKey ?? '';
     this.model = config.llm.model;
+    this.baseUrl = config.llm.xaiUrl;
   }
 
   async complete(
@@ -274,11 +276,12 @@ class XAILLMProvider implements LLMProvider {
 class GeminiLLMProvider implements LLMProvider {
   private apiKey: string;
   private model: string;
-  private baseUrl = 'https://generativelanguage.googleapis.com/v1beta/openai';
+  private baseUrl: string;
 
   constructor() {
     this.apiKey = config.llm.geminiApiKey ?? '';
     this.model = config.llm.model;
+    this.baseUrl = config.llm.geminiUrl;
   }
 
   async complete(

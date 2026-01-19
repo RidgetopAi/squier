@@ -89,12 +89,13 @@ Commit: 996d7e5
 
 ### Low Priority
 
-- [ ] **TASK-L1**: Lower reinforcement similarity threshold
+- [x] **TASK-L1**: Lower reinforcement similarity threshold
   - **File**: `src/services/reinforcement.ts:33`
   - **Issue**: SIMILARITY_THRESHOLD = 0.85 may be too high
   - **Fix**: Consider lowering to 0.80 for paraphrased mentions
   - **Impact**: Paraphrased mentions may not boost confidence
   - **Review Instance**: 3
+  - **Completed by**: Instance 9 | Commit: 8d26ede
 
 - [ ] **TASK-L2**: Make provider endpoint URLs configurable
   - **File**: `src/providers/llm.ts:66, 172, 277`
@@ -196,6 +197,7 @@ When ALL tasks checked AND ALL validation passes:
 | 7 | TASK-M4: Fix schema comment mismatch | Complete | Fixed 384-dim → 768-dim in commitments.embedding COMMENT statement |
 | 7 | TASK-M5: Implement object ID extraction | Complete | Added getObjectById/getObjectData integration, handles not found/deleted/read errors, deployed to VPS |
 | 8 | TASK-M6: Remove dead reminder embedding code | Complete | Removed unused generateEmbedding import and embedding search fallback from findMatchingReminders(), deployed to VPS |
+| 9 | TASK-L1: Lower reinforcement similarity threshold | Complete | Changed SIMILARITY_THRESHOLD from 0.85 to 0.80 for paraphrased mentions, deployed to VPS |
 
 ---
 
