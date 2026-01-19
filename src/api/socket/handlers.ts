@@ -687,12 +687,12 @@ async function streamGroqResponse(
   }
 
   // Create a combined abort signal with timeout
-  const API_TIMEOUT_MS = 30000; // 30 second timeout
+  const apiTimeoutMs = config.llm.apiTimeoutMs;
   const timeoutController = new AbortController();
   const timeoutId = setTimeout(() => {
-    console.log(`[Socket] ${provider} API timeout after ${API_TIMEOUT_MS}ms`);
+    console.log(`[Socket] ${provider} API timeout after ${apiTimeoutMs}ms`);
     timeoutController.abort();
-  }, API_TIMEOUT_MS);
+  }, apiTimeoutMs);
 
   // Abort if either the external signal or timeout fires
   signal.addEventListener('abort', () => timeoutController.abort());

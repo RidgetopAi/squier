@@ -97,12 +97,13 @@ Commit: 996d7e5
   - **Review Instance**: 3
   - **Completed by**: Instance 9 | Commit: 8d26ede
 
-- [ ] **TASK-L2**: Make provider endpoint URLs configurable
+- [x] **TASK-L2**: Make provider endpoint URLs configurable
   - **File**: `src/providers/llm.ts:66, 172, 277`
   - **Issue**: API endpoints hardcoded (api.groq.com, api.x.ai, etc.)
   - **Fix**: Move to config or environment variables
   - **Impact**: Cannot override endpoints for testing or proxying
   - **Review Instance**: 6
+  - **Completed by**: Instance 9 | Commit: 1af4932
 
 - [ ] **TASK-L3**: Make streaming timeout configurable
   - **File**: `src/api/socket/handlers.ts:752`
@@ -198,6 +199,7 @@ When ALL tasks checked AND ALL validation passes:
 | 7 | TASK-M5: Implement object ID extraction | Complete | Added getObjectById/getObjectData integration, handles not found/deleted/read errors, deployed to VPS |
 | 8 | TASK-M6: Remove dead reminder embedding code | Complete | Removed unused generateEmbedding import and embedding search fallback from findMatchingReminders(), deployed to VPS |
 | 9 | TASK-L1: Lower reinforcement similarity threshold | Complete | Changed SIMILARITY_THRESHOLD from 0.85 to 0.80 for paraphrased mentions, deployed to VPS |
+| 9 | TASK-L2: Make provider endpoint URLs configurable | Complete | Added GROQ_URL, XAI_URL, GEMINI_URL env vars to config, updated all LLM providers, deployed to VPS |
 
 ---
 
