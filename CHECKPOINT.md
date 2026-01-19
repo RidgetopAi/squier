@@ -79,12 +79,13 @@ Commit: 996d7e5
   - **Review Instance**: 8
   - **Completed by**: Instance 7 | Commit: b622ef6
 
-- [ ] **TASK-M6**: Add embedding column to reminders table (or remove dead code)
+- [x] **TASK-M6**: Add embedding column to reminders table (or remove dead code)
   - **File**: `schema/019_reminders.sql` and `src/tools/commitments.ts:59-83`
   - **Issue**: Tools code tries embedding search on reminders but column may not exist
   - **Fix**: Either add embedding column to reminders OR remove embedding search fallback code
   - **Impact**: Potential query failure on reminder embedding search
   - **Review Instance**: 7
+  - **Completed by**: Instance 8 | Commit: d052303
 
 ### Low Priority
 
@@ -194,6 +195,7 @@ When ALL tasks checked AND ALL validation passes:
 | 6 | TASK-M3: Wire entity name resolution to Beliefs | Complete | Added resolveEntityName helper, import searchEntities, wire entity resolution for about_person/about_project beliefs |
 | 7 | TASK-M4: Fix schema comment mismatch | Complete | Fixed 384-dim → 768-dim in commitments.embedding COMMENT statement |
 | 7 | TASK-M5: Implement object ID extraction | Complete | Added getObjectById/getObjectData integration, handles not found/deleted/read errors, deployed to VPS |
+| 8 | TASK-M6: Remove dead reminder embedding code | Complete | Removed unused generateEmbedding import and embedding search fallback from findMatchingReminders(), deployed to VPS |
 
 ---
 
