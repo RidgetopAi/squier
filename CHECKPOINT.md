@@ -55,12 +55,13 @@ Commit: 996d7e5
   - **Review Instance**: 3
   - **Completed by**: Instance 5 | Commit: 3b052f7
 
-- [ ] **TASK-M3**: Wire entity name resolution to Beliefs
+- [x] **TASK-M3**: Wire entity name resolution to Beliefs
   - **File**: `src/services/beliefs.ts:672-673`
   - **Issue**: relatedEntityId: undefined with TODO comment
   - **Fix**: Add entity resolution when belief_type is about_person or about_project
   - **Impact**: Beliefs about people/projects don't link to entity records
   - **Review Instance**: 3
+  - **Completed by**: Instance 6 | Commit: d489d03
 
 - [ ] **TASK-M4**: Fix schema comment mismatch on embedding dimension
   - **File**: `schema/018_commitments.sql:91`
@@ -188,6 +189,7 @@ When ALL tasks checked AND ALL validation passes:
 | 3 | TASK-H1 + TASK-H2: Consolidate prompts & add tool instructions to REST | Complete | Created src/constants/prompts.ts, updated both chat.ts and handlers.ts, deployed |
 | 4 | TASK-M1: Add entity_name to create_note | Complete | Added entity_name param with searchEntities resolution, deployed to VPS |
 | 5 | TASK-M2: Add embedding similarity to findSimilarBelief | Complete | Added schema migration 033, embedding generation in createBelief, similarity search in findSimilarBelief |
+| 6 | TASK-M3: Wire entity name resolution to Beliefs | Complete | Added resolveEntityName helper, import searchEntities, wire entity resolution for about_person/about_project beliefs |
 
 ---
 
