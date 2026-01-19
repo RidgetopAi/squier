@@ -88,4 +88,4 @@ COMMENT ON COLUMN commitments.rrule IS 'RFC 5545 RRULE for recurrence (e.g., FRE
 COMMENT ON COLUMN commitments.parent_commitment_id IS 'For recurring: links instance to parent template';
 COMMENT ON COLUMN commitments.resolution_memory_id IS 'Memory that resolved this commitment (e.g., "I finished X")';
 COMMENT ON COLUMN commitments.google_sync_status IS 'Sync state: local_only, synced, pending_push, pending_pull, conflict';
-COMMENT ON COLUMN commitments.embedding IS '384-dim vector for semantic similarity in resolution matching';
+COMMENT ON COLUMN commitments.embedding IS '768-dim vector for semantic similarity in resolution matching';
