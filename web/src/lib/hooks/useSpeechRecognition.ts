@@ -37,8 +37,10 @@ export interface UseSpeechRecognitionOptions {
   continuous?: boolean;
   interimResults?: boolean;
   lang?: string;
+  timeoutMs?: number;
   onResult?: (transcript: string, isFinal: boolean) => void;
   onError?: (error: string) => void;
+  onTimeout?: () => void;
 }
 
 export interface UseSpeechRecognitionReturn {
@@ -59,8 +61,10 @@ export function useSpeechRecognition(
     continuous = false,
     interimResults = true,
     lang = 'en-US',
+    timeoutMs,
     onResult,
     onError,
+    onTimeout,
   } = options;
 
   const [isListening, setIsListening] = useState(false);
@@ -70,6 +74,7 @@ export function useSpeechRecognition(
   const [error, setError] = useState<string | null>(null);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Check for browser support
   useEffect(() => {
@@ -146,17 +151,37 @@ export function useSpeechRecognition(
     setError(null);
     setInterimTranscript('');
 
+    // Set up timeout if configured
+    if (timeoutMs && timeoutMs > 0) {
+      timeoutRef.current = setTimeout(() => {
+        if (recognitionRef.current) {
+          recognitionRef.current.stop();
+          onTimeout?.();
+        }
+      }, timeoutMs);
+    }
+
     try {
       recognition.start();
     } catch (err) {
       // Handle if already started
       console.error('Speech recognition start error:', err);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     }
-  }, [isListening]);
+  }, [isListening, timeoutMs, onTimeout]);
 
   const stopListening = useCallback(() => {
     const recognition = recognitionRef.current;
     if (!recognition || !isListening) return;
+
+    // Clear timeout when manually stopped
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
 
     recognition.stop();
   }, [isListening]);

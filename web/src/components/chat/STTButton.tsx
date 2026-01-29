@@ -20,8 +20,9 @@ export function STTButton({ onTranscript, disabled = false }: STTButtonProps) {
     stopListening,
     resetTranscript,
   } = useSpeechRecognition({
-    continuous: false,
+    continuous: true,
     interimResults: true,
+    timeoutMs: 60000,
   });
 
   // When we get a final transcript, send it to the parent
