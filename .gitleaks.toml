@@ -1,0 +1,118 @@
+# =============================================================================
+# .gitleaks.toml — secret-leak gate config for squire (Squire agent + CLI)
+# =============================================================================
+# Used by hooks/pre-commit (`gitleaks protect --staged`; enable once per clone with
+# `git config core.hooksPath hooks`). Same posture as ra-mandrel / ridgetopai:
+#   - FAIL CLOSED: any real-secret shape in staged changes blocks the commit.
+#   - LOW NOISE: only confirmed noise is allowlisted, by enumerated literal or by a
+#     declared placeholder surface, each with a one-line reason. Never by secret SHAPE.
+# Added 2026-09-08 (task 97b29937): before this, squire had no gitleaks config and no
+# hooksPath (the AgentMail key config lives in src/config/master.ts) — it sat outside every secret gate (Tesla 86f5887a E4).
+# =============================================================================
+
+[extend]
+useDefault = true
+
+# =============================================================================
+# ADDED RULES — credential-shaped literals (SHARED with ra-mandrel, 2026-09-08)
+# =============================================================================
+# SOURCE OF TRUTH: ra-mandrel/.gitleaks.toml, section "ADDED RULES". The four rule
+# bodies below (id / regex / secretGroup / keywords / path) are byte-identical copies
+# of that file's, taken 2026-09-08 (Tesla record 86f5887a item 2, task 97b29937);
+# only the [rules.allowlist] tables are THIS repo's. When ra-mandrel's rules change,
+# re-copy the bodies — do not hand-edit a regex here. The measured history that
+# justifies each rule (the 2026-07-27 stopword miss, the 2026-09-08 SQL-literal miss
+# on commit 8cb7b7e6) lives in the source file's comments; it is not repeated here.
+#
+# WHAT THEY CATCH: `NAME=<literal>` where NAME ends in PASSWORD/PASSWD/SECRET/TOKEN/
+# API_KEY/PRIVATE_KEY/AUTH (or is *_PASS/*_PWD/*_PW), the same as a YAML mapping key,
+# a SQL `PASSWORD '<literal>'`, and a `scheme://user:pass@` URI. `$VAR`, `${VAR}`,
+# `<placeholder>`, `{{tpl}}`, SCREAMING_SNAKE placeholders and `changeme` are not
+# literals and do not match, nor do the redaction markers `***REDACTED***` / `[REDACTED …]`
+# (a literal may not begin with `* [ ] (`). `DUMMY_*` and `throwaway_*` ARE literals and DO match —
+# on purpose; a committable fixture is written disarmed, never exempted by prefix.
+#
+# ALLOWLIST FORM: regexTarget = "match" (version-independent across gitleaks 8.16 /
+# 8.18 / 8.30 — see the source file). DENY BY DEFAULT: each exception is an
+# enumerated literal or a declared placeholder surface with a one-line reason.
+# =============================================================================
+
+[[rules]]
+id = "mandrel-credential-env-assignment"
+description = "Credential-shaped ENV assignment with a bare literal value (DATABASE_PASSWORD=…, *_SECRET=…, *_TOKEN=…, *_API_KEY=…)"
+regex = '''(?:^|[\s'"({;&|=])(?:[A-Z][A-Z0-9_]*(?:PASSWORD|PASSWD|SECRET|TOKEN|API_?KEY|PRIVATE_KEY|AUTH)|(?:[A-Z][A-Z0-9_]*_)?(?:PASS|PWD|PW))=["']?([^\s"'`$<>{}[\]()*,;\\]{6,200})'''
+secretGroup = 1
+keywords = ["password","passwd","secret","token","apikey","api_key","pass","pwd","_pw","private_key","auth"]
+
+  [rules.allowlist]
+  description = "credential-shaped env literals triaged as placeholders / fixtures (squire, 2026-09-08)"
+  regexTarget = "match"
+  paths = [
+    '''\.example$''',   # .env.example: key NAMES with your-*-here values
+  ]
+  regexes = [
+    '''(?i)=['"]?(your|my)[-_.]''',            # docs/SQUIRE-CLI-USER-MANUAL.md GROQ_API_KEY=your_…
+    '''=['"]?\*{3}REDACTED\*{3}['"]?$''',
+  ]
+
+[[rules]]
+id = "mandrel-credential-mapping-key"
+description = "Credential-shaped UPPER_SNAKE mapping key with a literal value (docker-compose `environment:`, systemd-style YAML)"
+regex = '''(?m)^[ \t-]*(?:[A-Z][A-Z0-9_]*(?:PASSWORD|PASSWD|SECRET|TOKEN|API_?KEY|PRIVATE_KEY|AUTH)|(?:[A-Z][A-Z0-9_]*_)?(?:PASS|PWD|PW)):[ \t]+["']?([^\s"'`$<>{},;#]{6,200})'''
+secretGroup = 1
+path = '''(?i)\.ya?ml$'''
+keywords = ["password","passwd","secret","token","apikey","api_key","pass","pwd","private_key","auth"]
+
+  [rules.allowlist]
+  description = "compose/YAML mapping literals triaged as published dev defaults (squire, 2026-09-08)"
+  regexTarget = "match"
+  regexes = [
+    # docker-compose.yml LOCAL dev stack — the file itself says "do NOT use this
+    # compose's creds anywhere else"; both are published dev defaults, enumerated exactly.
+    '''(?i):[ \t]*squire_dev\b''',
+    '''(?i):[ \t]*minio_dev_password\b''',
+    # HISTORY-ONLY: the same compose default before the squier->squire rename
+    # (commit 998173b); not in the worktree. One exact literal, so a history-aware
+    # scan is not permanently RED on a dead dev default.
+    '''(?i):[ \t]*squier_dev\b''',
+  ]
+
+[[rules]]
+id = "mandrel-credential-sql-password"
+description = "SQL role password literal (CREATE/ALTER ROLE|USER … PASSWORD '…') — the 8cb7b7e6 carrier"
+regex = '''(?i)\b(?:PASSWORD|PASSWD)\s+['"]([^'"$<{ ][^'" ]{11,199})['"]'''
+secretGroup = 1
+keywords = ["password","passwd"]
+
+  [rules.allowlist]
+  description = "SQL password literals that are provably not secrets (squire, 2026-09-08)"
+  regexTarget = "match"
+  paths = [
+    '''\.example$''',
+  ]
+  regexes = [
+    '''\*{3}REDACTED\*{3}''',
+    # Documentation placeholders (parity with the JS detector, Inspector 72129bb7 F1).
+    '''(?i)^['"]?(?:your|my)-''',
+    '''['"][A-Z]+(?:_[A-Z]+)+['"]''',
+    '''(?i)['"]changeme['"]''',
+  ]
+
+[[rules]]
+id = "mandrel-credential-in-uri"
+description = "Credential embedded in a connection URI (postgres://user:pass@…, mysql://, redis://, mongodb://, amqp://)"
+regex = '''(?i)\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp|ftp)://[^\s:/@'"]{1,64}:([^\s:/@'"]{3,200})@'''
+secretGroup = 1
+keywords = ["postgres://","postgresql://","mysql://","mongodb://","redis://","amqp://","ftp://"]
+
+  [rules.allowlist]
+  description = "connection-URI literals triaged as documentation / local-test placeholders (squire, 2026-09-08)"
+  regexTarget = "match"
+  paths = [
+    '''\.example$''',   # .env.example DATABASE_URL sample
+  ]
+  regexes = [
+    '''(?i)://user:pass@''',                      # docs/SQUIRE-CLI-USER-MANUAL.md canonical placeholder
+    '''(?i)://test:test@''',                      # tests/*.test.ts + README/docs: the local test DB
+    '''(?i)://squire:squire_dev@''',               # the compose dev default above, in URI form
+  ]
