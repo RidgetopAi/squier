@@ -28,7 +28,8 @@ useDefault = true
 # API_KEY/PRIVATE_KEY/AUTH (or is *_PASS/*_PWD/*_PW), the same as a YAML mapping key,
 # a SQL `PASSWORD '<literal>'`, and a `scheme://user:pass@` URI. `$VAR`, `${VAR}`,
 # `<placeholder>`, `{{tpl}}`, SCREAMING_SNAKE placeholders and `changeme` are not
-# literals and do not match. `DUMMY_*` and `throwaway_*` ARE literals and DO match —
+# literals and do not match, nor do the redaction markers `***REDACTED***` / `[REDACTED …]`
+# (a literal may not begin with `* [ ] (`). `DUMMY_*` and `throwaway_*` ARE literals and DO match —
 # on purpose; a committable fixture is written disarmed, never exempted by prefix.
 #
 # ALLOWLIST FORM: regexTarget = "match" (version-independent across gitleaks 8.16 /
@@ -39,7 +40,7 @@ useDefault = true
 [[rules]]
 id = "mandrel-credential-env-assignment"
 description = "Credential-shaped ENV assignment with a bare literal value (DATABASE_PASSWORD=…, *_SECRET=…, *_TOKEN=…, *_API_KEY=…)"
-regex = '''(?:^|[\s'"({;&|=])(?:[A-Z][A-Z0-9_]*(?:PASSWORD|PASSWD|SECRET|TOKEN|API_?KEY|PRIVATE_KEY|AUTH)|(?:[A-Z][A-Z0-9_]*_)?(?:PASS|PWD|PW))=["']?([^\s"'`$<>{},;)\\]{6,200})'''
+regex = '''(?:^|[\s'"({;&|=])(?:[A-Z][A-Z0-9_]*(?:PASSWORD|PASSWD|SECRET|TOKEN|API_?KEY|PRIVATE_KEY|AUTH)|(?:[A-Z][A-Z0-9_]*_)?(?:PASS|PWD|PW))=["']?([^\s"'`$<>{}[\]()*,;\\]{6,200})'''
 secretGroup = 1
 keywords = ["password","passwd","secret","token","apikey","api_key","pass","pwd","_pw","private_key","auth"]
 
