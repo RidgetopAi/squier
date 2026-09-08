@@ -80,7 +80,7 @@ keywords = ["password","passwd","secret","token","apikey","api_key","pass","pwd"
 [[rules]]
 id = "mandrel-credential-sql-password"
 description = "SQL role password literal (CREATE/ALTER ROLE|USER … PASSWORD '…') — the 8cb7b7e6 carrier"
-regex = '''(?i)\b(?:PASSWORD|PASSWD)\s+['"]([^'"$<{][^'"]{11,199})['"]'''
+regex = '''(?i)\b(?:PASSWORD|PASSWD)\s+['"]([^'"$<{ ][^'" ]{11,199})['"]'''
 secretGroup = 1
 keywords = ["password","passwd"]
 
@@ -92,6 +92,8 @@ keywords = ["password","passwd"]
   ]
   regexes = [
     '''\*{3}REDACTED\*{3}''',
+    # Documentation placeholders (parity with the JS detector, Inspector 72129bb7 F1).
+    '''(?i)^['"]?(?:your|my)-''',
     '''['"][A-Z]+(?:_[A-Z]+)+['"]''',
     '''(?i)['"]changeme['"]''',
   ]
